@@ -183,6 +183,7 @@ export function PdfReader() {
     }, [doc])
 
     const toggleChrome = useCallback(() => {
+        stopSearch()
         chromeRef.current = !chromeRef.current
         setChrome(chromeRef.current)
         if (!chromeRef.current) { setPanelOpen(false); setSheetOpen(false); setExportOpen(false) }
@@ -512,7 +513,6 @@ export function PdfReader() {
                     onGoCFI={cfi => {
                         setPanelOpen(false)
                         goTo(cfi)
-                        setTimeout(() => stopSearch(), 2000)
                     }}
                     onEditNote={() => {}}
                     onRemoveAnnotation={() => {}}
