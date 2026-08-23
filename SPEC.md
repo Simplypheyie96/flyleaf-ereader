@@ -1119,7 +1119,7 @@ project            Flyleaf eReader        (id: flyleaf-ereader, no organisation)
 client             Flyleaf eReader web    (type: Web application)
 client id          1093925806507-geheiusfcb8belpi6bdpl6p8afi74g99.apps.googleusercontent.com
 created            23 Aug 2026 16:30 GMT+1 · status Enabled
-consent screen     "Flyleaf eReader" · External · Testing · 1 test user (cap 100)
+consent screen     "Flyleaf eReader" · External · In production · published 23 Aug 2026
 scopes             .../auth/drive.appdata · .../auth/userinfo.email — both non-sensitive
 ```
 
@@ -1147,33 +1147,56 @@ the sensitive and restricted tables empty. An earlier version of this document a
 `drive.appdata` was sensitive and that a published app would therefore need Google's verification
 review. It is not, and the assumption is corrected here rather than quietly deleted.
 
-The consent screen is in **Testing**, audience **External**, with `ajayifey@gmail.com` as its one
-test user. Testing is not a limitation to fix: it means the owner's own account, and any address
-listed as a test user, signs in without going near a review. Publishing is a Google review, not a
-switch, and it is a question for the day this is offered to other people.
+The consent screen is **In production**, audience **External**. It was in Testing with
+`ajayifey@gmail.com` as its one test user until 23 Aug 2026, and the owner's reason for changing
+that is worth keeping verbatim: *"i am not a tester but a user, so i want this to work normally."*
+Testing works for a listed address, but it puts Google's *"Google hasn't verified this app"*
+interstitial in front of every sign-in, and it makes the reader an entry in an allowlist. Neither
+belongs in front of someone opening their own books.
 
-**The Console shows one warning, and it is about publishing, not about this working.** The Audience
-page reports *"Your app's OAuth configuration is incomplete. You must enter the missing information
-to proceed. Please visit the Branding page to finish configuring your app."* The Branding page was
-read field by field after a hard reload, and **nothing on it is required and empty**: app name
-*Flyleaf eReader*, user support email and developer contact `ajayifey@gmail.com`, authorised domains
-`flyleaf.cc` and `flyleaf-ereader.vercel.app`, all saved. What is empty is the **application home
-page, privacy policy and Terms of Service links**, which Google marks optional on that form and
-wants before an External app can be **published** — and the same page states plainly *"Verification
-is not required since your app is in testing status."* Pressing Save did not clear the warning,
-which is consistent with that reading: it is a publishing prerequisite, not a broken client.
+**Publishing was not a Google review.** An earlier version of this document assumed it was. It is
+not, on three specific conditions that this app meets and that the confirmation dialog itself
+states: *"If your app's configuration has more than 10 domains, has a logo or requests sensitive or
+restricted scopes, you will need to submit for verification."* This app has **2** authorised
+domains, **no logo**, and both its scopes are in the **non-sensitive** table with sensitive and
+restricted empty. So publishing was a switch after all — but only because of those three facts, and
+each of them is now a thing that must not change casually:
 
-So it is left, deliberately. Clearing it means writing a public privacy policy and a Terms of
-Service and hosting both, which is a decision about offering this app to other people, not a
-configuration step. Nothing measured is blocked by it: the client is Enabled, both scopes are
-registered, all four origins are live, and the app is in Testing with the owner as its test user,
-which is the state that works today.
+- **Never upload a logo.** The Branding page says so in as many words: uploading one means
+  submitting for verification unless the app stays in Testing. The launch lockup lives in the app;
+  it does not need to live on Google's consent screen.
+- **Never add a sensitive or restricted scope** without accepting that a review comes with it.
+  `drive.appdata` is deliberately the narrowest Drive scope there is.
+- **Keep the authorised-domain list short.** Two is the whole list, and both are real.
 
-**Flyleaf Press, for the record, is a different case.** Its own project reads **In production**,
-audience External, 0 users of a 100 cap — so Press is published and any Google account can grant it
-access, while this app is in Testing and only listed test users can. Worth knowing before assuming
-the two behave alike. Press's own home page and privacy policy fields are empty too; it was
-published before Google asked for them, and nothing in this repo touches Press's project.
+**What publishing did require was the two documents Google gates it on** — an application privacy
+policy link and a Terms of Service link. Those were the Console's one standing warning, reported as
+*"Your app's OAuth configuration is incomplete… Please visit the Branding page."* Nothing on that
+form was required-and-empty; those two optional-looking fields were the block. They are now real
+pages in this app rather than a hosted afterthought:
+
+| Branding field | Value |
+|---|---|
+| Application home page | `https://read.flyleaf.cc` |
+| Application privacy policy link | `https://read.flyleaf.cc/privacy` |
+| Application Terms of Service link | `https://read.flyleaf.cc/terms` |
+
+They are **routes in the app** (`app/src/pages/Legal.tsx`, linked from Settings) because
+`read.flyleaf.cc` *is* the app, and a policy on a separate host would be one more thing to keep
+true. Every claim on both pages was checked against the code before it was written — the four hosts
+the app can ever reach, no analytics, appDataFolder only — so if any of that changes, those pages
+change with it. Verified after the branding save persisted across a hard reload, and after the
+publish: status **In production**, the *Test users* section gone, *Publish app* replaced by *Back to
+testing*.
+
+**Flyleaf Press reads In production too**, audience External, 0 users of a 100 cap — so the two now
+behave alike where they did not before. Press's own home page and privacy policy fields are still
+empty; it was published before Google asked for them, and nothing in this repo touches Press's
+project.
+
+**One thing publishing does not change: the two apps still cannot see each other's files.**
+`appDataFolder` is scoped to the OAuth *client*, and these are two different clients in two
+different projects. Publishing changes who may grant access, not what the grant reaches.
 
 #### How the failure used to lie
 
@@ -1322,8 +1345,9 @@ One of them still holds and the other does not, so both are set down straight:
   profile, which is not a thing to do to an account.
 - **No longer true.** *"So the Console clicks are the owner's."* They were not. The **Playwright MCP
   extension** drives the already-signed-in session in the owner's own browser, and the whole of step
-  2 — project, consent screen, audience, test user, scopes, client, four origins — was done that
-  way on 23 Aug 2026 at the owner's explicit and repeated request. **Signing in** is still not
+  2 — project, consent screen, audience, test user, scopes, client, four origins, and later the
+  branding URLs and the publish itself — was done that way on 23 Aug 2026 at the owner's explicit
+  and repeated request. **Signing in** is still not
   something this tooling does; **using a session the owner has already signed in to** is a different
   act, and the earlier text conflated them.
 
@@ -1372,8 +1396,13 @@ Done once already, and written out so it needs no rediscovering.
    developer contact `ajayifey@gmail.com`, audience **External**. This step agrees to Google's API
    Services User Data Policy; it is an inherent part of registering, and it was declared before it
    was ticked.
-4. **Audience → Test users → Add users.** Add the owner's address. External + Testing means only
-   listed test users can connect, cap 100.
+4. **Audience.** A new External app starts in *Testing*, where only listed test users can connect
+   and every sign-in carries Google's *"hasn't verified this app"* interstitial. Add the owner's
+   address as a test user to get moving, then **Publish app → Confirm** once the Branding page has
+   an application home page, a privacy policy link and a Terms of Service link — see the three
+   conditions above that keep publishing a switch rather than a review. Publishing before those
+   three URLs exist is not possible; the Console's *"OAuth configuration is incomplete"* warning
+   is that gate, not a broken client.
 5. **Data access → Add or remove scopes.** `.../auth/drive.appdata` — a hidden folder, *not* the
    reader's Drive, which we cannot see outside of — and `.../auth/userinfo.email`, only so the panel
    can name the account. Nothing else.
