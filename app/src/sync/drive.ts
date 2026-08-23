@@ -32,6 +32,27 @@
 const FILES = 'https://www.googleapis.com/drive/v3/files'
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files'
 
+/* WHOSE FILE IS THIS. Written onto every file this app creates, and the reason
+   it has to exist:
+
+   `appDataFolder` is per-OAuth-client, not per-app, and this app deliberately
+   SHARES its client with Flyleaf Press so the two need one consent screen
+   between them (SPEC.md § 15.1). One client means ONE hidden folder, and both
+   apps are in it — Press's `library.json` beside this app's `shelf.json`,
+   `marks.json`, `place.json` and one `book-<fp>` per backed-up book.
+
+   Reading and writing were always safe: every name is distinct and every
+   access is an exact-name lookup, so neither app can parse or overwrite the
+   other's documents. DELETING was not. `dropAll` used to take everything in
+   the folder — see the note on it — which meant this app's "remove the copy
+   from my Drive" quietly took Press's backup with it.
+
+   The tag is the durable half of the fix: a file carrying another app's tag is
+   never ours to delete, whatever it is called, so renaming a document later
+   cannot reintroduce the bug. The name list in `record.ts` is the bridge for
+   files written before the tag existed. */
+export const APP = 'ereader'
+
 export interface DriveFile {
   id: string
   name: string
@@ -43,6 +64,10 @@ export interface DriveFile {
       answered by the one listing call a sync already makes, instead of by
       downloading the record to render a sentence. */
   device?: string
+  /** Which Flyleaf app wrote it. See `APP` below — this is what keeps the two
+      apps' documents apart in a folder they share. Absent on a file written
+      before the tag existed. */
+  app?: string
 }
 
 interface RawFile {
@@ -62,6 +87,7 @@ function unpack(file: RawFile): DriveFile {
     modifiedTime: file.modifiedTime,
     size: file.size === undefined ? undefined : Number(file.size),
     device: file.appProperties?.device,
+    app: file.appProperties?.app,
   }
 }
 
@@ -120,8 +146,17 @@ async function ask(token: string, url: string, init?: RequestInit): Promise<Resp
     lookups, and Drive is happy to describe the whole folder in one call. The
     page size is the ceiling on how many books can be backed up in one pass and
     is named in `record.ts` where it matters. */
-export async function listFolder(token: string): Promise<Map<string, DriveFile>> {
-  const found = new Map<string, DriveFile>()
+/** Every row in the folder, in the order Drive gives them and WITHOUT
+    collapsing duplicate names.
+
+    Split out of `listFolder` because the two callers want opposite things from
+    a duplicate. Reading wants one file per name — the newest, see below.
+    Deleting wants all of them: the whole point of the delete is that a
+    half-written upload cannot be left behind claiming to be a backup, and a
+    deduped listing hands back exactly one of the two and silently strands the
+    other. */
+async function everything(token: string): Promise<DriveFile[]> {
+  const rows: DriveFile[] = []
   let pageToken = ''
   do {
     const url =
@@ -132,16 +167,21 @@ export async function listFolder(token: string): Promise<Map<string, DriveFile>>
       files?: RawFile[]
       nextPageToken?: string
     }
-    for (const file of body.files ?? []) {
-      /* Newest wins on a duplicate name. Drive allows two files with the same
-         name in one folder, and a half-written upload that was retried is
-         exactly how that happens. */
-      const row = unpack(file)
-      const held = found.get(row.name)
-      if (!held || held.modifiedTime < row.modifiedTime) found.set(row.name, row)
-    }
+    for (const file of body.files ?? []) rows.push(unpack(file))
     pageToken = body.nextPageToken ?? ''
   } while (pageToken)
+  return rows
+}
+
+export async function listFolder(token: string): Promise<Map<string, DriveFile>> {
+  const found = new Map<string, DriveFile>()
+  for (const row of await everything(token)) {
+    /* Newest wins on a duplicate name. Drive allows two files with the same
+       name in one folder, and a half-written upload that was retried is
+       exactly how that happens. */
+    const held = found.get(row.name)
+    if (!held || held.modifiedTime < row.modifiedTime) found.set(row.name, row)
+  }
   return found
 }
 
@@ -172,8 +212,8 @@ export async function write(
      somebody's own documents. A file cannot be re-parented on update, so that
      goes on the create only. */
   const meta = id
-    ? { appProperties: { device } }
-    : { name, parents: ['appDataFolder'], appProperties: { device } }
+    ? { appProperties: { device, app: APP } }
+    : { name, parents: ['appDataFolder'], appProperties: { device, app: APP } }
 
   const boundary = `flyleaf-${crypto.randomUUID()}`
   const head =
@@ -201,9 +241,9 @@ export async function remove(token: string, id: string): Promise<void> {
   await ask(token, `${FILES}/${id}`, { method: 'DELETE' })
 }
 
-/** Take the library back out of Drive — every file in the folder, not just the
-    ones we expect, so an old name or a half-written upload cannot be left
-    behind claiming to be a backup.
+/** Take the library back out of Drive — every file in the folder THIS APP
+    wrote, including duplicates and names it no longer uses, so a half-written
+    upload cannot be left behind claiming to be a backup.
 
     This exists because it could not be done by hand. `appDataFolder` is hidden
     — that is the point of it, and it is why this app can sync without leaving
@@ -212,19 +252,45 @@ export async function remove(token: string, id: string): Promise<void> {
     library somewhere has to be able to take it away again, from inside itself,
     in one press.
 
+    IT USED TO TAKE EVERYTHING IN THE FOLDER, and the comment here argued for
+    that: a stray name cannot be left behind if nothing is left behind. Sound
+    reasoning about a folder of our own, and wrong about this one. The folder is
+    per-OAuth-client, this app shares its client with Flyleaf Press on purpose
+    (`APP` above, SPEC.md § 15.1), and Press's `library.json` is in there beside
+    ours. So "remove the copy from my Drive" in a reading app silently deleted
+    the cloud backup of a different product — one press, no warning, and the
+    reassurance printed afterwards ("Your library here is untouched") was true
+    of this app and false of the other one.
+
+    `mine` decides ownership, and it is passed in rather than written here
+    because `record.ts` owns the names. It answers yes on our tag, and on the
+    names we used before the tag existed. Anything else — tagged as another
+    app's, or a name neither of us knows — is left alone. Leaving a stranger's
+    file behind is a much smaller failure than deleting it.
+
     The library on the device is untouched. This deletes the copy. */
-export async function dropAll(token: string): Promise<number> {
-  const found = await listFolder(token)
+export async function dropAll(
+  token: string,
+  mine: (file: DriveFile) => boolean,
+): Promise<number> {
   let gone = 0
-  for (const file of found.values()) {
+  for (const file of await everything(token)) {
+    if (!mine(file)) continue
     await remove(token, file.id)
     gone += 1
   }
   return gone
 }
 
-/** How much of the reader's own Drive quota the backup is using, and how much
-    of it is left. Both in bytes; `limit` is null on an account with none.
+/** How full the reader's Drive is, and how big it is. Both in bytes; `limit`
+    is null on an account with none.
+
+    This is WHOLE-ACCOUNT usage, not this app's share of it — every document,
+    photograph and mail attachment is in it, and so is Flyleaf Press's backup,
+    since the two apps share one hidden folder (see the note on `APP`). There
+    is no per-app figure to be had, and subtracting one from the other would be
+    guesswork. So the panel says "used in your Drive", which is what the number
+    is, and never "used by your books", which it is not.
 
     Worth a call of its own because the book files are opt-in and this is the
     number that decision turns on. "Books take space in your Drive" is an

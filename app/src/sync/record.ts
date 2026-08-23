@@ -28,6 +28,7 @@
    See `Grave` in types.ts. */
 
 import { db } from '../db'
+import { APP } from './drive'
 import type { Annotation, Book, Bookmark, Collection, Grave, Locator, ReadingDay } from '../types'
 
 /** Bumped only if a shape changes in a way an older build could not read. */
@@ -490,8 +491,40 @@ async function foldDays(
 
 const MAGIC = 'FLYLEAF-BOOK-1\n'
 
+const BOOK_PREFIX = 'book-'
+
 export function bookFileName(fp: string): string {
-  return `book-${fp}`
+  return `${BOOK_PREFIX}${fp}`
+}
+
+/** Is this file ours to delete?
+
+    The hidden Drive folder is shared with Flyleaf Press — one OAuth client, one
+    consent screen, one `appDataFolder` (SPEC.md § 15.1) — so "remove my backup"
+    has to be able to tell our files from a sibling's. Two ways, and it needs
+    both:
+
+      · THE TAG is the durable one. Every file written from this app now carries
+        `appProperties.app = 'ereader'`, so a document renamed in some later
+        version is still recognisably ours and a file tagged as another app's is
+        never touched, whatever it is called.
+
+      · THE NAMES are the bridge. A backup made before the tag existed carries
+        no tag at all, and it is still ours and should still go. Our four shapes
+        are the three record documents and one `book-<fingerprint>` per book.
+
+    Anything that is neither — Press's `library.json`, or a name from an app
+    that does not exist yet — is left where it is. Stranding a stranger's file
+    costs a few kilobytes of somebody's Drive quota. Deleting it costs them
+    their backup. */
+export function ours(file: { name: string; app?: string }): boolean {
+  if (file.app) return file.app === APP
+  return (
+    file.name === SHELF ||
+    file.name === MARKS ||
+    file.name === PLACE ||
+    file.name.startsWith(BOOK_PREFIX)
+  )
 }
 
 interface BookHead {
