@@ -68,10 +68,13 @@ Locked. Do not re-litigate.
 ## Stack
 
 Vite · React 19 · TypeScript · React Router 7 · Dexie (IndexedDB) · `vite-plugin-pwa` (Workbox).
-Static deploy on Vercel as `flyleaf-ereader`, project root `app/`, live at **`read.flyleaf.cc`**
-(one Cloudflare CNAME still outstanding — `SPEC.md` § 16.1). No server, no database to provision,
-and one optional env var: `VITE_GOOGLE_CLIENT_ID`, unset, which is what keeps Drive sync hidden
-(`SPEC.md` § 15.1).
+Static deploy on Vercel as `flyleaf-ereader`, project root `app/`, live at
+**`https://read.flyleaf.cc`** — DNS in, certificate issued (`SPEC.md` § 16.1). Source at
+`github.com/Simplypheyie96/flyleaf-ereader`, private, like both siblings. No server, no database to
+provision, and one optional env var: `VITE_GOOGLE_CLIENT_ID`, now **set** locally and in all three
+Vercel environments, so the Drive panel is visible. The one step left is the owner's: adding this
+app's origins to the OAuth client in Google Cloud Console, without which Connect fails with
+`origin_mismatch` (`SPEC.md` § 15.1).
 Same shape as Press deliberately — one less thing to hold in your head when moving between them.
 
 ### The engine

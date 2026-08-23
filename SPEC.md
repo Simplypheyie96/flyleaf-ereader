@@ -928,25 +928,40 @@ a network to work"* stays true: the reader who never connects is not an unsynced
 a reader we have no record of at all. Nothing signs in on their behalf, nothing nags, and there is
 no wall. Connecting changes **where the library is copied to**. It does not change what the app is.
 
-### 15.1 Why it is invisible right now
+### 15.1 Visible now, and the one step left
 
-`SYNC_AVAILABLE` in `src/sync/google.ts` is simply `CLIENT_ID.length > 0`, and `SyncPanel` returns
-`null` when it is false. `app/.env.example` leaves `VITE_GOOGLE_CLIENT_ID` **commented out**, so
-every local build and the deploy have it unset and the whole panel hides itself.
+`SYNC_AVAILABLE` in `src/sync/google.ts` is `CLIENT_ID.length > 0`, and `SyncPanel` returns `null`
+when it is false. For a long while it was false everywhere: the ID was commented out in
+`app/.env.example`, unset locally and unset on the deploy, so the panel hid itself and the owner
+asked *"where is google sync?"* three times running. Hiding a shipped feature is not an answer to
+that question, so the ID is now set in `app/.env.local` and in the Vercel project across all three
+environments, and the panel renders — measured on the live site at `read.flyleaf.cc/settings`.
 
-That is deliberate, not an oversight. Google's browser token flow has no client secret; the only
-thing standing between that ID and any other site is the OAuth client's **Authorized JavaScript
-origins** list, and this app's origins are not on it yet. A committed live ID would ship a Connect
-button that fails with `origin_mismatch` every time it is pressed, and a visible button that always
-fails is worse than no button.
+The ID is **public by design** and safe in a repo, a bundle and an env var; there is nothing in it
+to rotate or leak. Google's browser token flow has no client secret, so the only thing standing
+between that ID and any other site is the OAuth client's **Authorized JavaScript origins** list.
 
-**Two steps, both only doable by whoever owns the OAuth client, and neither doable from here:**
+**That list is the one step left, and it is the owner's alone** — it lives in Google Cloud Console
+and cannot be reached from here. Add all four:
 
-1. In Google Cloud Console, add this app's origins to that client's Authorized JavaScript origins:
-   `http://localhost:5173`, `http://localhost:4173`, the Vercel production domain, and the
-   `flyleaf.cc` subdomain.
-2. Set `VITE_GOOGLE_CLIENT_ID` in the Vercel project, all environments, and redeploy — it is a
-   build-time `import.meta.env` value, so an existing deploy will not pick it up.
+```
+http://localhost:5173      http://localhost:4173
+https://read.flyleaf.cc    https://flyleaf-ereader.vercel.app
+```
+
+Until they are added, pressing Connect fails. **Measured**, not assumed: driving the real button at
+`localhost:4173` opens Google's own error page at
+`accounts.google.com/signin/oauth/error?authError=…`, which decodes to `origin_mismatch` —
+*"You can't sign in to this app because it doesn't comply with Google's OAuth 2.0 policy. If you're
+the app developer, register the…"*.
+
+**And that failure used to lie.** `origin_mismatch` reaches the SDK as `popup_closed`, because
+Google paints its error page in the popup and all the SDK sees is the window going away. So the
+panel said *"Sign-in was closed before it finished"* — blaming the reader for a console setting.
+The two are now told apart by the clock: a person deciding to close a window takes at least a
+second or two, while the error page is reported back almost immediately, so under **1200ms** the
+message instead names the cause and the exact origin — *"Google turned this away:
+https://read.flyleaf.cc is not an authorised origin on the sync app's Google credentials."*
 
 The ID itself is **public by design** and safe in a repo, a bundle and an env var; there is nothing
 in it to rotate or leak. It is the same client Flyleaf Press already uses, so both apps share one
@@ -1045,8 +1060,8 @@ exists for.
 
 ## 16. The deploy
 
-Same shape as Press, deliberately: a static build, no server, no env vars required, nothing to
-provision.
+Same shape as Press, deliberately: a static build, no server, nothing to provision, and one
+optional env var (`VITE_GOOGLE_CLIENT_ID`) that only decides whether the Drive panel appears.
 
 | | |
 |---|---|
@@ -1062,12 +1077,21 @@ because a client-routed SPA 404s on a deep link otherwise; `max-age=0, must-reva
 never update itself; and a year of `immutable` on `/assets/*`, which is safe precisely because Vite
 content-hashes those filenames.
 
-### 16.1 The one manual step left
+### 16.1 Done — the record is in and the certificate issued
 
-`flyleaf.cc` runs on Cloudflare nameservers, so Vercel cannot write the record itself. The domain is
-already attached and verified on the Vercel side — the apex was verified long ago by the `flyleaf`
-project, which is why the subdomain needed no TXT challenge. What is missing is one DNS record, in
-the Cloudflare dashboard:
+**`https://read.flyleaf.cc` is live.** The owner added the record, and it was added correctly:
+`read` → `8cb29bd68555802f.vercel-dns-017.com.`, grey cloud, with the A records resolving to
+Vercel's own `216.198.79.1` / `64.29.17.1` rather than into Cloudflare's space, which is how you
+can tell from the outside that it is not proxied. Vercel reports the domain `verified`,
+`misconfigured: false`, `configuredBy: CNAME`.
+
+There was a gap of some minutes where **HTTP served the app and HTTPS returned nothing** — TCP
+connected and the TLS handshake failed with `SSL_ERROR_SYSCALL`, which is what "no certificate at
+the edge yet" looks like rather than a misconfiguration. `vercel certs issue read.flyleaf.cc`
+settled it in 13 seconds. Worth keeping: a correct record plus a failing handshake is a waiting
+game, not a bug, and the fix is to ask for the certificate rather than to re-edit DNS.
+
+The record, for the record:
 
 ```
 Type    CNAME
@@ -1077,9 +1101,20 @@ Proxy   DNS only  (grey cloud — NOT proxied)
 ```
 
 **DNS only** matters. Proxying it puts Cloudflare's TLS in front of Vercel's, which breaks
-certificate issuance and gives a redirect loop. `press.flyleaf.cc` is set up exactly this way and
-resolves straight through to its own `vercel-dns-017` target — copy that record's settings and
-change the two values.
+certificate issuance and gives a redirect loop.
 
-Until that record exists, `read.flyleaf.cc` does not resolve and the build is only reachable at its
-protected `*.vercel.app` URL.
+#### What it took, kept for the next subdomain
+
+`flyleaf.cc` runs on Cloudflare nameservers, so Vercel could not write the record itself. The domain
+was already attached and verified on the Vercel side — the apex was verified long ago by the `flyleaf`
+project, which is why the subdomain needed no TXT challenge. What is missing is one DNS record, in
+the Cloudflare dashboard:
+
+`press.flyleaf.cc` is set up exactly this way and resolves straight through to its own
+`vercel-dns-017` target — copy that record's settings and change the two values.
+
+One trap on the Vercel side: `vercel domains inspect` lists the nameservers as Cloudflare's, with ✘
+marks against Vercel's intended ones. That is **expected** for a CNAME-configured subdomain, not an
+error to chase. And the project identifiers live in the **repo root** `.vercel/project.json`, not
+in `app/.vercel/` — the linked directory is the root, and guessing the team ID instead of reading it
+returns a flat `Not authorized`.
