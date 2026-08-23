@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c2e4f8"/>
+      <stop offset="1" stop-color="#e9f6fb"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#sky)"/>
+  <!-- THE SAME PATH AS src/brand/Wordmark.tsx, character for character. The only
+       difference is the scale on the group: a home-screen icon needs a margin
+       inside its tile that the in-app mark does not, and 0.78 about the centre
+       is that margin. Scaling rather than re-typing the coordinates is the
+       point — there is no second set of numbers to drift out of sync.
+
+       Ink and not white. This tile used to hold a pale sheet on a pale sky and
+       vanished at the 48px a home screen shrinks it to; the whole point of a
+       solid mark is that it survives there.
+
+       Change this and you must change Wordmark.tsx, leaf-icon-maskable.svg,
+       KeepIcon in src/components/TabIcons.tsx (the 24-unit original), and
+       re-render the PNGs beside this file. -->
+  <g transform="translate(256 256) scale(0.78) translate(-256 -256)">
+    <path fill="#1b2431"
+          d="M256 57.6 A74.67 59.73 -90 1 1 256 206.93 A74.67 59.73 -90 1 1 256 57.6 Z
+             M444.69 194.69 A74.67 59.73 -18 1 1 302.66 240.85
+             A74.67 59.73 -18 1 1 444.69 194.69 Z
+             M372.61 416.51 A74.67 59.73 54 1 1 284.84 295.68
+             A74.67 59.73 54 1 1 372.61 416.51 Z
+             M139.39 416.51 A74.67 59.73 126 1 1 227.16 295.68
+             A74.67 59.73 126 1 1 139.39 416.51 Z
+             M67.31 194.69 A74.67 59.73 198 1 1 209.34 240.85
+             A74.67 59.73 198 1 1 67.31 194.69 Z
+             M217.6 256 A38.4 38.4 0 1 1 294.4 256 A38.4 38.4 0 1 1 217.6 256 Z"/>
+  </g>
+</svg>

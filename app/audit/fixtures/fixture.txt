@@ -1,0 +1,915 @@
+THE PLAIN TEXT FIXTURE
+
+A Book For Measuring Things
+
+
+
+CHAPTER I
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+
+A verse, kept as it was set
+
+The line breaks here are mine,
+and not the pane's to spend;
+an engine that would tidy them
+has tidied off the end.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+
+
+
+CHAPTER II
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+
+A verse, kept as it was set
+
+The line breaks here are mine,
+and not the pane's to spend;
+an engine that would tidy them
+has tidied off the end.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+
+
+
+CHAPTER III
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+
+A verse, kept as it was set
+
+The line breaks here are mine,
+and not the pane's to spend;
+an engine that would tidy them
+has tidied off the end.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+
+
+
+CHAPTER IV
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+
+A verse, kept as it was set
+
+The line breaks here are mine,
+and not the pane's to spend;
+an engine that would tidy them
+has tidied off the end.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+
+
+
+CHAPTER V
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+
+A verse, kept as it was set
+
+The line breaks here are mine,
+and not the pane's to spend;
+an engine that would tidy them
+has tidied off the end.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+
+
+
+CHAPTER VI
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+
+A verse, kept as it was set
+
+The line breaks here are mine,
+and not the pane's to spend;
+an engine that would tidy them
+has tidied off the end.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
+It is a fact universally acknowledged among the makers of reading
+machines that a paragraph typed with a hard line ending at the
+seventieth column must be joined back into one flowing line before
+it is shown to anybody, for otherwise the column of type is set by
+the typist and not by the reader.
+
+The second matter is verse, which must not be joined at all, because
+in verse the line ending is the whole of the argument, and a machine
+that tidies it away has destroyed the thing it was asked to display.
+
+The third matter, and the one most often forgotten, is the heading:
+plain text has no markup, so a heading can only be recognised by how
+it is written, and a machine that guesses too eagerly will put a
+line of ordinary prose into the table of contents.
+
