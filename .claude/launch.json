@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flyleaf-ereader",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "5183", "--strictPort"],
+      "cwd": "app",
+      "port": 5183
+    }
+  ]
+}

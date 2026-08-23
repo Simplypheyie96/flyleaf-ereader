@@ -1,0 +1,14 @@
+node_modules
+dist
+.DS_Store
+*.local
+.vercel
+
+# Real env files never travel. The documented example does — the negation must
+# come last, or a later broad pattern silently re-excludes it.
+.env
+.env.*
+!.env.example
+
+# Scratch output from the Playwright MCP server, not part of the app.
+.playwright-mcp

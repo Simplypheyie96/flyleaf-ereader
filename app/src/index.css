@@ -1,0 +1,3304 @@
+/* ─────────────────────────────────────────────────────────────
+   Flyleaf eReader — app chrome.
+
+   Inherited from Flyleaf Press by instruction: NEUTRAL chrome, black
+   ink on paper. Every value in the first block below is Press's,
+   unchanged. What is new here is a second block — page stocks and
+   highlighter tints — which are new ROLES for Press's existing
+   values, not new colours. See DESIGN.md.
+
+   The governing rule: chrome is where the design lives; the reading
+   page is where it gets out of the way.
+   ───────────────────────────────────────────────────────────── */
+:root{
+  --paper:#F4F2ED;
+  /* chrome surfaces sit CLOSE to the paper — a step lighter, not stark white */
+  --card-w:#FAF8F3;
+  --ink:#1B1917;
+  --ink-soft:#6B655C;
+  --rule:#E0DBD1;
+  /* ── the accent, now MONO ───────────────────────────────────────────────
+     WITHDRAWN by the owner's instruction: "we have blue on some buttons and
+     tabs and black in others, just make it mono, like on flyleaf press, to
+     avoid things like this."
+
+     They are right, and the screenshot proves it: a black active tab pill sat
+     beside a blue circular import button, one row apart, both of them meaning
+     "this is the thing". Two colours for one role is not an accent, it is a
+     bug with a palette. Press has no chrome accent at all — its emphasis is
+     ink on paper and nothing else — and this app is Press's.
+
+     So --accent is no longer a colour. It is an ALIAS for the two values the
+     surface already has: --accent means --ink and --accent-fg means --paper.
+     That keeps all seventeen use sites intact and makes them all agree, in one
+     place, in every theme, forever — a theme that redefines --ink redefines
+     the accent with it, and cannot drift out of step again.
+
+     Contrast is therefore the theme's own body pair, which is the highest
+     contrast the theme has: 15.67:1 light · 14.30:1 dark · 11.45:1 sepia ·
+     12.17:1 ink. [data-stock] re-pins both inside the reader, so a filled
+     control on a Coal page is cream on near-black, not cream on cream.
+
+     --danger keeps its own colour. A warning is not emphasis, and mono chrome
+     that swallows the one destructive signal would be a worse bug than the
+     one this fixes. */
+  --accent:var(--ink);
+  --accent-fg:var(--paper);
+  /* Deliberately not the accent above: a warning painted in the brand's own
+     colour stops reading as a warning. */
+  --danger:#B42318;
+  --danger-fg:#FDF7F5;
+  --mustard:#DCA94C;
+  --butter:#F6EBD9;
+  --coal:#221E1B;
+  --pink:#F3D9DD;
+  --blue:#DAE4EE;
+  --cream:#F4F2ED;
+
+  --serif:"Playfair Display",Georgia,serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --hand:"Kalam",cursive;
+  --sans:"Archivo",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+
+  /* Corner radii, one scale. --r-img stays tight on purpose: a 22×31 cover
+     thumbnail rounded to the same 11px as a panel loses its corners entirely
+     and stops reading as a book. */
+  --r-img:4px;
+  --r-sm:8px;
+  --r-md:11px;
+  --r-lg:16px;
+
+  /* shadows retired by request — elevation is drawn with hairline rules */
+  --sh-card:0 0 rgba(0,0,0,0);
+  --sh-plate:0 0 rgba(0,0,0,0);
+  --sh-nav:0 0 rgba(0,0,0,0);
+
+  --ease:cubic-bezier(.2,0,0,1);
+  --gutter:32px;
+
+  /* ── NEW: the page turn ────────────────────────────────────────────────
+     The only easing in either app that is not --ease. A turn is a thrown
+     object coming to rest, not a UI transition: --ease decelerates from a
+     standing start, which is right for a sheet and wrong for something the
+     finger has already given a velocity to. The DURATION is not here on
+     purpose — it is derived from release velocity at the moment of release
+     (260–420ms), and a token would imply it is declared. See DESIGN.md. */
+  --ease-turn:cubic-bezier(.16,1,.3,1);
+  /* keyboard and tap turns have no velocity to read, so they do get a number */
+  --turn-flat:300ms;
+  /* ── NEW ROLE: the graph ramp ──────────────────────────────────────────────
+     Replaces the six binding-cloth hues, removed by the owner's instruction
+     ("remove them and stick to just what we had before in flyleaf press, no
+     extra colors"). Nothing here is a new colour: every value is the theme's
+     own --ink mixed toward its own --rule or --card-w, so a chart, a tile and a
+     coverless ghost are the ink at a strength rather than a hue.
+
+     Two consequences worth stating, because they are the point:
+       · a format can no longer be read off a colour. It is read off the mono
+         label that was always on the ghost anyway.
+       · a chart is one series in one ink. Where a chart genuinely has parts
+         (the shelf mix), the parts are ordered steps of the ramp, and the key
+         carries the name — colour is never the only channel.
+
+     --wash / --wash-2 are surfaces. --graph-1..5 are marks. Neither is ever
+     type, and --accent is not in here: accent means "the thing to do", and a
+     bar chart is not a thing to do. */
+  --wash:color-mix(in oklab, var(--ink) 5%, var(--card-w));
+  /* 8%, not the 9% it shipped at. --wash-2 is the PRESSED state of the
+     continue card, and that card carries an --ink-soft metadata line: at 9%
+     that pair measured 4.41 in light — the only theme it failed in, and it
+     failed by 2%. 8% clears 4.5 in all four (4.54 light · 4.79 dark · 4.64
+     sepia · 4.60 ink) and keeps the press visible as a 1.067 step above
+     --wash, against 1.097 before. Measured by audit/ramp.mjs. */
+  --wash-2:color-mix(in oklab, var(--ink) 8%, var(--card-w));
+  --graph-1:color-mix(in oklab, var(--ink) 16%, var(--rule));
+  --graph-2:color-mix(in oklab, var(--ink) 32%, var(--rule));
+  --graph-3:color-mix(in oklab, var(--ink) 50%, var(--rule));
+  --graph-4:color-mix(in oklab, var(--ink) 70%, var(--rule));
+  --graph-5:var(--ink);
+
+  /* ── the grain ─────────────────────────────────────────────────────────────
+     One noise tile, declared once. The body already had it as a fixed layer at
+     z-index:-1, which meant every opaque card painted over it and the app read
+     as untextured everywhere it actually has surfaces — so the surfaces now
+     carry it themselves, via background-image + background-blend-mode against
+     their own fill. No extra element, no shadow, no filter.
+
+     STRENGTH, per the owner: "the texture shouldn't be too grainy. subtle but
+     visible." The tile was opacity .36 at baseFrequency .9, which is a fine
+     high-frequency noise — the frequency is what made it read as grain rather
+     than as stock. Now .20 at .62/4 octaves: a coarser, softer mottle, so the
+     eye reads an uneven surface instead of individual specks.
+
+     --grain-blend is per theme because multiply is only right on a light
+     ground: multiplying noise into #1B2430 is invisible, so dark themes screen
+     it back out at a lower strength instead.
+
+     It still does NOT reach running text. .stage below paints its stock plain,
+     because DESIGN.md bans texture over the text and grain under a paragraph
+     read for an hour is texture whatever its opacity. The reader's CHROME is
+     grained; the book's page is not. */
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.62' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.20'/%3E%3C/svg%3E");
+  --grain-blend:multiply;
+  --grain-op:1;
+}
+@media (max-width:640px){ :root{ --gutter:20px; } }
+
+/* ── dark mode — CHROME ONLY. Neutral grey; the dark chrome is a dimmed room,
+   not a coffee stain. Every value R=G=B. The reading page does NOT invert with
+   it: the page carries its own stock, chosen separately, and .stock below
+   re-pins whichever one that is. Applied via data-theme on <html>. ── */
+:root[data-theme="dark"]{
+  --grain-blend:screen;
+  --paper:#151515;
+  --card-w:#1E1E1E;
+  --ink:#E9E9E9;
+  --ink-soft:#969696;
+  --rule:#343434;
+  /* No --accent here any more: the :root alias resolves to THIS theme's --ink
+     and --paper, so a filled control is #E9E9E9 on #151515 at 14.30:1. */
+  /* lifted well off the light-mode crimson — #B42318 on #151515 is barely
+     legible, so dark mode carries the same signal at a tint that clears */
+  --danger:#F08379;
+  --danger-fg:#1A1211;
+  --sh-card:0 0 rgba(0,0,0,0);
+  --sh-plate:0 0 rgba(0,0,0,0);
+  --sh-nav:0 0 rgba(0,0,0,0);
+}
+
+/* ── NEW: two more chrome themes ──────────────────────────────────────────
+   Warm ones, because the ask was for colour and the guardrail says warm only.
+   Neither introduces a new colour: Sepia's ground and ink are the Tea stock's,
+   Ink's are Dusk's — the same values Press's palette already carries, doing a
+   second job as chrome. What IS new in each is one card surface, because a
+   stock is a single sheet of paper and chrome needs a card that sits a step
+   off the ground the way --card-w does in light mode.
+
+   Each is a complete theme, not a tint of another one: light-mode Sepia and
+   dark-mode Ink, so the pair reads as two more of the same kind of choice
+   rather than a filter over the first two.
+
+   Measured, every text pair, before it was written down (WCAG AA, 4.5:1):
+
+     Sepia   ink 11.45 paper / 12.64 card · soft 4.98 / 5.50 · danger 8.19 / 9.04
+     Ink     ink 12.17 paper / 10.69 card · soft 6.31 / 5.54 · danger 6.13 / 5.39
+
+   Ink's row was 10.42 / 9.33 / 5.46 / 4.90 / 5.70 / 5.11 while it was the warm
+   brown; it was re-hued blue below and the row above is the re-measurement.
+
+   --ink-soft is the one value in each that is NOT a stock's: a stock's soft ink
+   is measured against one ground, and chrome has two, so each is nudged until
+   it clears on the card as well as the paper. Sepia's is lifted for exactly
+   that reason. The stocks themselves are untouched — this is chrome. */
+:root[data-theme="sepia"]{
+  --paper:#EADCC3;
+  --card-w:#F2E7D2;
+  --ink:#2A231C;
+  --ink-soft:#655A4A;
+  --rule:#D8C6A6;
+  /* No --accent: the alias resolves here to #2A231C on #EADCC3, 11.45:1. */
+  /* light mode's #B42318 measures 6.60 here, which passes — but it reads
+     orange against a tan ground, and a warning that reads as the brand's
+     terracotta stops reading as a warning. Deepened, not re-hued. */
+  --danger:#8F1D14;
+  --danger-fg:#FDF7F5;
+}
+:root[data-theme="ink"]{
+  --grain-blend:screen;
+  /* ── RE-HUED by the owner's instruction ─────────────────────────────────
+     Ink was a warm brown borrowed from the Dusk stock. The owner's call:
+     "update the ink, doesn't look great. let's use maybe blue or something.
+     pastel blue maybe, but don't neglect assesiblity."
+
+     So the theme is now what its name says — blue-black ink, with a pastel
+     blue on it. This is a REPLACEMENT, not an addition: the warm brown left
+     when the blue arrived, so the app still carries one accent and four
+     themes. The Dusk reading stock is untouched; that is paper, not chrome.
+
+     Measured before it was written down (audit/theme.mjs, WCAG AA 4.5:1):
+       ink #D9E4F2   12.17 paper · 10.69 card
+       soft #96A6BB   6.31 paper ·  5.54 card
+       danger         6.13 paper ·  5.39 card
+     Lowest pair on the theme is 5.39 — 20% of headroom over AA. The accent
+     that used to be measured here (#79B0E6) is gone; see --accent at :root. */
+  --paper:#1B2430;
+  --card-w:#232E3C;
+  --ink:#D9E4F2;
+  --ink-soft:#96A6BB;
+  --rule:#33414F;
+  /* No --accent: the alias resolves here to #D9E4F2 on #1B2430, 12.17:1. */
+  --danger:#F08379;
+  --danger-fg:#1A1211;
+  --sh-card:0 0 rgba(0,0,0,0);
+  --sh-plate:0 0 rgba(0,0,0,0);
+  --sh-nav:0 0 rgba(0,0,0,0);
+}
+
+/* ── NEW ROLE: page stocks ────────────────────────────────────────────────
+   Press calls its card grounds "paper stocks, not themes". Here they are
+   literally that: the paper the book is printed on. Seven of them, chosen
+   independently of the chrome theme — a reader on a dark train may want dark
+   chrome and a Butter page, and that is not a bug to be tidied away.
+
+   Four are Press's own values, unchanged. Tea, Dusk and Pitch are new, for the
+   three roles Press has no token for: a deep sepia, a blue dark, and a true
+   black for OLED. Every ink pair below was computed against its ground before
+   it was written down — lowest body pair 10.88:1 (Pitch), lowest secondary
+   4.62:1 (Tea), all clear of AA. DESIGN.md carries the table. The two figures
+   in this sentence were WRONG until the blue-Dusk change; they were measured
+   again from the shipping values rather than carried forward.
+
+   Set with data-stock on the reader root. Every one of them re-pins --ink and
+   --rule inside itself, so a highlight, a footnote rule and a selection all
+   land correctly without a single per-stock override anywhere else. */
+[data-stock]{
+  background:var(--stock-bg);
+  color:var(--stock-ink);
+  --ink:var(--stock-ink);
+  --rule:var(--stock-rule);
+  --ink-soft:var(--stock-soft);
+  /* --accent is an alias for --ink/--paper (see :root), and --paper is CHROME —
+     it is not re-pinned by a stock. Left alone, a filled reader control on a
+     Coal page would be cream ink on cream paper, i.e. invisible. So the stock
+     re-pins the second half of the alias as well: on a stock, "paper" means
+     the stock's own ground. */
+  --accent:var(--stock-ink);
+  --accent-fg:var(--stock-bg);
+}
+[data-stock="press"]{ --stock-bg:#FFFFFF; --stock-ink:#1B1917; --stock-soft:#6B655C; --stock-rule:#E4E1DB; }
+[data-stock="day"]  { --stock-bg:#F4F2ED; --stock-ink:#1B1917; --stock-soft:#6B655C; --stock-rule:#E0DBD1; }
+[data-stock="butter"]{ --stock-bg:#F6EBD9; --stock-ink:#1B1917; --stock-soft:#6A6255; --stock-rule:#E5D6BC; }
+/* Coal is the third contrast state, per Press — a paper stock, not dark mode.
+   The ink is cream rather than white: pure white on #221E1B is the glare
+   that makes a dark reading page tiring after twenty minutes. */
+[data-stock="tea"]  { --stock-bg:#EADCC3; --stock-ink:#2A231C; --stock-soft:#6A5F4F; --stock-rule:#D8C6A6; }
+[data-stock="coal"] { --stock-bg:#221E1B; --stock-ink:#F4F2ED; --stock-soft:#9A938A; --stock-rule:#3A342F; }
+/* Dusk was a warm dark, and the owner's call was that it did not earn its
+   place: "I think coal and dusk are not so different, maybe let's have the blue
+   ink thing here." Measured, they were right — #2E2823 and Coal's #221E1B are
+   both warm near-blacks 12 sRGB steps apart, which is a difference you can only
+   see with the two side by side.
+
+   So Dusk is now the blue-black one, and it is not a new colour: these are the
+   Ink CHROME theme's own four values doing a second job as paper, which is the
+   same borrowing the theme did in the other direction when it was warm. That
+   makes the seven stocks one warm-white, three warm-lights, one warm-dark, one
+   BLUE-dark and one true black — seven answers instead of six and a duplicate.
+
+   This is a deliberate, owner-instructed exception to the "no cool-shifted
+   page" guardrail, recorded as such in DESIGN.md. It is exactly one stock; the
+   other six stay warm.
+
+   Measured against its own ground before it was written down (audit/tints.mjs):
+     ink #D9E4F2  12.17:1   ·   soft #96A6BB  6.31:1
+   Both up on the warm Dusk it replaces (12.10 and 4.71) — the secondary in
+   particular was the second-worst in the whole table and is now the best. */
+[data-stock="dusk"] { --stock-bg:#1B2430; --stock-ink:#D9E4F2; --stock-soft:#96A6BB; --stock-rule:#33414F; }
+/* Pitch exists for OLED, where a true black pixel is off. The ink is
+   deliberately NOT white: #FFF on #000 is the highest-contrast pair available
+   and the most tiring one to read a novel in. */
+[data-stock="pitch"]{ --stock-bg:#000000; --stock-ink:#BFBAB2; --stock-soft:#8A857E; --stock-rule:#2A2A2A; }
+
+/* ── NEW ROLE: highlighter tints ─────────────────────────────────────────
+   Press's pastels, doing a second job. These are FILLS, drawn behind the
+   words — see DESIGN.md — and terracotta is the exception: a 2px underline,
+   never a fill, because a fill in the brand's own strong colour buries the
+   sentence it is meant to mark.
+
+   Two families, because the two do different jobs:
+
+     --hl-*        the solid pastel. Never varies by stock, because it is only
+                   ever painted on CHROME: the 10px dot in the marks list, the
+                   chip in the selection menu, and the 2px margin bar on a dark
+                   page. A dot has no text in it, so it needs no wash.
+     --hl-fill-*   what the overlay paints across the words. On a light stock
+                   that is the solid pastel at mix-blend-mode: multiply, which
+                   is arithmetically identical to a marker under the text. On a
+                   dark one, a measured low-alpha wash — see below.
+
+   Every value below was computed, not chosen by eye: audit/tints.mjs. */
+:root{
+  --hl-mustard:#DCA94C;
+  --hl-pink:#F3D9DD;
+  --hl-blue:#DAE4EE;
+  --hl-butter:#F6EBD9;
+  --hl-underline:#1C5480;
+
+  /* Light stocks: paint the solid tint and let multiply do the work. Ink ×
+     pastel is still ink (worst body pair across the four light stocks and four
+     tints: 6.37:1, on Tea + mustard); page × pastel is the pastel, so the mark
+     itself stays visible against the page (1.17:1 at the faintest, Press +
+     butter). No margin bar — the fill reads on its own. */
+  --hl-fill-mustard:var(--hl-mustard);
+  --hl-fill-pink:var(--hl-pink);
+  --hl-fill-blue:var(--hl-blue);
+  --hl-fill-butter:var(--hl-butter);
+  --hl-blend:multiply;
+  --hl-bar:off;
+}
+/* On a dark stock a pastel fill is a bright block with dark text inside it — the
+   inverse of the page, and unreadable at speed. Multiply is no help either: a
+   pastel times a near-black ground is mud. So on a dark stock the tint drops to
+   a low-alpha NORMAL wash, the words stay at the stock's own cream ink, and the
+   mark is joined by a 2px bar in the page's margin at the full solid tint.
+
+   The twelve alphas below are the measured ones — the largest value, in 0.01
+   steps, that still leaves the stock's ink at 4.8:1 or better through the wash.
+   The bar is 4.8 and not 4.5 on purpose: maximising against 4.5 put every pair
+   between 4.51 and 4.63, which is AA passing by a rounding error, and the
+   browser composites in its own colour space rather than in the model the
+   script uses. With the headroom, the twelve land at 4.81–4.94:1 measured, and
+   the wash still separates from the page by 1.89–3.00:1. audit/tints.mjs
+   recomputes and re-prints this whole block. */
+[data-stock="coal"],[data-stock="dusk"],[data-stock="pitch"]{
+  --hl-blend:normal;
+  --hl-bar:on;
+  --hl-underline:#7FB6EC;
+}
+[data-stock="coal"]{
+  --hl-fill-mustard:rgba(220,169,76,.4);
+  --hl-fill-pink:rgba(243,217,221,.37);
+  --hl-fill-blue:rgba(218,228,238,.36);
+  --hl-fill-butter:rgba(246,235,217,.36);
+}
+/* Re-measured after Dusk became the blue stock — a lighter page than the warm
+   dusk it replaced (L 12.17:1 ink, up from 10.42), so every wash can carry a
+   little more alpha and still leave the ink above 4.8:1 through it.
+   audit/tints.mjs, largest alpha in .01 steps that holds. */
+[data-stock="dusk"]{
+  --hl-fill-mustard:rgba(220,169,76,.35);
+  --hl-fill-pink:rgba(243,217,221,.32);
+  --hl-fill-blue:rgba(218,228,238,.32);
+  --hl-fill-butter:rgba(246,235,217,.31);
+}
+[data-stock="pitch"]{
+  --hl-fill-mustard:rgba(220,169,76,.38);
+  --hl-fill-pink:rgba(243,217,221,.35);
+  --hl-fill-blue:rgba(218,228,238,.35);
+  --hl-fill-butter:rgba(246,235,217,.35);
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html,body,figure,figcaption,h1,h2,h3,p{ margin:0; }
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:13.5px;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+  /* A reader is a swipe surface. Without this, iOS treats a horizontal drag
+     near the left edge as a back-navigation and the page turn is stolen
+     mid-gesture — and pull-to-refresh at the top of a chapter reloads the app.
+     Set globally because the reader is the app's main screen, not a modal. */
+  overscroll-behavior:none;
+}
+button{ font-family:var(--sans); }
+img{ max-width:100%; }
+
+/* ── paper grain ───────────────────────────────────────────────────────────
+   One fixed layer of fractal noise over the whole viewport, inline as a data
+   URI so it is precached with the stylesheet and works offline. At z-index:-1
+   it lands above body's background fill and below every element, so there is
+   no stacking argument with the nav or a sheet.
+
+   It does NOT reach the reading page. .reader below paints its own opaque
+   stock over it, deliberately: DESIGN.md bans a texture over the text, and
+   grain under a paragraph read for an hour is a texture whatever its opacity.
+   Grain is the app's paper; the book's paper is plain. */
+body::before{
+  content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+  opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.62' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.20'/%3E%3C/svg%3E");
+  mix-blend-mode:multiply;
+}
+
+/* Grain on the chrome surfaces, blended against each surface's OWN fill.
+
+   Every selector here has to have an opaque background-color. background-blend-mode
+   blends the image against the element's background-COLOR, not against what is
+   behind the element — so on a transparent box the noise paints at full strength
+   as a grey rectangle with hard edges. That is a real bug this rule shipped with
+   once (the theme row in Settings, which is a bare flex container), so the list
+   is now only surfaces whose fill is declared in this file, and adding to it
+   means checking for that fill first. */
+/* .reader-bar is NOT in this list, and the rule above is exactly why. The
+   floating rows have no fill of their own — the fills moved to the three
+   capsules inside them, so those are what carry the grain. Putting the bar
+   back here would paint a hard-edged grey rectangle across the page, which is
+   the bug the paragraph above is about. */
+.panel,.strip,.tabbar,.menu,.continue,.stat,.sheet,
+.reader-btn,.reader-title,.reader-readout{
+  background-image:var(--grain);
+  background-blend-mode:var(--grain-blend);
+}
+/* A cover is a photograph. Grain on it is dirt on a photograph. */
+.cover,.cover img{ background-image:none; }
+/* on a near-black ground multiply has nothing to darken, so the grain has to
+   add light instead — same layer, opposite blend, pulled well down. Keyed on
+   the two dark-GROUND themes, not on the one called "dark": Ink is a different
+   theme with the same problem. */
+:root[data-theme="dark"] body::before,
+:root[data-theme="ink"] body::before{ mix-blend-mode:screen; opacity:.14; }
+
+/* ── page scaffold ── */
+.page{
+  min-height:100vh; min-height:100dvh;
+  padding:28px var(--gutter) 128px;
+  display:flex; flex-direction:column; align-items:center;
+  overflow-x:clip;
+}
+.page-inner{ width:100%; max-width:680px; }
+/* Only when the page is showing an empty state: scoped with :has so the fill
+   follows the content rather than the page having to remember to ask for it. */
+.page-inner:has(> .empty){ flex:1 1 auto; display:flex; flex-direction:column; }
+
+.app-head{
+  display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between;
+  gap:6px 16px; padding-bottom:14px; margin-bottom:28px;
+  border-bottom:1px solid var(--rule);
+}
+.app-head h1{
+  font-family:var(--serif); font-weight:500; font-size:19px; line-height:1;
+  letter-spacing:-.01em; display:flex; align-items:center; gap:9px;
+}
+/* neutral chrome: the rosette prints in ink here, not a colour */
+.app-head h1 svg{ display:block; color:var(--ink); }
+.app-head > span{
+  font-size:11.5px; font-weight:500; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-soft);
+  flex:0 1 auto; min-width:0; text-align:right;
+}
+.app-head > span a{ white-space:nowrap; }
+
+.ui-lbl{
+  font-family:var(--sans); font-size:11.5px; font-weight:500; line-height:1.2;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft);
+}
+.ui-h{
+  font-family:var(--serif); font-weight:600; letter-spacing:-.012em;
+  font-size:26px; line-height:1.15;
+}
+.ui-p{ font-size:13px; line-height:1.55; color:var(--ink); }
+.ui-p--soft{ color:var(--ink-soft); }
+/* A refusal, in the app's one alarm colour and nothing else — no icon, no
+   filled band. The sentence is the signal; --danger is measured AA on every
+   theme's paper (§ Colour), which a tinted band behind it would not be. */
+.ui-p--warn{ color:var(--danger); }
+
+/* ── buttons ──────────────────────────────────────────────────────────────
+   The FILLED .btn is terracotta, and it is the only filled colour on a screen.
+   Press kept this off its chrome; the owner's instruction is that the app
+   should not be black and white, and the discipline that makes one strong
+   colour work — Cardinal's — is to spend it on the primary action and nothing
+   else. So: --ghost stays neutral, a PRESSED ghost goes to ink (that is a
+   selection, not an action), and danger keeps its own colour. Accent means one
+   thing on every screen: this is the thing to do. */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  border:0; cursor:pointer;
+  height:40px; padding:0 20px; border-radius:999px;
+  background:var(--accent); color:var(--accent-fg);
+  font-family:var(--sans); font-size:11.5px; font-weight:500;
+  letter-spacing:.1em; text-transform:uppercase;
+  /* The height is fixed, so a label that wraps does not make the pill taller —
+     it makes the second line overflow it. Uppercase + .1em tracking is wide,
+     and every label on one is two or three words, so they never need to. */
+  white-space:nowrap;
+  transition:transform 160ms var(--ease), opacity 160ms var(--ease);
+  text-decoration:none;
+}
+.btn:active{ transform:scale(.97); }
+.btn:disabled{ opacity:.4; cursor:default; }
+.btn--ghost{
+  background:var(--card-w); color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--rule);
+}
+.btn--sm{ height:32px; padding:0 14px; font-size:11px; }
+.btn--ghost[aria-pressed="true"]{ background:var(--ink); color:var(--accent-fg); box-shadow:none; }
+.btn--danger{ background:transparent; color:var(--danger); box-shadow:inset 0 0 0 1px var(--danger); }
+.btn--danger-solid{ background:var(--danger); color:var(--danger-fg); box-shadow:none; }
+
+/* ── white panels ── */
+.panel{
+  background:var(--card-w); border-radius:var(--r-md); border:1px solid var(--rule);
+  padding:22px;
+}
+.panel + .panel{ margin-top:16px; }
+
+/* ── focus ────────────────────────────────────────────────────────────────
+   One ring, everywhere, and it is drawn in ink rather than the UA's blue —
+   which on the Butter and Coal stocks is the only visible colour on the page
+   and reads as an error. :focus-visible only, so a tap never draws it. */
+:where(a,button,input,select,textarea,[tabindex]):focus-visible{
+  outline:2px solid var(--ink);
+  outline-offset:2px;
+  border-radius:var(--r-sm);
+}
+
+/* ── the floating pill nav, per Press (mechanics unchanged): a bottom-centred
+   capsule that hugs its tabs. Tabs are icon-only at rest; the ACTIVE tab grows
+   into an icon + label capsule, filled --ink. The one real action — open a
+   book — is its own round button beside the bar, never inside it.
+
+   It is ABSENT in the reader. A page-turn surface with a floating capsule over
+   it is a page-turn surface with a hole in it. ── */
+.tabbar{
+  /* The inset is clearance, not a margin to stack on: sitting the bar AT the
+     top of the safe area clears the iOS home indicator exactly, where adding
+     the two put it 48px up with a shelf of empty paper underneath. */
+  position:fixed; left:50%; bottom:max(14px, env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  z-index:40;
+  display:flex; align-items:center; gap:10px;
+  max-width:calc(100vw - 20px);
+}
+.tab-pill{
+  display:flex; align-items:center; gap:2px;
+  background:var(--card-w);
+  border:1px solid var(--rule); border-radius:999px;
+  box-shadow:var(--sh-nav);
+  padding:5px;
+  min-width:0;
+}
+.tab-pill a{
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  min-width:44px; min-height:44px;
+  padding:10px 12px; border-radius:999px;
+  color:var(--ink-soft); text-decoration:none;
+  font-family:var(--sans); font-size:11.5px; font-weight:500;
+  letter-spacing:.1em; text-transform:uppercase; line-height:1;
+  transition:color 180ms var(--ease), background 180ms var(--ease);
+  -webkit-tap-highlight-color:transparent;
+  white-space:nowrap;
+}
+.tab-pill a{ --tab-bg:var(--card-w); }
+.tab-pill a svg{ display:block; width:20px; height:20px; flex:none; }
+.tab-pill a .tab-lbl{ display:none; }
+.tab-pill a[aria-current="page"]{
+  --tab-bg:var(--ink);
+  padding-inline:15px;
+  background:var(--ink); color:var(--accent-fg);
+}
+.tab-pill a[aria-current="page"] .tab-lbl{ display:block; }
+/* the main action: open a book */
+.tab-add{
+  width:50px; height:50px; border-radius:50%; flex:none;
+  display:flex; align-items:center; justify-content:center;
+  /* the nav's one action, so it is the nav's one colour. The active TAB stays
+     ink on purpose: where you are is not something to do. */
+  background:var(--accent); color:var(--accent-fg);
+  border:1px solid var(--accent);
+  box-shadow:var(--sh-nav);
+  text-decoration:none;
+  transition:transform 160ms var(--ease);
+  cursor:pointer;
+}
+.tab-add:active{ transform:scale(.94); }
+.tab-add svg{ display:block; width:22px; height:22px; }
+@media (max-width:389px){
+  .tabbar{ gap:8px; }
+  .tab-pill a{ padding:10px 10px; }
+  .tab-pill a[aria-current="page"]{ padding-inline:12px; }
+}
+
+/* ── empty state ──────────────────────────────────────────────────────────
+   The Library with nothing in it is the first screen most people will see, so
+   it is a real screen rather than a shrug: the mark, one line saying what to
+   do, the action, and the formats spelled out — because "any ebook" is a claim
+   and a list is a fact. */
+.empty{
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  /* An empty state IS the screen's content, so it gets the screen: it centres
+     in what is left between the head's rule and the nav's clearance instead of
+     sitting under the rule with a third of the page blank below it. The extra
+     bottom padding is optical — a block centred by arithmetic reads low. */
+  flex:1 1 auto; justify-content:center;
+  /* The page already reserves 128px at the foot for the nav, which is 58px
+     more than the nav actually occupies — so the lift here is small: 8px, not
+     the 20 an untouched optical rule would want. Measured against the pill,
+     not against the padding box. */
+  padding:24px 0 40px;
+}
+.empty svg{ display:block; width:56px; height:56px; color:var(--ink); opacity:.32; }
+.empty h2{ font-family:var(--serif); font-weight:500; font-size:22px; line-height:1.2; margin-top:22px; }
+.empty p{ margin-top:10px; max-width:34em; font-size:13px; line-height:1.6; color:var(--ink-soft); }
+.empty .btn{ margin-top:24px; }
+/* Child selector, not `.empty-formats` alone: `.empty p` outranks a lone
+   class, so the bare version silently lost its own font-size to the 13px body
+   rule above. */
+.empty > .empty-formats{
+  margin-top:28px; padding-top:18px; border-top:1px solid var(--rule);
+  width:100%; max-width:34em;
+  /* Wrapped as flex items rather than one string of middots: a separator
+     glyph that lands at a line break dangles at the end of the line, and this
+     list wraps at every width it will ever be read at. The gap is the
+     separator, and 12px is measured rather than chosen: at 15 the nine items
+     came to 435px inside a 425px column and orphaned PDF onto a line of its
+     own on every screen wide enough to have fitted it. */
+  display:flex; flex-wrap:wrap; justify-content:center; gap:7px 12px;
+  font-family:var(--mono); font-size:12.5px; line-height:1.45; color:var(--ink-soft);
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important; animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;
+  }
+}
+
+/* ── settings rows ────────────────────────────────────────────────────────
+   A segmented choice, and the action row under a panel's copy. Both exist so
+   that a panel's own padding is never the thing spacing its contents: 22px on
+   the panel, 18px between a paragraph and the controls under it, and nothing
+   sitting flush against an edge. */
+.seg{ display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+/* Five themes, so the row wraps on a phone — hence gap on both axes and a
+   button that carries its own colour rather than needing a legend. */
+.btn--seg{ padding-inline:12px 16px; gap:7px; }
+/* Literal hex, not var(--paper): a swatch has to show the theme you are NOT
+   in. Its ring is currentColor, so it stays visible when the pressed state
+   flips the button to filled ink. */
+.seg-swatch{
+  flex:none; width:14px; height:14px; border-radius:999px;
+  box-shadow:0 0 0 1px currentColor;
+  display:grid; place-items:center;
+}
+.seg-swatch::after{
+  content:""; width:6px; height:6px; border-radius:999px; background:var(--sw-ink);
+}
+.seg-swatch[data-sw="light"]{ background:#F4F2ED; --sw-ink:#1B1917; }
+.seg-swatch[data-sw="sepia"]{ background:#EADCC3; --sw-ink:#2A231C; }
+.seg-swatch[data-sw="dark"] { background:#151515; --sw-ink:#E9E9E9; }
+/* Hard-coded rather than token-driven, because a swatch shows a theme that is
+   NOT the active one, so var(--paper) would paint all five the same. The cost
+   is that they can drift, and Ink's did: it went on painting the warm brown
+   #2E2823/#E4D9C6 for a release after the theme itself was re-hued blue, so
+   the picker showed a brown dot for a blue theme. These four pairs are the
+   :root[data-theme] blocks above, copied by hand — change one, change both. */
+.seg-swatch[data-sw="ink"]  { background:#1B2430; --sw-ink:#D9E4F2; }
+/* System is not a colour, it is a deferral — drawn as both grounds at once,
+   with no ink dot, because it has no ink of its own to show. */
+.seg-swatch[data-sw="system"]{ background:linear-gradient(90deg,#F4F2ED 0 50%,#151515 50% 100%); }
+.seg-swatch[data-sw="system"]::after{ display:none; }
+.set-acts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+/* A step inside a panel, not a second panel: the confirm belongs to the control
+   above it, and a nested card would say it was a separate thing. A rule and an
+   indent are enough — DESIGN.md § Space, group with space before lines. */
+.set-confirm{
+  margin-top:18px; padding-top:16px;
+  border-top:1px solid var(--rule);
+}
+.set-switch{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:16px; margin-top:16px;
+}
+/* first-child, not a blanket margin: a panel that opens on a label should not
+   start with 6px of nothing above it */
+.panel > .ui-lbl:first-child{ margin-bottom:0; }
+
+/* ── rows that leave the app ───────────────────────────────────────────────
+   Three destinations in one panel, grouped by space and not by rules: a
+   hairline between each would make a table of three sentences. 18px between
+   rows against 4px inside one is the 2:1 the layout rule asks for, with room
+   to spare.
+
+   The whole row is the link, so the target is the row's own height rather than
+   the width of a word — measured at 390px the shortest of the three is 58px
+   tall, and the note wraps to two lines on all of them at that width. */
+.set-links{ display:flex; flex-direction:column; gap:18px; margin-top:18px; }
+.set-link{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  /* The negative inline inset pushes the pressed state out to the panel's own
+     padding, so the row lights up edge to edge instead of leaving a 22px strip
+     of card either side. The equal positive padding puts the text back exactly
+     on the panel's column — net 0, checked on both edges. */
+  margin-inline:-10px; padding:8px 10px;
+  border-radius:var(--r-sm);
+  text-decoration:none; color:inherit;
+  min-height:44px;
+}
+.set-link-txt{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+/* A destination, not a caption — see the comment in Settings.tsx. Ink against
+   the note's grey, sentence case against the panel label's tracked caps, and
+   one step up in size, so the row has its own identity in a panel where
+   everything else is a heading or a paragraph. */
+.set-link-name{
+  font-family:var(--sans); font-size:14px; font-weight:600;
+  line-height:1.25; letter-spacing:-.004em; color:var(--ink);
+}
+.set-link-go{
+  flex:none; display:inline-flex; color:var(--ink-soft);
+  transition:color 140ms ease, transform 140ms ease;
+}
+.set-link-go > svg{ width:17px; height:17px; }
+@media (hover:hover) and (pointer:fine){
+  .set-link:hover{ background:color-mix(in oklab, var(--ink) 6%, transparent); }
+  .set-link:hover .set-link-go{ color:var(--ink); transform:translate(1px,-1px); }
+}
+.set-link:active{ background:color-mix(in oklab, var(--ink) 10%, transparent); }
+@media (prefers-reduced-motion:reduce){
+  .set-link-go{ transition:color 140ms ease; }
+  .set-link:hover .set-link-go{ transform:none; }
+}
+
+/* ── the small print ───────────────────────────────────────────────────────
+   A definition list, because that is what it is: five things, each named and
+   then explained. The name carries the weight and the explanation carries the
+   colour, so the panel can be skimmed for the one clause somebody came for
+   without reading the other four. */
+.fine{ margin:14px 0 0; }
+.fine dt{
+  font-family:var(--sans); font-size:12px; font-weight:600;
+  letter-spacing:.01em; color:var(--ink);
+  margin-top:16px;
+}
+.fine dt:first-of-type{ margin-top:0; }
+.fine dd{
+  margin:5px 0 0; font-size:13px; line-height:1.55; color:var(--ink-soft);
+  /* Capped in the panel as well as on the page: these are the longest
+     paragraphs in Settings, and at 1280px the panel is wide enough to run them
+     past a comfortable measure. */
+  max-width:62ch;
+}
+.fine-name{ font-family:var(--mono); font-size:12px; }
+
+/* ── the shelf ─────────────────────────────────────────────────────────────
+   Press's card language, doing a library: covers as objects, mono micro-labels,
+   hairline groups, no shadow anywhere. Radii per DESIGN.md — 2px on a printed
+   card, 4px on a cover thumbnail.
+
+   Every gap here is a multiple of 4 and every box is checked on both edges. The
+   grid's own gap is the only separator between cards; there is no rule between
+   them, because a shelf of covers with rules between them is a table. */
+
+/* Screen-reader-only, for the labels on icon-only controls and the file input
+   that a styled button stands in for. Not display:none: a hidden input cannot
+   be clicked, and a hidden label is not read. */
+.sr-only{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0;
+}
+
+/* DESIGN.md: library 680px, book detail 620px. */
+.page-inner--detail{ max-width:620px; }
+
+/* ── a cover, as an object ──
+   contain, not cover: cropping a cover cuts the title off the artwork. So
+   covers of different proportions are not forced into a common rectangle —
+   they stand on a common baseline, which is what object-position does here. */
+.cover{
+  display:block; position:relative;
+  aspect-ratio:2 / 3; width:100%;
+  border-radius:var(--r-img); overflow:hidden;
+  transform:rotate(var(--lean,0deg));
+  transition:transform 180ms var(--ease);
+}
+.cover img{
+  display:block; width:100%; height:100%;
+  object-fit:contain; object-position:bottom center;
+}
+/* No cover: a small labelled ghost, never a cover-sized dashed tile. It says
+   the one true thing the app knows about the file. */
+.cover-ghost{
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+  /* A ghost, not a generated cover: no artwork, no fabricated title page, no
+     author. One mono label saying what the file is, on a wash of the theme's
+     own ink. The format used to be carried by a hue as well; the hues are
+     gone, so the label is the only channel — which is also the accessible
+     one, because it was never safe to read a format off a colour alone. */
+  background:var(--wash);
+  border:1px solid var(--rule); border-radius:var(--r-img);
+  text-align:center; padding:8px;
+}
+.cover-ghost-fmt{
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.08em; color:var(--ink);
+}
+.cover-ghost-note{ font-size:11.5px; color:var(--ink-soft); }
+
+/* ── the progress hairline ──
+   A 2px rule, not a rounded capsule: it is the same hairline the rest of the
+   chrome uses for elevation, filled to where you are. */
+.bar{
+  display:block; position:relative; width:100%; height:2px;
+  background:var(--rule); border-radius:1px; overflow:hidden;
+}
+.bar-fill{ display:block; height:100%; background:var(--accent); border-radius:1px; }
+.bar--wide{ margin-top:14px; }
+
+/* ── the Continue row ──
+   A printed card: 2px radius, no border, no shadow. Absent entirely until
+   something has been opened — SPEC.md § 7. */
+.continue{
+  display:flex; gap:18px; align-items:stretch;
+  /* A wash, not a tint. This card is still the one filled full-width surface
+     on the shelf — it is the reading state, and it should read as the thing to
+     return to — but it earns that with area, cover size and the serif title
+     rather than with a hue. --wash is the theme's own ink at 5%, so the card
+     lands one measured step off --card-w in all four themes and cannot become
+     a mint block on a dark page. */
+  background:var(--wash); border-radius:var(--r-card,2px);
+  padding:18px; margin-bottom:28px;
+  text-decoration:none; color:inherit;
+  transition:transform 180ms var(--ease);
+}
+.continue:active{ transform:scale(.995); }
+.continue-cover{ flex:none; width:64px; align-self:flex-start; }
+.continue-body{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-width:0; flex:1 1 auto; }
+.continue-title{
+  font-family:var(--serif); font-weight:500; font-size:19px; line-height:1.2;
+  letter-spacing:-.01em; margin-top:2px;
+}
+.continue-where{
+  font-size:12.5px; line-height:1.4; color:var(--ink-soft);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%;
+}
+/* --wash already carries 5% ink, so the default --rule track loses most of its
+   separation on it; the track is drawn from the ink instead. The fill above it
+   is still the accent — progress is the one thing on this card worth colour. */
+.continue-body .bar{ margin-top:8px; background:color-mix(in oklab, var(--ink) 16%, transparent); }
+/* a coverless book inside the card steps the other way, so the ghost stays
+   visible as its own surface rather than merging into the card */
+.continue .cover-ghost{ background:var(--card-w); }
+.continue-pct{
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.04em; color:var(--ink-soft);
+}
+
+/* ── the shelf's own bar: groups on the left, how-and-what-order on the right ── */
+/* ── the shelf's controls ──
+   One stack: a search field, then a row of a three-way view switch and a sort
+   picker. Two rows on a phone and one on a tablet, and the field is above the
+   row rather than beside it because at 360px a field sharing a line with a
+   segmented control has room for about five characters.
+
+   The old versions of these — a native <select>, a pair of loose icon buttons,
+   a search field that only appeared above twelve books — are gone. See the note
+   at the top of Library.tsx for why each one went. */
+.shelf-bar{
+  display:flex; flex-direction:column; gap:12px;
+  margin-bottom:22px;
+}
+.shelf-ctl{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+
+/* The search field. The lens sits INSIDE the field rather than beside it, so
+   the field is the whole target — a 40px input next to a 24px icon reads as two
+   controls, and the icon is not one.
+
+   `type="search"` keeps the platform's own clear affordance on iOS; the drawn
+   one is for everywhere that has none, which is why it is only rendered when
+   there is something to clear. */
+.find{
+  position:relative; display:flex; align-items:center;
+  background:var(--card-w); border:1px solid var(--rule); border-radius:var(--r-sm);
+  transition:border-color 160ms var(--ease);
+}
+.find:focus-within{ border-color:var(--ink); }
+.find > svg{
+  flex:none; width:17px; height:17px; margin-inline:13px 0;
+  color:var(--ink-soft); pointer-events:none;
+}
+.find input{
+  flex:1; min-width:0; height:42px; padding:0 12px;
+  background:transparent; color:var(--ink); border:0;
+  font-family:var(--sans); font-size:14px;
+}
+.find input:focus{ outline:none; }
+.find input::placeholder{ color:var(--ink-soft); }
+.find input::-webkit-search-decoration,
+.find input::-webkit-search-cancel-button{ -webkit-appearance:none; appearance:none; }
+.find-clear{
+  flex:none; display:inline-flex; align-items:center; justify-content:center;
+  width:32px; height:32px; margin-inline-end:5px; padding:0;
+  background:transparent; border:0; border-radius:999px;
+  color:var(--ink-soft); cursor:pointer;
+}
+.find-clear svg{ width:15px; height:15px; }
+.find-clear:hover{ color:var(--ink); background:color-mix(in oklab, var(--ink) 8%, transparent); }
+
+/* The view switch: one track, three cells, the pressed one filled. A segmented
+   control rather than three separate buttons because the three are one choice,
+   and three loose pills in a row look like three unrelated actions — which is
+   what the old bar looked like.
+
+   Icon-only under 480px. The label is not decoration there: at 360px three
+   labelled cells are 106px each, which is why the whole row used to wrap. */
+.seg-views{
+  display:flex; gap:2px; padding:2px;
+  background:color-mix(in oklab, var(--ink) 5%, var(--card-w));
+  border:1px solid var(--rule); border-radius:999px;
+}
+.seg-view{
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  min-width:44px; height:34px; padding:0 12px;
+  background:transparent; color:var(--ink-soft); border:0; border-radius:999px;
+  font-family:var(--sans); font-size:11.5px; font-weight:600;
+  letter-spacing:.05em; text-transform:uppercase; cursor:pointer;
+  transition:background 160ms var(--ease), color 160ms var(--ease);
+}
+.seg-view svg{ flex:none; width:17px; height:17px; }
+.seg-view:hover{ color:var(--ink); }
+.seg-view[aria-pressed="true"]{ background:var(--ink); color:var(--card-w); }
+.seg-view-lbl{ display:none; }
+@media (min-width:480px){
+  .seg-view-lbl{ display:inline; }
+}
+
+/* The picker's closed button. Deliberately the same height and radius as a
+   segmented cell so the row reads as one line of controls, and deliberately
+   NOT filled — it is a menu, and a filled menu trigger looks pressed. */
+.picker{
+  display:inline-flex; align-items:center; gap:7px;
+  /* 40px, not 38: the segmented control beside it measures 40 (34px cell + 2px
+     track padding + 2px border), and two controls on one row at different
+     heights is the kind of 2px that reads as sloppiness without being
+     nameable. Measured, not matched by eye. */
+  height:40px; padding:0 13px; max-width:100%;
+  background:var(--card-w); color:var(--ink);
+  border:1px solid var(--rule); border-radius:999px; cursor:pointer;
+  font-family:var(--sans); font-size:11.5px; font-weight:600;
+  letter-spacing:.05em; text-transform:uppercase;
+  transition:border-color 160ms var(--ease);
+}
+.picker:hover{ border-color:var(--ink); }
+.picker > svg{ flex:none; width:16px; height:16px; color:var(--ink-soft); }
+.picker-val{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.picker-caret{ flex:none; display:inline-flex; color:var(--ink-soft); }
+.picker-caret svg{ width:14px; height:14px; }
+/* On a phone the value is dropped and the glyph stands for it. The sort is
+   still discoverable — the menu names the current one with a tick — and the
+   alternative is a row that wraps to three lines at 360px. */
+@media (max-width:479px){
+  .picker--compact .picker-val{ display:none; }
+  .picker--compact{ padding-inline:11px; }
+}
+
+.icon-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:34px; height:34px; padding:0; cursor:pointer;
+  background:var(--card-w); color:var(--ink);
+  border:1px solid var(--rule); border-radius:999px;
+  transition:background 160ms var(--ease), color 160ms var(--ease);
+}
+.icon-btn svg{ display:block; width:16px; height:16px; }
+.icon-btn[aria-pressed="true"]{ background:var(--ink); color:var(--card-w); border-color:var(--ink); }
+.icon-btn:disabled{ opacity:.35; cursor:default; }
+.icon-btn--danger{ color:var(--danger); }
+.icon-btn--danger:hover{ background:color-mix(in oklab, var(--danger) 12%, transparent); }
+
+.shelf-none{ font-size:13px; line-height:1.6; color:var(--ink-soft); padding:8px 0 4px; }
+
+/* ── covers view ──
+   140px minimum: at 360px the page is 320px wide inside its gutters, which is
+   two columns of 148 with a 24px gap — measured, not chosen. */
+.shelf-grid{
+  list-style:none; margin:0; padding:0;
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:28px 24px;
+}
+.shelf-card{
+  display:flex; flex-direction:column; align-items:flex-start; gap:6px;
+  text-decoration:none; color:inherit;
+}
+.shelf-card .bar{ margin-top:4px; }
+.shelf-title{
+  font-family:var(--serif); font-weight:500; font-size:14.5px; line-height:1.25;
+  letter-spacing:-.005em; margin-top:4px;
+}
+.shelf-author{ font-size:12px; line-height:1.35; color:var(--ink-soft); }
+/* INCLUDED, in mono, so nobody wonders where the two books came from */
+.tag{
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--ink-soft); border:1px solid var(--rule); border-radius:var(--r-img);
+  padding:2px 6px; margin-top:2px; align-self:flex-start; line-height:1.4;
+}
+@media (hover:hover) and (pointer:fine){
+  /* the lean comes off under the pointer — transform only, and it is the whole
+     of the shelf's motion */
+  .shelf-card:hover .cover{ transform:rotate(0deg); }
+}
+
+/* ── list view ── */
+.shelf-list{ list-style:none; margin:0; padding:0; }
+.shelf-list li + li{ border-top:1px solid var(--rule); }
+.shelf-row{
+  display:flex; align-items:flex-start; gap:16px;
+  padding:16px 0; text-decoration:none; color:inherit;
+}
+.shelf-list li:first-child .shelf-row{ padding-top:4px; }
+.shelf-row-cover{ flex:none; width:44px; }
+.shelf-row-body{ display:flex; flex-direction:column; gap:4px; min-width:0; flex:1 1 auto; }
+.shelf-row-title{
+  font-family:var(--serif); font-weight:500; font-size:15.5px; line-height:1.25;
+  letter-spacing:-.006em;
+}
+.shelf-row .tag{ margin-top:2px; flex:none; }
+.shelf-row-body .bar{ margin-top:6px; max-width:220px; }
+.mono-meta{
+  font-family:var(--mono); font-size:11.5px; line-height:1.5; letter-spacing:.02em;
+  color:var(--ink-soft);
+}
+
+/* ── the discovery line under the last row ──
+   One hairline and one line of mono: the formats as text, with "your own books"
+   as the link. Spaced as flex items rather than joined with middots, for the
+   same reason the empty state's list is — a separator glyph that lands at a
+   line break dangles at the end of the line. */
+.shelf-foot{
+  margin-top:36px; padding-top:18px; border-top:1px solid var(--rule);
+  display:flex; flex-wrap:wrap; align-items:baseline; gap:7px 12px;
+  font-family:var(--mono); font-size:12px; line-height:1.45; color:var(--ink-soft);
+  text-transform:uppercase; letter-spacing:.04em;
+}
+/* An underline rather than a border-bottom, so padding can grow the box while
+   the hairline stays on the text. A flex parent blockifies its children, so
+   this link is not inline text and does not get WCAG 2.5.8's inline exception —
+   it was a 107.5x18.4 target. Baseline alignment keeps the row on one line. */
+.shelf-foot a{
+  color:var(--ink); padding-block:4px;   /* 3px measured 23.4 — 0.6 short */
+  text-decoration:underline; text-decoration-color:var(--rule);
+  text-decoration-thickness:1px; text-underline-offset:3px;
+}
+.shelf-foot a:hover{ text-decoration-color:var(--ink); }
+
+/* the cleared shelf's second action: text, hairline, and clearly under the
+   primary rather than beside it */
+.empty > .empty-second{
+  /* 12.5px type in a centred flex column is a 15px-tall box, and a flex item
+     is not inline text, so the 24px minimum applies to it in full. Padding
+     with an underline instead of a border keeps the hairline against the words
+     while the target grows; margin drops to hold the same 14px optical gap. */
+  margin-top:9px; padding:5px 8px; font-size:12.5px; color:var(--ink-soft);
+  text-decoration:underline; text-decoration-color:var(--rule);
+  text-decoration-thickness:1px; text-underline-offset:3px;
+}
+.empty > .empty-second:hover{ color:var(--ink); text-decoration-color:var(--ink); }
+
+/* ── book detail ────────────────────────────────────────────────────────── */
+/* padding-block, and the margin reduced by the same amount, so the target grows
+   without the gap below it moving: the box is 26px tall where the words are 16.
+   In `.detail-bar` this link is a flex item, which blockifies it — so WCAG
+   2.5.8's exception for a target inline in a sentence does not apply to it and
+   the 24px minimum applies in full. It measured 84.9x16. */
+/* This class is worn by BOTH an <a> and a <button> (Library's "back to
+   collections"), and index.css has no global button reset — the only global
+   button rule in the file sets font-family. So it resets the UA chrome itself.
+   Without these four lines the collection header rendered the control as a
+   grey 2px outset Windows-95 button; measured, not guessed. */
+.back{
+  display:inline-flex; align-items:center; gap:8px;
+  padding-block:5px; padding-inline:0; margin-bottom:19px;
+  appearance:none; -webkit-appearance:none;
+  background:none; border:0; cursor:pointer;
+  font-family:var(--sans); font-size:11.5px; font-weight:500;
+  letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-soft); text-decoration:none;
+}
+.back svg{ display:block; width:16px; height:16px; }
+.back:hover{ color:var(--ink); }
+
+/* The header row: back on the leading edge, the ⋯ on the trailing one. The
+   row centres them on each other — the link's box is 26px and the button's is
+   32px — and the link's own bottom margin comes off, because the row owns the
+   gap now. */
+.detail-bar{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  margin-bottom:24px;
+}
+.detail-bar .back{ margin-bottom:0; }
+
+.menu-wrap{ position:relative; }
+/* A hairline card, per the guardrail — no shadow anywhere, so the menu is
+   separated from what is under it by its own border and ground alone. It is
+   pinned to the trailing edge because that is the edge its trigger is on. */
+.menu{
+  position:absolute; top:calc(100% + 8px); inset-inline-end:0; z-index:30;
+  min-width:216px; padding:6px;
+  background:var(--card-w); border:1px solid var(--rule); border-radius:var(--r-md);
+  display:flex; flex-direction:column; gap:2px;
+}
+.menu-item{
+  display:flex; align-items:center; gap:10px; width:100%;
+  min-height:40px; padding:8px 12px; border:0; border-radius:var(--r-sm);
+  background:transparent; color:var(--ink); cursor:pointer; text-align:start;
+  font-family:var(--sans); font-size:12.5px; font-weight:500; letter-spacing:.01em;
+  transition:background 140ms var(--ease);
+}
+.menu-item svg{ flex:none; width:17px; height:17px; }
+.menu-item:hover,
+.menu-item:focus-visible{ background:color-mix(in oklab, var(--ink) 7%, transparent); }
+/* The destructive item is the only coloured text in the menu, and it is last
+   and rule-separated — the two cheapest ways to stop a pointer landing on it
+   by momentum. */
+.menu-item--danger{
+  color:var(--danger);
+  margin-top:5px; padding-top:13px; border-top:1px solid var(--rule);
+  border-radius:0 0 var(--r-sm) var(--r-sm);
+}
+.menu-item--danger:hover,
+.menu-item--danger:focus-visible{ background:color-mix(in oklab, var(--danger) 12%, transparent); }
+
+.detail-head{ display:flex; gap:24px; align-items:flex-start; margin-bottom:28px; }
+.detail-cover{ flex:none; width:132px; }
+.detail-meta{ display:flex; flex-direction:column; gap:8px; min-width:0; padding-top:2px; }
+.detail-meta .tag{ margin:0 0 2px; }
+.detail-meta .ui-h{ font-size:24px; }
+.detail-author{ font-size:14px; line-height:1.4; color:var(--ink-soft); }
+.detail-place{ margin-top:10px; }
+.detail-marks{ margin-top:6px; font-family:var(--mono); font-size:11.5px; letter-spacing:.02em; }
+.detail-blurb{ margin-top:10px; color:var(--ink-soft); }
+.detail-confirm{ margin-top:8px; }
+
+/* The action sits under the author in the head column, so it needs a real gap
+   above it — 18px, one step up from the 8px the head's own rows use, which is
+   what makes it read as a separate thing rather than a fourth line of meta. */
+.detail-act{ margin-top:18px; display:flex; flex-direction:column; align-items:flex-start; gap:12px; }
+.detail-act .btn{ min-width:168px; }
+.detail-prog{ width:100%; max-width:260px; margin:0; }
+.detail-prog .bar{ margin-top:0; margin-bottom:7px; }
+
+/* Six lines, then a toggle. The clamp is on a class rather than toggled inline
+   so the measurement in useClamped compares against a real clamped height. */
+.detail-blurb--clamp{
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:6; overflow:hidden;
+}
+/* 7px of vertical padding, not 4: the text box is 12px tall, and a 20px
+   control is under the 24px WCAG 2.5.8 floor. The padding is invisible — the
+   underline is drawn on the text, not the box — so the optical gap above is
+   held by dropping the margin to 6px. */
+.detail-more{
+  margin-top:6px; padding:7px 0; border:0; background:none; cursor:pointer;
+  font-family:var(--sans); font-size:11.5px; font-weight:500;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink);
+  text-decoration:underline; text-decoration-color:var(--rule);
+  text-decoration-thickness:1px; text-underline-offset:4px;
+}
+.detail-more:hover{ text-decoration-color:var(--ink); }
+
+/* The publisher's own subject headings. Same chip as .tag, set as a list
+   because that is what it is; the gap is the only separator. */
+/* padding:0 is not decoration — `list-style:none` does not remove the UA's
+   40px `padding-inline-start`, and without it this row started 40px to the
+   trailing side of the blurb it belongs to. Every other list in this file zeroes
+   it; this one was missed, and a screenshot caught it. 20px above because the
+   chips are a group of their own and MORE (10px) belongs to the blurb — an
+   inter-group gap has to beat the intra-group one to read as a break. Row gap
+   over column gap so three wrapped lines read as lines. */
+.subjects{
+  display:flex; flex-wrap:wrap; gap:7px 6px;
+  margin:20px 0 0; padding:0; list-style:none;
+}
+.subjects li{
+  font-family:var(--mono); font-size:10.5px; line-height:1.4; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink-soft);
+  border:1px solid var(--rule); border-radius:var(--r-img); padding:3px 7px;
+}
+
+/* A disclosure, not a <details>: the panel already provides the box, and
+   <summary>'s default marker cannot be styled consistently across engines.
+   Full width, so the whole label row is the target.
+
+   The padding reaches out into the panel's own padding and the negative margin
+   takes it back, which grows the target to 38px without moving anything on
+   screen — the label and the marker sit exactly where they did. Measured 22px
+   before this, which is under the 24px minimum; an earlier comment here claimed
+   44px, which was never true of the code beneath it. */
+.disclose{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  width:100%; min-height:22px; border:0; background:none; cursor:pointer;
+  padding:8px 0; margin:-8px 0;
+  color:inherit; text-align:start;
+}
+
+.disclose .ui-lbl{ pointer-events:none; }
+.disclose-mark{
+  font-family:var(--mono); font-size:15px; line-height:1; color:var(--ink-soft);
+  width:22px; height:22px; display:grid; place-items:center;
+  border:1px solid var(--rule); border-radius:999px;
+}
+.disclose:hover .disclose-mark{ color:var(--ink); border-color:var(--ink); }
+
+/* Two columns on a phone, because a label and its value are one row and a
+   wrapped value under a wrapped label is unreadable. Hairlines between rows,
+   not around them. */
+.facts{ margin-top:16px; display:flex; flex-direction:column; }
+.facts > div{
+  display:grid; grid-template-columns:minmax(88px, 34%) 1fr; gap:14px;
+  padding:9px 0; border-top:1px solid var(--rule); align-items:baseline;
+}
+.facts > div:first-child{ border-top:0; padding-top:0; }
+.facts dt{
+  font-family:var(--sans); font-size:10.5px; font-weight:500;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft);
+}
+.facts dd{
+  font-family:var(--mono); font-size:11.5px; line-height:1.5; color:var(--ink);
+  overflow-wrap:anywhere; text-wrap:pretty;
+}
+
+/* Outlined in the danger colour, never filled: the panel is a question, and
+   the only filled danger surface in the app is the button that answers it. */
+.panel--danger{ border-color:var(--danger); margin-top:16px; }
+.panel--danger .ui-lbl{ color:var(--danger); }
+@media (max-width:479px){
+  .detail-head{ gap:18px; }
+  .detail-cover{ width:104px; }
+  .detail-meta .ui-h{ font-size:21px; }
+}
+
+/* ── import ────────────────────────────────────────────────────────────────
+   A panel that says what it is waiting for, centred, with real breathing room.
+   Not a dashed tile: the drop target is the whole window, and a dashed
+   rectangle would claim otherwise. */
+.drop{
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+  gap:16px; padding:40px 24px;
+  background:var(--card-w); border:1px solid var(--rule); border-radius:var(--r-md);
+}
+.drop svg{ display:block; width:34px; height:34px; color:var(--ink); opacity:.4; }
+.drop-lead{ max-width:34em; color:var(--ink-soft); }
+.drop-busy{ margin-top:-4px; }
+
+.results{ list-style:none; margin:20px 0 0; padding:0; }
+.result{
+  display:flex; flex-direction:column; align-items:flex-start; gap:6px;
+  padding:18px 0; border-top:1px solid var(--rule);
+}
+.result-title{
+  font-family:var(--serif); font-weight:500; font-size:16px; line-height:1.25;
+}
+.result .btn{ margin-top:6px; }
+/* a refusal is not an error state to be shouted — the reason is the message,
+   and the only colour is the rule that carries it */
+.result--no{ border-top-color:var(--danger); }
+.result--no .result-title{ color:var(--danger); }
+
+/* the window-wide drop veil. No blur and no glass: an opaque wash of the
+   app's own paper, and one line of mono. */
+.dropveil{
+  position:fixed; inset:0; z-index:40; pointer-events:none;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--paper); opacity:.94;
+  box-shadow:inset 0 0 0 2px var(--ink);
+}
+.dropveil span{
+  font-family:var(--mono); font-size:13px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--ink);
+}
+
+/* ── iPad and desktop ─────────────────────────────────────────────────────
+   Build order step 5. Two changes, and deliberately only two: the nav stands
+   up into a rail, and the shelf is allowed to be as wide as the window.
+
+   The rail is the SAME capsule as the phone bar — same tokens, same 999px,
+   same filled-ink active tab, same round Open button beside it. It is rotated,
+   not redesigned. Press has no rail to inherit (it is a phone-first app), so
+   the only honest way to build one is to turn a component that already exists
+   rather than to invent a surface: no border-right, no full-height sidebar,
+   no second kind of chrome.
+
+   It gains one thing the phone bar cannot afford: every tab keeps its label,
+   stacked under the icon, not just the active one. On a phone that costs the
+   width of the bar; here there is nothing to spend it against.
+
+   The page RESERVES the rail's column rather than letting the capsule float
+   over the content. Content centres with `align-items:center`, so a floating
+   rail would be centred against — and eventually overlap — a shelf that has
+   just been allowed to grow to the width of the window. */
+@media (min-width:1024px){
+  :root{ --rail:88px; }
+
+  /* TWO gutters, not one: the rail lives in the first and the content clears
+     it by the second. With a single gutter the arithmetic works out to the
+     content starting at exactly the rail's right edge — invisible at 1280,
+     where the 1080 cap leaves slack to centre in, and flush against the rail
+     at 1024, where it does not. Measured: 0px clearance on the left against
+     32px on the right. */
+  .page{ padding-left:calc(var(--gutter) * 2 + var(--rail)); }
+
+  .tabbar{
+    left:var(--gutter); bottom:auto; top:50%;
+    transform:translateY(-50%);
+    flex-direction:column; gap:14px;
+    max-width:none;
+  }
+  .tab-pill{ flex-direction:column; gap:4px; width:var(--rail); }
+  .tab-pill a{
+    /* stacked, so the label sits under its icon rather than beside it */
+    flex-direction:column; gap:6px;
+    width:100%; min-height:0;
+    padding:12px 4px; border-radius:22px;
+    font-size:9.5px; letter-spacing:.09em;
+  }
+  /* every tab is named here, not only the current one */
+  .tab-pill a .tab-lbl{ display:block; }
+  .tab-pill a[aria-current="page"]{ padding-inline:4px; }
+  .tab-add{ width:56px; height:56px; }
+
+  /* NOT widened. A shelf capped at 680px in a 1920px window is four small
+     covers with 360px of blank paper either side, and the obvious fix is one
+     number — `.page-inner--wide{ max-width:1080px }` gives six columns and
+     measures balanced at every width from 1024 up.
+
+     DESIGN.md § Space says "Library max width 680px", and that outranks the
+     obvious fix. The hook is left in place, unset, because the question is
+     the owner's and the answer is one line either way. */
+}
+
+/* ══ THE READER ═══════════════════════════════════════════════════════════
+   The one screen in the app that is not a page of cards. Three rules govern
+   the whole thing:
+
+   1. The chrome FLOATS over the read area, and the text still never runs
+      under it. Those two things are only compatible because the clear band is
+      the paginator's own block margin rather than a reserved strip: the page
+      keeps its gutter, the controls sit in it, and nothing in the flow changes
+      when they appear. So a reveal costs no relayout at all — no transition on
+      a track, no arithmetic, no reflow of the book.
+
+   2. The stage and the contents list share ONE grid area. The list can
+      therefore cover the page exactly, without knowing the height of a bar
+      or the depth of a safe-area inset.
+
+   3. No shadow, no blur, no glass. The guardrail stands. What changed is the
+      LAYOUT, on the owner's instruction — "I also want floating icons on top
+      common to ios apps, on the reading page too."
+
+      The bars used to be two 52px tracks in this grid, which took 104px off
+      the page and made the reveal cost a reflow of the book. They now sit
+      INSIDE the read area, pinned to its two ends, so:
+
+        · the paper reaches all four edges of the window, which is the whole
+          visual difference between this and a web page with a toolbar;
+        · revealing the chrome costs no relayout at all, because nothing in
+          the flow changes — where the row model spent one reflow of the book
+          on every toggle;
+        · the clear band the controls sit in is the paginator's own block
+          margin, raised to CHROME_INSET in Reader.tsx, so the text never
+          runs under a control on a paginated page.
+
+      They float without a shadow because they do not need one: --lift is the
+      page moved 8% toward its own ink, and a hairline closes it. A shadow
+      would be the lazy way to say the same thing, on all seven stocks, badly. */
+.reader{
+  height:100dvh;
+  display:grid;
+  grid-template-areas:"read" "sheet";
+  grid-template-rows:1fr auto;
+  overflow:hidden;
+  /* The paper is full-bleed; the PAGE is not. Insetting here rather than on
+     each bar is what lets the paginator's margin stay one symmetric number:
+     foliate takes a single block margin for both ends and cannot express a
+     47px notch at one end only. */
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
+  /* A pull-to-refresh in the middle of a chapter is a lost page. */
+  overscroll-behavior:none;
+  /* Selection belongs to the text inside the iframe; on the chrome around it a
+     drag that highlights the title is a drag that failed to turn the page. */
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+/* ── the bars ─────────────────────────────────────────────────────────────
+   Not bars any more: two rows of floating controls, pinned to the two ends of
+   the read area and sharing it with the page. No fill and no rule of their own
+   — every mark on screen belongs to a control, so there is no strip of chrome
+   to look at when the chrome is what you are not using.
+
+   pointer-events is the load-bearing line. A transparent full-width row over
+   the page would eat every tap meant for the turn, so the row is inert and
+   only its children are live. Get this wrong and the top and bottom thirds of
+   the book stop turning while the chrome is open. */
+.reader-bar{
+  grid-area:read;
+  z-index:4;
+  pointer-events:none;
+  display:flex; align-items:center; gap:8px;
+  padding:10px 12px;
+  background:none;
+}
+.reader-bar > *{ pointer-events:auto; }
+.reader-bar--top{ align-self:start; }
+.reader-bar--bottom{ align-self:end; }
+
+/* The reveal is now free — nothing in the flow moves — so it can afford to
+   arrive rather than appear. transform and opacity only; the exit is a plain
+   unmount, because React cannot hold a node open for an out transition and
+   faking it with a timer would put JS on the main thread at the exact moment
+   a finger might be starting a turn. */
+@keyframes reader-chrome-in{
+  from{ opacity:0; transform:translateY(var(--chrome-from)); }
+  to  { opacity:1; transform:none; }
+}
+.reader-bar--top{ --chrome-from:-8px; }
+.reader-bar--bottom{ --chrome-from:8px; }
+.reader-bar{ animation:reader-chrome-in 200ms var(--ease) both; }
+@media (prefers-reduced-motion:reduce){
+  .reader-bar{ animation:none; }
+}
+
+/* 44px round, which is the iOS touch target and here also the visible shape —
+   hit area and drawing are the same circle, so there is no invisible margin to
+   mis-aim at and no 32px pill pretending to be 44.
+
+   THE ICON SIZE IS THE FIX. This rule shipped with no width or height on the
+   svg, and an svg with neither and a viewBox resolves to 100%/100% of its box:
+   every icon in the reader was drawn at 44×44 inside a 44×44 button, glyph
+   edge against button edge, 1.8 of stroke scaled to nearly 3.3. Measured
+   before the fix, all four buttons: btn 44×44, svg 44×44. That is what "the
+   icons are huge for no reason" was. Every other icon in this file carries an
+   explicit size; the reader's four were the only ones that did not. 20px in 44
+   leaves a 12px optical inset, which is the ratio the nav pills already use. */
+.reader-btn{
+  flex:none;
+  display:inline-flex; align-items:center; justify-content:center;
+  width:44px; height:44px; padding:0;
+  border:1px solid var(--rule); border-radius:999px;
+  background:var(--lift); color:var(--ink);
+  cursor:pointer;
+  transition:transform 160ms var(--ease), background-color 160ms var(--ease);
+}
+.reader-btn > svg{ display:block; width:20px; height:20px; }
+.reader-btn:active{ transform:scale(.92); background:var(--lift-hi); }
+.reader-btn[aria-expanded="true"]{
+  background:var(--ink); color:var(--stock-bg); border-color:var(--ink);
+}
+
+/* One line, always — a title that wraps is a title that grows into the text.
+   It floats as a capsule rather than as bare words for a reason that only
+   appears once the bars stop being bars: unfilled text over a paragraph is
+   unreadable on every stock, and in scrolled flow there is no clear band for
+   it to sit in. The capsule is deliberately SHORTER than the 44px circles
+   beside it — a label is not a control, and the height difference is what says
+   so without a second colour.
+
+   flex:0 1 auto, not 1 1 auto: the capsule is as wide as the title and no
+   wider, so it reads as a chip on the page rather than as a bar with a rounded
+   end. margin-inline:auto is what keeps it centred between the two buttons. */
+.reader-title{
+  flex:0 1 auto; min-width:0;
+  margin:0 auto;
+  display:flex; align-items:center;
+  height:34px; padding:0 14px;
+  border:1px solid var(--rule); border-radius:999px;
+  background:var(--lift);
+  font-family:var(--serif); font-weight:600;
+  font-size:14px; line-height:1;
+  text-align:center; color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* ── the readout ──────────────────────────────────────────────────────────
+   Per-chapter pages, never a whole-book page number: on a reflowable book that
+   number is a property of this font at this size on this screen, and printing
+   it as if it were a property of the book is a lie. `tabular-nums` because the
+   figure changes on every turn and a shifting readout draws the eye off the
+   page. */
+.reader-readout{
+  /* Same capsule as the title, and the same flex:0 1 auto for the same reason:
+     the pill is the width of the readout, centred by auto margins, and the
+     chapter is the part that gives when there is not enough room. */
+  flex:0 1 auto;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  min-width:0; margin:0 auto;
+  height:30px; padding:0 14px;
+  border:1px solid var(--rule); border-radius:999px;
+  background:var(--lift);
+  font-family:var(--mono); font-size:10px; font-weight:500;
+  letter-spacing:.09em; text-transform:uppercase;
+  font-variant-numeric:tabular-nums;
+  /* Full ink, not --ink-soft. Soft was correct while the readout floated bare
+     on the page: the page was the ground it was measured against. On --lift it
+     is measured against a ground already 8% toward the ink, and that ate the
+     margin — re-measured after Dusk became the blue stock, soft fails on three:
+     day 4.29:1, butter 4.26, tea 3.91, all under the 4.5 that 10px uppercase
+     needs. (Dusk now clears it at 5.30, because its lighter page carries a
+     lighter soft; it keeps full ink anyway — the readout is one component, not
+     one per stock.) The capsule is what makes the readout quiet, so the type
+     inside it does not have to be. Full ink measures 9.70:1 (tea) to
+     14.57:1 (press). */
+  color:var(--ink);
+}
+/* The dots are punctuation between three values, not content. They keep the
+   soft tone the figures gave up, and at 55% they are the one thing here that
+   is allowed to be faint. */
+.reader-readout-sep{ flex:none; color:var(--ink-soft); opacity:.55; }
+.reader-readout > span{ flex:none; }
+.reader-chapter{
+  flex:0 1 auto; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  text-transform:none; letter-spacing:.04em;
+}
+
+/* ── the stage ────────────────────────────────────────────────────────────
+   min-height:0 is not optional: a grid item defaults to min-content, and the
+   iframe inside would push this track past 1fr and put the foot bar off the
+   bottom of the window. */
+.reader-stage{
+  grid-area:read;
+  position:relative;
+  min-height:0;
+  overflow:hidden;
+}
+.reader-stage > foliate-view{
+  display:block;
+  width:100%; height:100%;
+}
+/* Paginated has nothing to scroll, so the browser's own horizontal gestures
+   are given up — but never pinch-zoom, which is somebody's only way of
+   reading this. Scrolled keeps its vertical pan. */
+.reader[data-flow="paginated"] .reader-stage{ touch-action:pinch-zoom; }
+.reader[data-flow="scrolled"]  .reader-stage{ touch-action:pan-y pinch-zoom; }
+
+/* ── the seam ─────────────────────────────────────────────────────────────
+   The 1px rule on the leading edge of the outgoing page. Without it a slide
+   between two pages of the same stock is two identical grounds moving past
+   each other with no visible boundary, and the turn reads as the text
+   twitching rather than as a page leaving.
+
+   It is a real element with a real transform, animated by the turn on the same
+   clock and easing as the page itself, because a custom property is not
+   interpolable unless it is registered and a hairline that steps is worse than
+   no hairline. Hidden except during a turn: a permanent vertical rule down the
+   middle of the page is the drawn spine gutter the guardrails ban. */
+.reader-seam{
+  position:absolute;
+  inset-block:0;
+  inset-inline-start:0;
+  width:1px;
+  background:var(--rule);
+  opacity:0;
+  pointer-events:none;
+  z-index:2;
+}
+/* A slide has a moving edge; a fade and an instant have none, so there the
+   hairline would be a stray rule down the leading margin. The edge is the
+   page's own trailing edge, and #seamAt puts it at the offset. */
+.reader[data-turn="slide"] .reader-stage[data-turning] .reader-seam{
+  opacity:1;
+  will-change:transform;
+}
+@media (prefers-reduced-motion: reduce){
+  /* Nothing slides, so there is no edge to draw. */
+  .reader-stage[data-turning] .reader-seam{ opacity:0; }
+}
+
+.reader-opening{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  margin:0;
+}
+
+/* ── contents ─────────────────────────────────────────────────────────────
+   The rows only. The surface they sit on is `.reader-panel` — the contents
+   list stopped being its own drawer when it gained the marks and search tabs,
+   and the container rule that used to live here (`grid-area:read`, the stock
+   ground, its own scroller) was dead from that day: nothing has carried the
+   bare `.reader-toc` class since. Scrolling and the safe-area pad are
+   `.panel-body`'s now. */
+.reader-toc-list{ list-style:none; margin:0; padding:0; }
+.reader-toc-item{ margin:0; }
+/* The hairline is between rows, not around them, so a nested list reads as one
+   continuous column rather than as boxes inside boxes. */
+.reader-toc-item + .reader-toc-item > .reader-toc-link,
+.reader-toc-item > .reader-toc-list > .reader-toc-item:first-child > .reader-toc-link{
+  border-top:1px solid var(--rule);
+}
+.reader-toc-link{
+  display:block; width:100%;
+  border:0; background:transparent;
+  padding:14px 22px;
+  text-align:start; cursor:pointer;
+  font-family:var(--serif); font-weight:500;
+  font-size:15px; line-height:1.35;
+  color:var(--ink);
+  text-wrap:pretty;
+}
+.reader-toc-link:active{ background:var(--rule); }
+.reader-toc-link:disabled{ color:var(--ink-soft); cursor:default; }
+/* Depth is indent plus a step down in voice: a sub-entry is the same list, one
+   level quieter, not a different kind of thing. */
+.reader-toc-item[data-depth="1"] > .reader-toc-link,
+.reader-toc-item[data-depth="2"] > .reader-toc-link,
+.reader-toc-item[data-depth="3"] > .reader-toc-link{
+  font-family:var(--sans); font-weight:400;
+  font-size:13px; line-height:1.5;
+  color:var(--ink-soft);
+}
+.reader-toc-item[data-depth="1"] > .reader-toc-link{ padding-inline-start:44px; }
+.reader-toc-item[data-depth="2"] > .reader-toc-link{ padding-inline-start:66px; }
+.reader-toc-item[data-depth="3"] > .reader-toc-link{ padding-inline-start:88px; }
+.reader-toc-empty{ margin:0; padding:22px; }
+
+/* ── a book that would not open ───────────────────────────────────────────
+   A refusal, not a spinner that never stops. DRM is caught at import and never
+   reaches here; what reaches here is a corrupt file or one this app does not
+   read, and in both cases the reader is told which. */
+.reader--message{ place-content:center; }
+.reader-message{
+  grid-area:read;
+  align-self:center;
+  max-width:34ch;
+  margin-inline:auto;
+  padding:0 var(--gutter);
+  text-align:center;
+}
+.reader-message .ui-h{ font-size:19px; }
+.reader-message .ui-p{ margin:10px 0 22px; }
+
+/* ── the reading sheet ─────────────────────────────────────────────────────
+   The fourth row, for the same reason the bars are the first and third: a
+   panel of type controls that covers the type it is setting is a form, not a
+   control. Opening it shrinks the page pane, the text reflows once, and every
+   slider afterwards moves text the reader can see. That single reflow at the
+   toggle is the whole cost, and it buys the only arrangement in which "shows
+   its effect live behind the sheet" is literally true.
+
+   Capped at 46dvh so the page keeps the larger half of the window even on the
+   shortest phone in landscape; the body scrolls inside the cap. */
+.sheet{
+  grid-area:sheet;
+  z-index:5;
+  display:flex; flex-direction:column;
+  min-height:0;
+  /* The page pane always keeps the larger share. Measured on an 844px phone:
+     a 380px cap left 360px of reading and the sheet was the bigger half of
+     the screen, which is not what "the pane shrinks, the text stays visible"
+     means. 40dvh/360px leaves 404px of page against 336px of controls. */
+  max-height:min(40dvh, 360px);
+  background:var(--stock-bg);
+  border-top:1px solid var(--rule);
+  animation:sheet-in 240ms var(--ease);
+}
+@keyframes sheet-in{
+  /* transform and opacity only — the row height itself is not animatable and
+     does not need to be: the content rises into a box that is already there. */
+  from{ transform:translateY(10px); opacity:0; }
+  to{ transform:none; opacity:1; }
+}
+@media (prefers-reduced-motion:reduce){ .sheet{ animation:none; } }
+
+.sheet-tabs{
+  flex:none;
+  display:flex; gap:2px;
+  padding:6px 10px 2px;
+}
+.sheet-tab{
+  flex:1 1 0; min-height:38px; padding:0 8px;
+  border:0; border-radius:var(--r-sm);
+  background:transparent; color:var(--ink-soft);
+  font-family:var(--sans); font-size:11.5px; font-weight:600;
+  letter-spacing:.1em; text-transform:uppercase;
+  cursor:pointer;
+  transition:color 160ms var(--ease), background 160ms var(--ease);
+}
+/* Same inversion as .reader-btn — one idiom for "this is the one that is on",
+   and it needs no colour to say it. */
+.sheet-tab[aria-selected="true"]{ background:var(--ink); color:var(--stock-bg); }
+
+.sheet-body{
+  flex:1 1 auto; min-height:0;
+  overflow-y:auto; overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding:0 16px 16px;
+}
+
+/* The PDF sheet has no tabs above it, so nothing supplies the top padding the
+   tabbed sheet gets for free. The same 16px as the sides, so the lead sentence
+   sits in an even inset instead of against the sheet's own top rule. */
+.sheet-body--bare{ padding-top:16px; }
+
+/* The one sentence at the top of the PDF sheet, saying why there is so little
+   in it. Prose, not a control: the sans face at the caption size, its own
+   measure, and 12px of air before the first rule so it reads as an
+   introduction rather than as another row's note. */
+.sheet-lead{
+  margin:0 0 12px;
+  max-width:46ch;
+  font-family:var(--sans);
+  font-size:12.5px; line-height:1.55;
+  text-wrap:pretty;
+}
+
+/* ── one control ──────────────────────────────────────────────────────────
+   A micro-label on the leading edge, its current value on the trailing edge,
+   and the control under both. The value is mono and tabular for the reason the
+   readout is: it changes under the finger, and a figure that changes width
+   drags the eye off the page it is meant to be judging. */
+.ctl{ padding:13px 0; border-top:1px solid var(--rule); }
+.ctl:first-child{ border-top:0; }
+.ctl[data-off]{ opacity:.55; }
+.ctl--row{ display:flex; align-items:flex-start; gap:16px; }
+.ctl-grow{ flex:1 1 auto; min-width:0; }
+.ctl-head{
+  display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+  margin:0; min-height:13px;
+}
+.ctl-lbl{
+  font-family:var(--sans); font-size:10.5px; font-weight:500; line-height:1.2;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft);
+}
+.ctl-val{
+  flex:none;
+  font-family:var(--mono); font-size:11px; font-weight:500; line-height:1.2;
+  letter-spacing:.04em; color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+.ctl-opts{ display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+.ctl-note{
+  margin:8px 0 0; max-width:52ch;
+  font-family:var(--sans); font-size:12px; line-height:1.45; color:var(--ink-soft);
+}
+
+.sheet-opt{
+  display:inline-flex; align-items:center; gap:8px;
+  min-height:40px; padding:0 13px;
+  border:0; border-radius:var(--r-sm);
+  background:transparent; color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--rule);
+  font-family:var(--sans); font-size:13px; font-weight:500; line-height:1;
+  cursor:pointer;
+  transition:transform 160ms var(--ease), background 160ms var(--ease);
+}
+.sheet-opt:active{ transform:scale(.96); }
+.sheet-opt[aria-pressed="true"]{
+  background:var(--ink); color:var(--stock-bg); box-shadow:none;
+}
+/* The face's own family at something near reading size, so the chip is the
+   specimen and the control at once. A picker that names five serifs in the
+   chrome face asks the reader to remember what Newsreader looks like. */
+.sheet-opt--face{ font-size:15px; font-weight:400; letter-spacing:0; }
+.sheet-opt--stock{ padding-inline-start:10px; }
+
+/* The swatch carries data-stock, so its ground comes from the same block the
+   page itself reads — there is no second table of seven values here. Its ring
+   is mixed from its OWN ink rather than the reader's --rule, because inside a
+   [data-stock] element --rule has already been re-pinned to that stock's. The
+   colour is never the only channel: every swatch has its name beside it. */
+.sheet-sw{
+  flex:none; width:18px; height:18px; border-radius:999px;
+  box-shadow:inset 0 0 0 1px color-mix(in oklab, var(--stock-ink) 32%, transparent);
+}
+
+/* ── slider ───────────────────────────────────────────────────────────────
+   34px of touch height around a 3px track. Both the fill stop and the zero
+   tick are positioned on the THUMB'S travel — calc(11px + (100% - 22px) * n) —
+   not on the track's width. Using a plain percentage puts the fill up to 11px
+   away from the thumb at each end, which reads as a slider that does not quite
+   line up with itself. */
+.rng-wrap{ position:relative; margin-top:4px; }
+.rng{
+  -webkit-appearance:none; appearance:none;
+  display:block; width:100%; height:34px; margin:0;
+  background:transparent; color:var(--ink); cursor:pointer;
+}
+.rng:disabled{ cursor:default; }
+.rng:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; border-radius:var(--r-sm); }
+.rng::-webkit-slider-runnable-track{
+  height:3px; border-radius:2px;
+  background:linear-gradient(to right,
+    var(--ink) 0, var(--ink) calc(11px + (100% - 22px) * var(--p)),
+    var(--rule) calc(11px + (100% - 22px) * var(--p)), var(--rule) 100%);
+}
+.rng::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none;
+  width:22px; height:22px; margin-top:-9.5px;
+  border:2px solid var(--stock-bg); border-radius:999px;
+  background:var(--ink);
+}
+.rng::-moz-range-track{ height:3px; border-radius:2px; background:var(--rule); }
+.rng::-moz-range-progress{ height:3px; border-radius:2px; background:var(--ink); }
+.rng::-moz-range-thumb{
+  width:18px; height:18px;
+  border:2px solid var(--stock-bg); border-radius:999px;
+  background:var(--ink);
+}
+/* Where zero is on a signed range. Word and letter spacing both cross it, and
+   without the tick "back to normal" is a value you have to read rather than a
+   place you can feel. */
+.rng-zero{
+  position:absolute; top:50%; left:calc(11px + (100% - 22px) * var(--z));
+  width:1px; height:10px; margin-top:-5px;
+  background:var(--ink-soft); opacity:.5;
+  pointer-events:none;
+}
+
+/* ── switch ───────────────────────────────────────────────────────────────
+   One thing with two states. Two chips would make it look like two choices,
+   which is how a reader ends up wondering which of On and Off is selected.
+   The pill is 28px tall for proportion and its hit area is 44 via ::before. */
+.sw{
+  flex:none; position:relative;
+  width:46px; height:28px; padding:0;
+  border:0; border-radius:999px;
+  background:var(--rule); cursor:pointer;
+  transition:background 160ms var(--ease);
+}
+.sw::before{ content:""; position:absolute; inset:-8px; }
+.sw:disabled{ cursor:default; opacity:.5; }
+.sw-knob{
+  position:absolute; top:3px; left:3px; width:22px; height:22px;
+  /* the stock on the reading page, the card ground anywhere else: this switch
+     is used in Settings too, where no stock is declared */
+  border-radius:999px; background:var(--stock-bg,var(--card-w));
+  transition:transform 180ms var(--ease);
+}
+.sw[aria-checked="true"]{ background:var(--ink); }
+.sw[aria-checked="true"] .sw-knob{ transform:translateX(18px); }
+@media (prefers-reduced-motion:reduce){
+  .sw-knob{ transition:none; }
+}
+
+/* ── the rivers note ──────────────────────────────────────────────────────
+   A hairline note carrying its own fix, per SPEC.md § 3 — not a modal, and
+   not a colour: no theme tint reaches the reading page or its chrome, because
+   inside a [data-stock] the ink has been re-pinned and a theme tint against a
+   stock ink is a pair nobody measured. */
+.sheet-note{
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+  margin:12px 0 0; padding-top:12px;
+  border-top:1px solid var(--rule);
+  font-family:var(--sans); font-size:12.5px; line-height:1.45; color:var(--ink);
+}
+.sheet-note > span{ flex:1 1 20ch; min-width:0; }
+.sheet-note-do,
+.sheet-note-no{
+  flex:none; min-height:34px; padding:0 12px;
+  border:0; border-radius:var(--r-sm);
+  font-family:var(--sans); font-size:12.5px; font-weight:600; line-height:1;
+  cursor:pointer;
+}
+.sheet-note-do{ background:var(--ink); color:var(--stock-bg); }
+.sheet-note-no{ background:transparent; color:var(--ink-soft); padding-inline:6px; }
+
+/* On a wide window the bars stop running the full width of the glass: the
+   controls belong over the text they control, not out at the bezel. */
+@media (min-width:1024px){
+  /* The hairline still runs the full width of the glass — it is the edge of
+     the sheet, and a rule that stops short of the window reads as a box. Only
+     the CONTENT is brought in, by padding, to sit over the column of text. */
+  .reader-bar{ padding-inline:max(16px, calc((100% - 1080px) / 2)); }
+  .reader-title{ font-size:16px; }
+  /* The controls sit over the column of text they are setting, on the same
+     inset as the contents list. The sheet's own ground and hairline still run
+     to the bezel — they are the edge of the sheet of paper, not a card. */
+  .sheet-tabs{ padding-inline:max(10px, calc((100% - 726px) / 2)); }
+  .sheet-body{ padding-inline:max(16px, calc((100% - 720px) / 2)); }
+  /* No taller cap here: at 1280x900 a 440px sheet left only 356px of page,
+     the same inversion as on the phone. Wide gains go to the column width
+     above, not to the sheet's height. */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   P3 — marks: the panel, the selection menu, the note, the export sheet.
+
+   One new role, and only one. Everything on the reading page is a stock, and a
+   stock has exactly two grounds: the page and the hairline. A search field, a
+   note card and a floating menu all need a third — a surface that reads as
+   sitting ON the page without a shadow to say so, since shadows are banned.
+
+     --lift   the page, moved 8% toward its own ink.
+
+   Derived rather than tabulated, which is the whole reason it is allowed: it
+   cannot drift out of step with a stock, it cannot be cool on a warm page, and
+   adding an eighth stock needs no line here. Recorded as NEW in DESIGN.md.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.reader{
+  --lift:color-mix(in oklab, var(--stock-bg) 92%, var(--stock-ink));
+  --lift-hi:color-mix(in oklab, var(--stock-bg) 86%, var(--stock-ink));
+}
+
+/* Pitch is the one stock the derivation cannot serve, and the reason is oklab,
+   not the recipe. A perceptual mix moves LIGHTNESS: 8% of the way from L 0 to
+   the ink's L 0.79 is L 0.063, and L 0.063 in sRGB is 1/255. Measured: the
+   panel came out rgb(1,1,1) on rgb(0,0,0) — 3/765 from the page, so nothing
+   on the darkest stock read as lifted at all. Every other stock has room below
+   its ground; pitch sits on the sRGB floor and has none.
+
+   So pitch, and only pitch, gets the step tabulated instead of derived, at the
+   size the other dark stocks arrive at by formula: coal lifts 14/255 per
+   channel and dusk 13, and their hovers 25 and 23. Warm, in the ink's own
+   191:186:178 ratio, so a lifted surface on black is not the one cool grey in
+   the app. */
+.reader[data-stock="pitch"]{
+  --lift:#0F0E0D;
+  --lift-hi:#1A1918;
+}
+
+/* The ribbon in the "on" state. Accent, not inverted ink: every other toggle
+   on this page is a mode, and this one is a mark the reader made. */
+.reader-btn.is-on{ color:var(--accent); }
+.reader-btn.is-on[aria-expanded="true"]{ color:var(--accent-fg); }
+
+/* ── the tick ─────────────────────────────────────────────────────────────
+   2px × 18px on the page's top trailing corner, and it stays when the chrome
+   goes. That is the point of it: with the bars hidden there is nothing else on
+   screen that says this page is kept, and re-opening the chrome to check is
+   exactly the tap the ribbon exists to save. */
+.reader-tick{
+  position:absolute;
+  top:0; inset-inline-end:14px;
+  width:2px; height:18px;
+  background:var(--accent);
+  border-end-start-radius:2px; border-end-end-radius:2px;
+  pointer-events:none;
+  z-index:3;
+}
+
+/* ═══ the panel ════════════════════════════════════════════════════════════
+   Contents, marks and search in one surface, over the page, in the stage's own
+   grid area — so it covers the text and nothing else, exactly as the contents
+   list did before it grew two more jobs.
+
+   `.reader-panel`, not `.panel`. This was `.panel` for one release and it
+   silently took over the chrome's white card of the same name: same
+   specificity, declared later, so every panel on Settings and the book sheet
+   inherited `display:flex`, a transparent background in place of `--card-w`,
+   an inert `grid-area`, and — from the 820px block below — a 400px cap inside
+   a 680px column. The children keep their `panel-` prefix: those names are
+   already unique to this surface. */
+.reader-panel{
+  grid-area:read;
+  z-index:6;
+  display:flex; flex-direction:column;
+  min-height:0;
+  background:var(--stock-bg);
+}
+
+.panel-head{
+  flex:none;
+  display:flex; flex-direction:column; gap:10px;
+  padding:12px 16px 0;
+  border-bottom:1px solid var(--rule);
+}
+
+/* The dismiss row. Trailing edge and text-only: this surface names itself in
+   the tabs immediately below it, so a title above them would be the same word
+   twice. The row is its own line rather than a third control inside the find
+   field, which already carries a clear button.
+
+   The negative inline margin buys the 44px hit area back out of the head's
+   own padding, so the target reaches the corner of the screen without the
+   label drifting off the 16px edge every other row is aligned to. */
+.panel-bar{
+  display:flex; align-items:center; justify-content:flex-end;
+  margin-inline-end:-6px;
+}
+.panel-done{
+  /* flex-end, not center: a text-only button aligns by its GLYPH, not by its
+     hit box. Centred in a 64px target the label landed 22px in from the head's
+     edge against the find field's 16px — a 6px break in the one vertical the
+     whole head is aligned to, invisible by eye and obvious in a measurement.
+     The box still runs out to the corner; only the word is on the line. */
+  display:inline-flex; align-items:center; justify-content:flex-end;
+  min-height:44px; min-width:64px; padding:0 6px;
+  border:0; background:transparent; color:var(--ink);
+  font-family:var(--sans); font-size:11.5px; font-weight:600;
+  letter-spacing:.1em; text-transform:uppercase;
+  cursor:pointer;
+}
+.panel-done:active{ color:var(--ink-soft); }
+
+/* The field. 16px is not a style choice — iOS Safari zooms the whole page for
+   anything smaller, and a page that zooms while the reader types has lost
+   their place. */
+.panel-find{
+  display:flex; align-items:center; gap:8px;
+  min-height:42px;
+  padding-inline:12px;
+  background:var(--lift);
+  border-radius:var(--r-sm);
+}
+.panel-find-icon{ flex:none; display:inline-flex; color:var(--ink-soft); }
+.panel-find-icon > svg{ width:18px; height:18px; }
+.panel-find-field{
+  flex:1 1 auto; min-width:0;
+  /* Stretched rather than centred: the input's own box is one line tall, so
+     without this the only part of a 42px field that answers a tap is a 19px
+     strip through the middle of it. */
+  align-self:stretch;
+  border:0; background:transparent;
+  padding:0; margin:0;
+  font-family:var(--sans); font-size:16px; line-height:1.2;
+  color:var(--ink);
+  /* The field is the one place on this page where selecting text is the job. */
+  user-select:text; -webkit-user-select:text;
+}
+.panel-find-field::placeholder{ color:var(--ink-soft); }
+.panel-find-field:focus{ outline:none; }
+/* Safari draws its own clear button on type=search. There is already one, and
+   two of them side by side is a bug the reader has to work out. */
+.panel-find-field::-webkit-search-cancel-button,
+.panel-find-field::-webkit-search-decoration{ -webkit-appearance:none; appearance:none; }
+.panel-find:focus-within{ background:var(--lift-hi); }
+.panel-find-clear{
+  flex:none;
+  display:inline-flex; align-items:center; justify-content:center;
+  width:26px; height:26px; padding:0;
+  margin-inline-end:-4px;
+  border:0; border-radius:999px;
+  background:transparent; color:var(--ink-soft);
+  cursor:pointer;
+}
+.panel-find-clear > svg{ width:15px; height:15px; }
+.panel-find-clear:active{ background:var(--lift-hi); }
+
+/* Two tabs, and they take the strip only while there is no query. Same
+   inversion as .sheet-tab and .reader-btn: one idiom for "this is the one that
+   is on", and it needs no colour to say it. */
+.panel-tabs{ display:flex; gap:2px; padding-bottom:8px; }
+.panel-tab{
+  flex:1 1 0; min-height:36px; padding:0 10px;
+  border:0; border-radius:var(--r-sm);
+  background:transparent; color:var(--ink-soft);
+  font-family:var(--sans); font-size:11.5px; font-weight:600;
+  letter-spacing:.1em; text-transform:uppercase;
+  cursor:pointer;
+  transition:color 160ms var(--ease), background 160ms var(--ease);
+}
+.panel-tab[aria-selected="true"]{ background:var(--ink); color:var(--stock-bg); }
+
+/* …and the count takes it instead while one is live. One strip, one job. */
+.panel-count{
+  display:flex; align-items:baseline; gap:10px;
+  margin:0; padding:2px 2px 10px;
+  font-family:var(--mono); font-size:10px; font-weight:500;
+  letter-spacing:.09em; text-transform:uppercase;
+  font-variant-numeric:tabular-nums;
+  color:var(--ink-soft);
+}
+.panel-count-n{ color:var(--ink); }
+/* The only link in this app that leaves it. Labelled as leaving, and absent
+   entirely when there is no network — a dead link is worse than no link. */
+.panel-out{
+  margin-inline-start:auto;
+  color:var(--accent);
+  text-decoration:underline;
+  text-underline-offset:2px;
+  text-decoration-thickness:from-font;
+  white-space:nowrap;
+}
+
+/* ── the body ─────────────────────────────────────────────────────────────
+   One scroller for all three jobs, so switching tabs never changes the shape
+   of the page under the reader's thumb. The lists inside it nest — one per
+   chapter, one per row — and neither of them scrolls. */
+.panel-body{
+  flex:1 1 auto; min-height:0;
+  overflow-y:auto; overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:max(24px, env(safe-area-inset-bottom));
+}
+.panel-list{ list-style:none; margin:0; padding:0; }
+.panel-body > .reader-toc-list{ padding-top:4px; }
+
+.panel-kinds{
+  display:flex; gap:2px;
+  padding:10px 16px 4px;
+}
+.panel-kind{
+  flex:1 1 0; min-height:32px;
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:0 8px;
+  border:0; border-radius:999px;
+  background:var(--lift); color:var(--ink-soft);
+  font-family:var(--sans); font-size:11px; font-weight:600;
+  letter-spacing:.08em; text-transform:uppercase;
+  cursor:pointer;
+  transition:color 160ms var(--ease), background 160ms var(--ease);
+}
+.panel-kind[aria-selected="true"]{ background:var(--ink); color:var(--stock-bg); }
+.panel-kind-count{
+  font-size:10px; letter-spacing:.04em;
+  font-variant-numeric:tabular-nums;
+  opacity:.7;
+}
+
+/* A chapter heading with its own count. The hairline is above the heading and
+   not around the group, so the whole panel reads as one column of rows rather
+   than as boxes inside boxes — the same rule the contents list follows. */
+.panel-group + .panel-group > .panel-group-head{ border-top:1px solid var(--rule); }
+.panel-group-head{
+  display:flex; align-items:baseline; gap:10px;
+  margin:0; padding:16px 16px 6px;
+  font-family:var(--sans); font-size:10.5px; font-weight:600;
+  letter-spacing:.12em; text-transform:uppercase;
+  color:var(--ink-soft);
+}
+.panel-group-label{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.panel-group-count{ flex:none; font-size:10px; letter-spacing:.04em; font-variant-numeric:tabular-nums; opacity:.7; }
+
+/* ── one row ──────────────────────────────────────────────────────────────
+   A mark row is the row button plus an actions control beside it; a search
+   result is the row button alone. So the button carries its own leading
+   padding and gives up the trailing one when it has a neighbour — which keeps
+   both kinds of row starting on the same 16px edge. */
+.panel-item + .panel-item{ border-top:1px solid var(--rule); }
+.panel-item-row{ display:flex; align-items:flex-start; }
+.panel-row{
+  display:flex; align-items:flex-start; gap:10px;
+  width:100%; padding:13px 16px;
+  border:0; background:transparent;
+  text-align:start; cursor:pointer;
+  color:var(--ink);
+}
+.panel-item-row > .panel-row{ flex:1 1 auto; min-width:0; padding-inline-end:4px; }
+.panel-row:active{ background:var(--lift); }
+.panel-item + .panel-item > .panel-item-row > .panel-row{ border-top:0; }
+/* Search results have no actions control, so the hairline lives on the li. */
+.panel-list > li + li > .panel-row{ border-top:1px solid var(--rule); }
+
+/* 10px, sitting 4px down so it lines up with the top of the letters rather
+   than the top of the line box: level with the letters it reads as belonging
+   to the sentence, level with the box it floats above it. */
+.panel-dot{
+  flex:none;
+  width:10px; height:10px; margin-top:5px;
+  border-radius:999px;
+}
+/* Terracotta is a rule on the page, never a fill — so its marker in a list is
+   a rule too, at the 2px it is actually drawn at. */
+.panel-dot[data-underline]{
+  height:2px; margin-top:9px; border-radius:1px;
+}
+/* The column beside the dot: the line, and the note under it if there is one. */
+.panel-mark{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:6px; }
+
+.panel-excerpt{
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;
+  overflow:hidden;
+  font-family:var(--serif); font-size:14.5px; line-height:1.45;
+  color:var(--ink);
+  text-wrap:pretty;
+}
+/* In a result the surround is context and the match is the point, so the two
+   swap weights. No tint behind the match: a tint means "a reader marked this",
+   and a search hit is not a mark. */
+.panel-excerpt--find{ color:var(--ink-soft); font-size:14px; line-height:1.5; }
+.panel-hit{ color:var(--ink); font-weight:600; }
+
+/* The note in the reader's own hand, on its own ground. The pairing is the
+   whole idea: the book's voice in the book's type, the reader's in a hand. */
+.panel-note{
+  padding:7px 10px;
+  background:var(--lift);
+  border-radius:var(--r-sm);
+  font-family:var(--hand); font-size:13.5px; line-height:1.4;
+  color:var(--ink);
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;
+  overflow:hidden;
+}
+
+/* The actions control. Always present, because a long-press is unreachable by
+   keyboard and invisible to anyone who has not been told it is there — 34 wide
+   inside a row whose own height clears 44. */
+.panel-more{
+  flex:none;
+  display:inline-flex; align-items:center; justify-content:center;
+  width:34px; height:34px; margin:9px 10px 0 0; padding:0;
+  border:0; border-radius:999px;
+  background:transparent; color:var(--ink-soft);
+  cursor:pointer;
+}
+.panel-more > svg{ width:18px; height:18px; }
+.panel-more[aria-expanded="true"]{ background:var(--ink); color:var(--stock-bg); }
+
+.panel-acts{
+  display:flex; gap:8px;
+  padding:0 16px 12px;
+  margin-inline-start:26px;
+}
+.panel-act{
+  display:inline-flex; align-items:center; gap:6px;
+  min-height:34px; padding:0 12px;
+  border:1px solid var(--rule); border-radius:999px;
+  background:transparent; color:var(--ink);
+  font-family:var(--sans); font-size:12px; font-weight:600;
+  cursor:pointer;
+}
+.panel-act > svg{ width:15px; height:15px; }
+.panel-act:active{ background:var(--lift); }
+.panel-act--drop{ color:var(--accent); border-color:color-mix(in oklab, var(--accent) 40%, var(--rule)); }
+
+.panel-empty{
+  margin:0; padding:30px 22px;
+  max-width:34ch;
+  font-family:var(--sans); font-size:13.5px; line-height:1.55;
+  color:var(--ink-soft);
+  text-wrap:pretty;
+}
+
+/* At the end of the list, not pinned above it: export is what a reader does
+   after looking at their marks, so it belongs where looking at them ends. */
+.panel-foot{
+  display:flex; justify-content:center;
+  margin-top:8px; padding:14px 16px 4px;
+  border-top:1px solid var(--rule);
+}
+.panel-export{
+  display:inline-flex; align-items:center; gap:8px;
+  min-height:42px; padding:0 18px;
+  border:1px solid var(--rule); border-radius:999px;
+  background:transparent; color:var(--ink);
+  font-family:var(--sans); font-size:12.5px; font-weight:600;
+  cursor:pointer;
+}
+.panel-export > svg{ width:16px; height:16px; }
+.panel-export:active{ background:var(--lift); }
+
+/* The tail of a capped result list. Same button as export at the end of the
+   marks list, because it is the same gesture — the thing you do when you reach
+   the end of a list — and the line above it says what is being held back. A cap
+   with no count is a lie about how much the book had to say. */
+.panel-tail{
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+  padding:22px 16px 30px;
+  border-top:1px solid var(--rule);
+}
+.panel-tail-note{
+  margin:0;
+  font-family:var(--sans); font-size:11.5px; letter-spacing:.02em;
+  color:var(--ink-soft);
+}
+.panel-tail-note .mono{ font-variant-numeric:tabular-nums; }
+
+/* ═══ the selection menu ═══════════════════════════════════════════════════
+   Absolute over the page, above the seam and below the panel. It is the one
+   surface in this app that sits ON the text, so it has to be opaque and it has
+   to have an edge — with no shadow available, --lift plus a hairline is what
+   separates it from the sentence underneath. */
+.selmenu{
+  position:absolute;
+  z-index:7;
+  display:flex; flex-direction:column;
+  max-width:min(320px, calc(100% - 16px));
+  padding:6px;
+  background:var(--lift);
+  border:1px solid var(--rule);
+  border-radius:var(--r-md);
+}
+.selmenu-tints{
+  display:flex; align-items:center; gap:6px;
+  padding:2px 2px 6px;
+  border-bottom:1px solid var(--rule);
+}
+/* 30px so the touch target clears 44 with the gap counted, and a ring rather
+   than a tick for the selected one — a tick inside a 30px pastel circle is
+   four pixels of glyph on a light ground. */
+.selmenu-tint{
+  flex:none;
+  width:30px; height:30px; padding:0;
+  border:1px solid color-mix(in oklab, var(--ink) 14%, transparent);
+  border-radius:999px;
+  background:var(--dot, var(--ink-soft));
+  cursor:pointer;
+  transition:transform 140ms var(--ease);
+}
+.selmenu-tint[data-tint="mustard"]{ --dot:var(--hl-mustard); }
+.selmenu-tint[data-tint="pink"]{ --dot:var(--hl-pink); }
+.selmenu-tint[data-tint="blue"]{ --dot:var(--hl-blue); }
+.selmenu-tint[data-tint="butter"]{ --dot:var(--hl-butter); }
+/* The odd one out, and it looks like what it does: a terracotta rule across a
+   blank chip rather than a terracotta circle. */
+.selmenu-tint[data-tint="underline"]{
+  background:transparent;
+  border-color:var(--rule);
+  position:relative;
+}
+.selmenu-tint[data-tint="underline"]::after{
+  content:"";
+  position:absolute; inset-inline:6px; bottom:9px; height:2px;
+  background:var(--hl-underline);
+}
+.selmenu-tint[aria-pressed="true"]{
+  transform:scale(1.06);
+  outline:2px solid var(--ink);
+  outline-offset:2px;
+}
+.selmenu-acts{ display:flex; align-items:center; gap:2px; padding-top:4px; }
+.selmenu-act{
+  flex:1 1 auto;
+  display:inline-flex; flex-direction:column; align-items:center; gap:3px;
+  min-width:52px; min-height:44px; padding:5px 6px;
+  border:0; border-radius:var(--r-sm);
+  background:transparent; color:var(--ink);
+  font-family:var(--sans); font-size:10px; font-weight:600;
+  letter-spacing:.04em;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.selmenu-act > svg{ width:18px; height:18px; }
+.selmenu-act:active{ background:var(--lift-hi); }
+.selmenu-act--drop{
+  flex:none; min-width:34px;
+  margin-inline-start:auto;
+  color:var(--accent);
+}
+.selmenu-act--drop > svg{ width:17px; height:17px; }
+
+/* ═══ the note editor ══════════════════════════════════════════════════════
+   Over the page, not beside it, and the quoted line comes with it — writing
+   beside a sentence you cannot see is writing from memory. */
+.note{
+  /* The stage's own grid row, like the panel — not `position:absolute`, since
+     .reader is a grid and not a positioned ancestor, so an inset:0 here would
+     escape to the viewport and cover the bars as well. */
+  grid-area:read;
+  z-index:8;
+  display:flex; flex-direction:column;
+  background:var(--stock-bg);
+  padding:16px 16px calc(16px + env(safe-area-inset-bottom));
+  gap:12px;
+}
+.note-quote{
+  flex:none;
+  margin:0; padding:0 0 0 12px;
+  border-inline-start:2px solid var(--accent);
+  font-family:var(--serif); font-size:13px; line-height:1.5;
+  color:var(--ink-soft);
+  text-wrap:pretty;
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:4;
+  overflow:hidden;
+}
+.note-field{
+  flex:1 1 auto; min-height:0;
+  width:100%;
+  padding:12px 14px;
+  border:1px solid var(--rule); border-radius:var(--r-md);
+  background:var(--card-w);
+  font-family:var(--hand); font-size:16px; line-height:1.5;
+  color:var(--ink);
+  resize:none;
+  user-select:text; -webkit-user-select:text;
+}
+.note-field:focus{ outline:2px solid var(--ink); outline-offset:1px; }
+.note-field::placeholder{ font-family:var(--sans); font-size:14px; color:var(--ink-soft); }
+.note-acts{ flex:none; display:flex; align-items:center; gap:10px; }
+.note-drop{
+  display:inline-flex; align-items:center; gap:7px;
+  min-height:42px; padding:0 14px;
+  border:1px solid color-mix(in oklab, var(--accent) 40%, var(--rule));
+  border-radius:999px;
+  background:transparent; color:var(--accent);
+  font-family:var(--sans); font-size:12.5px; font-weight:600;
+  cursor:pointer;
+}
+.note-done{
+  margin-inline-start:auto;
+  display:inline-flex; align-items:center; gap:7px;
+  min-height:42px; padding:0 20px;
+  border:0; border-radius:999px;
+  background:var(--ink); color:var(--stock-bg);
+  font-family:var(--sans); font-size:12.5px; font-weight:600;
+  cursor:pointer;
+}
+.note-drop > svg, .note-done > svg{ width:16px; height:16px; }
+
+/* ═══ export ═══════════════════════════════════════════════════════════════
+   The fourth row, like the type sheet, because it is the same kind of thing: a
+   short form with a decision in it. Copy first, because on iOS a download is a
+   fight and copy is what most readers actually want. */
+.sheet.export{ padding:14px 16px calc(14px + env(safe-area-inset-bottom)); gap:12px; }
+.export-head{
+  display:flex; align-items:baseline; gap:10px;
+  margin:0;
+  font-family:var(--mono); font-size:10px; font-weight:500;
+  letter-spacing:.09em; text-transform:uppercase;
+  font-variant-numeric:tabular-nums;
+  color:var(--ink-soft);
+}
+.export-formats{ display:flex; flex-direction:column; gap:2px; }
+.export-format{
+  display:flex; align-items:baseline; gap:10px;
+  min-height:44px; padding:6px 12px;
+  border:1px solid transparent; border-radius:var(--r-sm);
+  background:transparent;
+  text-align:start; cursor:pointer;
+  color:var(--ink);
+}
+.export-format[aria-checked="true"]{ background:var(--lift); border-color:var(--rule); }
+.export-format-name{
+  flex:none;
+  font-family:var(--sans); font-size:13px; font-weight:600;
+}
+.export-format-note{
+  flex:1 1 auto; min-width:0;
+  font-family:var(--sans); font-size:11.5px; line-height:1.4;
+  color:var(--ink-soft);
+}
+.export-acts{ display:flex; align-items:center; gap:8px; }
+.export-do{
+  flex:1 1 auto;
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  min-height:44px; padding:0 18px;
+  border:0; border-radius:999px;
+  background:var(--ink); color:var(--stock-bg);
+  font-family:var(--sans); font-size:13px; font-weight:600;
+  cursor:pointer;
+}
+.export-alt{
+  flex:0 0 auto;
+  display:inline-flex; align-items:center; justify-content:center; gap:7px;
+  min-height:44px; padding:0 16px;
+  border:1px solid var(--rule); border-radius:999px;
+  background:transparent; color:var(--ink);
+  font-family:var(--sans); font-size:13px; font-weight:600;
+  cursor:pointer;
+}
+.export-shut{
+  flex:0 0 auto;
+  min-height:44px; padding:0 12px;
+  border:0; background:transparent; color:var(--ink-soft);
+  font-family:var(--sans); font-size:13px; font-weight:600;
+  cursor:pointer;
+}
+.export-do > svg, .export-alt > svg{ width:16px; height:16px; }
+/* A live region, so it has to hold its line whether or not it has anything to
+   say — a strip that appears and disappears moves every control above it. */
+.export-said{
+  min-height:16px; margin:0;
+  font-family:var(--sans); font-size:11.5px; line-height:1.35;
+  color:var(--ink-soft);
+}
+
+/* iPad and up: the panel is a column against the leading edge rather than a
+   full cover, so the page it is about stays on screen and the reader can see
+   where a tap is going to take them. */
+@media (min-width:820px){
+  .reader-panel{
+    max-width:400px;
+    border-inline-end:1px solid var(--rule);
+  }
+  .panel-head{ padding-inline:20px; }
+  .panel-kinds, .panel-group-head, .panel-row, .panel-acts{ padding-inline:20px; }
+  .panel-item-row > .panel-row{ padding-inline-end:4px; }
+  .panel-acts{ margin-inline-start:30px; }
+  .note{
+    max-width:420px;
+    margin-inline-start:auto;
+    border-inline-start:1px solid var(--rule);
+  }
+}
+
+/* ── your reading ──────────────────────────────────────────────────────────
+   Four figures on four identical washes, and every chart below them drawn in
+   one ink at five strengths. This page used to carry four different pastels on
+   the tiles and five more in the charts; the owner's call was that the extra
+   hues "do not fit in all the themes", so the whole page is now the ramp.
+
+   What that costs: a chart can no longer separate its parts by hue alone. What
+   it buys: it never could, accessibly — so every multi-part chart here now
+   names its parts in a key, and the ramp only orders them. */
+
+.app-sub{
+  font-size:13px; line-height:1.5; color:var(--ink-soft);
+  flex:1 1 100%; margin-top:2px; max-width:52ch;
+}
+
+/* Four figures, two up on a phone. minmax(0,1fr) rather than 1fr so a long
+   value — "12h 40m" — shrinks its own tile instead of widening the grid and
+   pushing the page into a horizontal scroll. */
+.stat-grid{
+  display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px;
+}
+.stat{
+  display:flex; flex-direction:column; gap:7px; justify-content:flex-end;
+  /* 84, not 96: the pair is 47px tall and the padding is 32, so 96 left 17px of
+     dead space above every figure — measured, and it read as a tile that had
+     lost its top line. Bottom-aligned rather than centred so the four labels
+     sit on one line across the row even when a figure wraps to two. */
+  min-height:84px; padding:16px; border-radius:var(--r-md);
+  background:var(--wash); border:1px solid var(--rule);
+}
+.stat-n{
+  font-family:var(--serif); font-weight:500; font-size:27px; line-height:1;
+  letter-spacing:-.02em; color:var(--ink);
+  /* the figures change as you read; proportional digits would shuffle the
+     tile's width every time the minute ticks over */
+  font-variant-numeric:tabular-nums;
+}
+.stat-lbl{
+  font-family:var(--sans); font-size:10.5px; font-weight:500; line-height:1.2;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft);
+}
+
+.stat-sec{ margin-top:34px; }
+.stat-sec h2{
+  font-family:var(--serif); font-weight:500; font-size:16px; line-height:1.2;
+  letter-spacing:-.01em; color:var(--ink);
+}
+.stat-sec-sub{
+  margin-top:5px; font-family:var(--sans); font-size:12.5px; line-height:1.5;
+  color:var(--ink-soft); font-variant-numeric:tabular-nums;
+}
+.stat-sec .facts{ margin-top:12px; }
+
+/* ── this week ─────────────────────────────────────────────────────────────
+   Seven columns, always seven, whatever has happened in them. A week that
+   drops its empty days is a week you cannot read the shape of. */
+.wk{
+  /* margin/padding zeroed for the reason written at .marks: `list-style:none`
+     leaves the UA's 40px padding-inline-start behind, and on a seven-column
+     grid that does not indent the block — it shrinks every column by 5.7px and
+     pushes the whole week off the text column's leading edge. */
+  margin:16px 0 0; padding:0;
+  display:grid; grid-template-columns:repeat(7, 1fr); gap:8px; list-style:none;
+}
+.wk-col{ display:flex; flex-direction:column; align-items:stretch; gap:8px; }
+.wk-track{
+  /* 52, not 76, and the same ground as the six-month grid rather than a bordered
+     white card. At 76 with a padded border each column read as a control — seven
+     switches in a row — and the block carried more saturated colour than every
+     other chart on the page put together. The track is `--rule`, which is
+     exactly what an empty calendar cell is, so the two charts share a floor. */
+  position:relative;
+  /* 62, up from 52. The covers inside are 26px wide at 2:3, so 39 tall, and a
+     52px track left them 6px of air top and bottom — which read as cramped
+     rather than as tight. Measured against the cover, not chosen. */
+  display:flex; align-items:flex-end; height:62px;
+  border-radius:var(--r-sm); background:var(--rule); overflow:hidden;
+}
+.wk-bar{
+  display:block; width:100%; min-height:0;
+  /* Top corners only, and small: the track's own radius clips the bottom, and
+     inheriting the full radius turned a 6px Wednesday into a capsule floating
+     in its track rather than a column standing in it. */
+  border-radius:3px 3px 0 0; background:var(--graph-4);
+}
+.wk-day{
+  font-family:var(--sans); font-size:10.5px; font-weight:500; line-height:1;
+  text-align:center; color:var(--ink-soft);
+}
+/* Today is named by weight and ink, not by a coloured ring: a ring here would
+   be the only outline on the page and would read as an error state. */
+.wk-col[data-today] .wk-day{ color:var(--ink); font-weight:600; }
+
+/* ── the week, in covers ───────────────────────────────────────────────────
+   The stack sits INSIDE the track, absolutely, so the minutes bar behind it and
+   the covers on top of it share one 7-column grid and one baseline. Absolute
+   rather than a second grid row because the two have to overlap: the covers
+   stand on the day, not above it. */
+.wk-stack{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  pointer-events:none;
+}
+.wk-cover{
+  position:relative; display:block; flex:none;
+  width:26px; aspect-ratio:2/3;
+  border-radius:2px; overflow:hidden;
+  /* No shadow, per the guardrail. Separation between overlapping covers is a
+     hairline ring in the track's own ground colour — which reads as the gap
+     between two books rather than as a border drawn round each. */
+  box-shadow:0 0 0 1.5px var(--card-w);
+}
+/* The overlap. Each cover after the first slides back over the one before it by
+   a third of its width, which is the least that still reads as a stack and the
+   most that still shows a spine's worth of the one behind. */
+.wk-cover + .wk-cover{ margin-inline-start:-9px; }
+/* Painted in reverse order (see Stats.tsx), so the LAST element in the DOM is
+   the front of the pile and gets the offset removed instead of added. */
+.wk-stack[data-n="2"] .wk-cover,
+.wk-stack[data-n="3"] .wk-cover{ width:22px; }
+.wk-more{
+  position:absolute; inset-block-end:2px; inset-inline-end:2px;
+  font-family:var(--mono); font-size:9px; line-height:1;
+  padding:2px 3px; border-radius:2px;
+  background:var(--card-w); color:var(--ink-soft);
+}
+/* A day still to come is absent, not empty: no track fill, no cover, and the
+   floor dropped to half strength so the week reads as unfinished rather than
+   as five good days and two bad ones. */
+.wk-col[data-future] .wk-track{ background:color-mix(in oklab, var(--rule) 50%, var(--paper)); }
+
+/* ── six months ────────────────────────────────────────────────────────────
+   Columns are weeks, rows are weekdays, so a weekend reader sees two stripes.
+   grid-auto-flow: column with a fixed row count is what puts a week in a
+   column; the cells are square by aspect-ratio so the block reflows with the
+   page instead of needing a pixel size per breakpoint. */
+.cal{
+  margin-top:16px; display:grid; grid-template-rows:repeat(7, 1fr);
+  grid-auto-flow:column; grid-auto-columns:1fr; gap:3px;
+}
+.cal-cell{
+  display:block; aspect-ratio:1; border-radius:2px;
+  background:var(--rule);
+}
+/* One hue, five weights of it. Stepped opacity rather than five hand-picked
+   tints: the steps stay perceptually even when the theme changes the ground
+   under them, which five fixed colours would not. */
+.cal-cell[data-level="0"]{ background:var(--rule); }
+.cal-cell[data-level="1"]{ background:var(--graph-1); }
+.cal-cell[data-level="2"]{ background:var(--graph-2); }
+.cal-cell[data-level="3"]{ background:var(--graph-3); }
+.cal-cell[data-level="4"]{ background:var(--graph-4); }
+/* A day that has not happened is absent, not zero. */
+.cal-cell[data-future]{ background:transparent; box-shadow:inset 0 0 0 1px var(--rule); }
+.cal-key{
+  margin-top:10px; display:flex; align-items:center; gap:5px;
+  font-family:var(--sans); font-size:10.5px; font-weight:500;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft);
+}
+.cal-key .cal-cell{ width:10px; height:10px; aspect-ratio:auto; flex:0 0 auto; }
+.cal-key span:first-child{ margin-right:3px; }
+.cal-key span:last-child{ margin-left:3px; }
+
+/* ── where the time went ───────────────────────────────────────────────────*/
+.tops{ margin:16px 0 0; padding:0; list-style:none; display:flex; flex-direction:column; }
+.tops li{
+  display:grid; grid-template-columns:1fr auto; gap:7px 12px;
+  padding:11px 0; border-top:1px solid var(--rule); align-items:baseline;
+}
+.tops li:first-child{ border-top:0; padding-top:0; }
+.top-t{
+  font-family:var(--serif); font-size:14.5px; line-height:1.35; color:var(--ink);
+  text-decoration:none;
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  /* Padding out, margin back in: the title is a link to the book, and a 19.6px
+     line is a target you miss. This makes the tappable box 27.6px without
+     moving a single pixel of the row it sits in. Measured, not guessed — the
+     19.6 is what audit/stats.mjs reported before it was here. */
+  padding-block:4px; margin-block:-4px;
+}
+a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
+.top-t--gone{ color:var(--ink-soft); font-style:italic; }
+.top-n{
+  font-family:var(--mono); font-size:11.5px; color:var(--ink-soft);
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+.top-bar{
+  grid-column:1 / -1; display:block; height:4px; border-radius:2px;
+  background:var(--rule); overflow:hidden;
+}
+.top-fill{ display:block; height:100%; background:var(--graph-4); }
+
+/* ── the shelf's mix ───────────────────────────────────────────────────────
+   Five ordered steps of the ramp, not five hues. The key below carries the
+   format name against the same step, so the chart is readable without colour
+   vision — which is why the segments are ordered largest-ink-first rather than
+   assigned per format at random. */
+.mix{
+  margin-top:16px; display:flex; height:10px; border-radius:5px;
+  overflow:hidden; background:var(--rule); gap:2px;
+}
+.mix-seg{ display:block; min-width:3px; background:var(--seg, var(--rule)); }
+.mix-seg[data-family="epub"], .mix-dot[data-family="epub"]{ --seg:var(--graph-5); }
+.mix-seg[data-family="kindle"], .mix-dot[data-family="kindle"]{ --seg:var(--graph-4); }
+.mix-seg[data-family="fb2"], .mix-dot[data-family="fb2"]{ --seg:var(--graph-3); }
+.mix-seg[data-family="text"], .mix-dot[data-family="text"]{ --seg:var(--graph-2); }
+.mix-seg[data-family="pdf"], .mix-dot[data-family="pdf"]{ --seg:var(--graph-1); }
+.mix-key{
+  margin:11px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:6px 16px;
+  list-style:none;
+}
+.mix-key li{
+  display:flex; align-items:center; gap:7px;
+  font-family:var(--sans); font-size:11.5px; font-weight:500;
+  letter-spacing:.06em; color:var(--ink-soft);
+}
+.mix-dot{
+  width:8px; height:8px; border-radius:50%; flex:0 0 auto;
+  background:var(--seg, var(--rule));
+}
+.mix-n{
+  font-family:var(--mono); font-size:11px; color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+
+/* ── the way through to it ─────────────────────────────────────────────────
+   A row, not a card and not a button: it is a door to a screen, and the only
+   filled surfaces in the app are the primary action and the continue card. */
+.strip{
+  margin-top:14px; display:flex; align-items:center; gap:13px;
+  padding:14px 16px; border:1px solid var(--rule); border-radius:var(--r-md);
+  background:var(--card-w); color:var(--ink);
+}
+.strip:hover{ border-color:var(--ink-soft); }
+.strip > svg{ width:20px; height:20px; flex:0 0 auto; color:var(--ink-soft); }
+.strip-body{ display:flex; flex-direction:column; gap:3px; min-width:0; flex:1 1 auto; }
+.strip-t{
+  font-family:var(--serif); font-size:14.5px; line-height:1.25; color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+.strip-s{
+  font-family:var(--sans); font-size:10.5px; font-weight:500; line-height:1;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft);
+}
+.strip-go{ font-size:19px; line-height:1; color:var(--ink-soft); flex:0 0 auto; }
+
+/* Above the phone, four tiles across and the calendar gets its own breathing
+   room. The tiles do NOT grow taller with the width — a 96px figure card at
+   1440px is a poster, not a statistic. */
+@media (min-width:600px){
+  .stat-grid{ grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px; }
+  .cal{ gap:4px; }
+  .stat-sec{ margin-top:40px; }
+}
+
+/* ══ THE PDF VIEW ═════════════════════════════════════════════════════════
+   SPEC.md § 11, P4. A fixed page cannot reflow, so the stock tints the
+   SURROUND, and the type controls are absent rather than disabled. What is
+   left is geometry: how big the page is, and how far down it you are.
+
+   NEW ROLE: --pdf-veil. Press has no token for it because Press never shows a
+   surface it did not author. A PDF is authored elsewhere — usually black ink
+   on white — and a white sheet on the coal stock at night is a torch. The veil
+   is a flat fill of the stock's own colour over the page at this opacity.
+
+   Its values are capped by measurement, not taste. Dimming a white page makes
+   black ink LESS readable, so every value below was checked as black-on-veiled
+   -white and holds 7:1 or better; see audit/pdf.mjs. That is why the dark
+   stocks stop near 0.4 instead of going to a true dark mode: an opacity veil
+   cannot invert a page, and pretending otherwise would trade an honest dim for
+   unreadable type. */
+[data-stock="press"] { --pdf-veil:0; }
+[data-stock="day"]   { --pdf-veil:0.16; }
+[data-stock="butter"]{ --pdf-veil:0.22; }
+[data-stock="tea"]   { --pdf-veil:0.28; }
+[data-stock="coal"]  { --pdf-veil:0.42; }
+[data-stock="dusk"]  { --pdf-veil:0.42; }
+[data-stock="pitch"] { --pdf-veil:0.40; }
+
+.pdf-scroll{
+  position:absolute; inset:0;
+  overflow:auto;
+  background:var(--stock-bg);
+  overscroll-behavior:contain;
+  /* Native momentum scroll in both axes stays with the browser — it is better
+     than anything this app could write. Blocking pinch-zoom is the whole point:
+     the two-finger gesture belongs to the page, not to the viewport. */
+  touch-action:pan-x pan-y;
+  -webkit-overflow-scrolling:touch;
+}
+.pdf-scroll:focus-visible{ outline:2px solid var(--stock-ink); outline-offset:-2px; }
+
+.pdf-strip{
+  position:relative;
+  /* The strip is what a live pinch transforms. Nothing else moves. */
+  transform-origin:0 0;
+}
+
+.pdf-page{
+  position:absolute;
+  background:#FFFFFF;
+  /* No shadow, per the guardrails. The gap and the stock around it are what
+     separate one sheet from the next. */
+  border:1px solid var(--stock-rule);
+  box-sizing:content-box;
+  contain:paint;
+}
+.pdf-canvas{ display:block; }
+.pdf-veil{
+  position:absolute; inset:0;
+  background:var(--stock-bg);
+  opacity:calc(var(--pdf-veil, 0) * var(--pdf-veil-mul, 1));
+  pointer-events:none;
+}
+
+/* ── pdfjs's own text-layer contract ──────────────────────────────────────
+   Trimmed from pdfjs-dist/web/pdf_viewer.css. It is here rather than imported
+   because the shipped file also carries the annotation layer, the editor and
+   the find-controller's highlighter, none of which this app uses.
+
+   The parts that are load-bearing, so a future edit knows what not to touch:
+   TextLayer positions every span with left/top as a PERCENTAGE of the page and
+   sets a per-span --font-height in px; the font size comes back out of
+   --total-scale-factor (set by setLayerScale in engine.ts). --scale-round-x/y
+   must exist, because pdfjs sizes the container with round(down, …, var(…)) and
+   an unset value there makes the whole declaration invalid. */
+.textLayer{
+  position:absolute; inset:0;
+  text-align:initial;
+  overflow:clip;
+  line-height:1;
+  letter-spacing:normal;
+  word-spacing:normal;
+  text-size-adjust:none;
+  forced-color-adjust:none;
+  transform-origin:0 0;
+  z-index:0;
+  --min-font-size:1;
+  --scale-round-x:1px;
+  --scale-round-y:1px;
+  --text-scale-factor:calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv:calc(1 / var(--min-font-size));
+}
+.textLayer :is(span, br){
+  color:transparent;
+  position:absolute;
+  white-space:pre;
+  cursor:text;
+  transform-origin:0% 0%;
+  user-select:text;
+  -webkit-user-select:text;
+}
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent){
+  z-index:1;
+  --font-height:0;
+  font-size:calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x:1;
+  --rotate:0deg;
+  transform:rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.textLayer .markedContent{ display:contents; }
+.textLayer span[role="img"]{ user-select:none; cursor:default; }
+/* The selection has to be visible over a canvas the app did not draw, so it
+   carries the highlighter's own tint rather than the platform accent. */
+.textLayer ::selection{ background:color-mix(in srgb, var(--hl-mustard) 65%, transparent); color:transparent; }
+.textLayer br::selection{ background:transparent; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   HOME
+   The first screen: what you are reading, what it adds up to, what just
+   arrived. Three sections, and every one of them is a rail or a card — there
+   is no list on this page, because a list is what the Library is for.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.home-sec{ margin-top:30px; }
+.home-sec:first-of-type{ margin-top:0; }
+.home-sec-head{
+  display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+  margin-bottom:14px;
+}
+.home-sec-head h2{
+  font-family:var(--sans); font-size:11.5px; font-weight:500; line-height:1;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft);
+}
+.home-sec-n{
+  font-family:var(--mono); font-size:11px; color:var(--ink-soft);
+}
+.home-sec-all{
+  font-family:var(--sans); font-size:11.5px; font-weight:500; line-height:1;
+  letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink); text-decoration:none;
+  border-bottom:1px solid var(--rule); padding-bottom:2px;
+}
+.home-sec-all:hover{ border-bottom-color:var(--ink); }
+
+/* ── the rail ──────────────────────────────────────────────────────────────
+   A scroll-snap row, and nothing more. No pager dots, no transform driven off
+   a pointer, no JS: native overflow scrolling already runs on the compositor,
+   already carries the platform's momentum and rubber-band, already answers to
+   a trackpad and to the arrow keys, and already honours reduced motion. A
+   hand-rolled carousel would be more code and worse at all five.
+
+   It breaks the page's gutter on purpose — negative margin out to the viewport
+   edge, matching padding back in. That is DESIGN.md's rule for a scroller: the
+   content bleeds, the controls do not, and a rail that stops at the text
+   column looks like it has nothing more in it. */
+.rail{
+  list-style:none; margin:0; padding:0;
+  margin-inline:calc(var(--gutter) * -1);
+  padding-inline:var(--gutter);
+  display:flex; gap:14px;
+  overflow-x:auto; overflow-y:hidden;
+  scroll-snap-type:x mandatory;
+  scroll-padding-inline-start:var(--gutter);
+  overscroll-behavior-x:contain;
+  scrollbar-width:none;
+  /* the rail is focusable so it can be scrolled from the keyboard; the ring is
+     the app's own, inset so it is not clipped by the overflow */
+  border-radius:var(--r-md);
+}
+.rail::-webkit-scrollbar{ display:none; }
+.rail:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
+.rail-item{
+  scroll-snap-align:start;
+  flex:none;
+  /* Not 100%: the next card peeks 34px past the edge, which is the only thing
+     that says the rail has more in it. 100% would make a one-card rail and a
+     four-card rail look identical. */
+  width:min(310px, calc(100% - 34px));
+}
+/* One card is not a rail. With nothing to scroll to, the peek is a lie and the
+   card should just use the column. */
+.rail-item:only-child{ width:100%; }
+.rail-item--cover{ width:104px; }
+
+/* ── the continue card ─────────────────────────────────────────────────────
+   Cover left, everything else right, progress at the foot. Same anatomy as the
+   library's old continue card because they mean the same thing — but sized for
+   a rail, so the cover is fixed and the body flexes. */
+.cont{
+  display:flex; gap:16px; height:100%;
+  padding:16px; text-decoration:none; color:inherit;
+  background:var(--wash); border:1px solid var(--rule);
+  border-radius:var(--r-md);
+  background-image:var(--grain); background-blend-mode:var(--grain-blend);
+  transition:border-color 160ms var(--ease);
+}
+.cont:hover{ border-color:color-mix(in oklab, var(--ink) 34%, var(--rule)); }
+.cont:active{ background:var(--wash-2); }
+.cont-cover{
+  flex:none; width:62px; align-self:flex-start;
+  border-radius:var(--r-img); overflow:hidden;
+}
+.cont-body{
+  display:flex; flex-direction:column; align-items:flex-start;
+  min-width:0; flex:1 1 auto;
+}
+.cont-title{
+  font-family:var(--serif); font-weight:500; font-size:16px; line-height:1.25;
+  letter-spacing:-.01em; color:var(--ink);
+  /* two lines, then stop. A four-line title in a fixed-height rail card pushes
+     the progress bar out of the card. */
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.cont-author{
+  margin-top:4px;
+  font-family:var(--sans); font-size:12px; line-height:1.3; color:var(--ink-soft);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+}
+.cont-where{
+  margin-top:8px;
+  font-family:var(--sans); font-size:11.5px; line-height:1.3; color:var(--ink-soft);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%;
+}
+/* margin-top:auto is what keeps the bar on the card's floor whatever the title
+   did above it, which is the whole reason the rail's cards line up. */
+.cont-foot{
+  margin-top:auto; padding-top:12px;
+  display:flex; align-items:center; gap:10px; width:100%;
+}
+.cont-foot .bar{ flex:1 1 auto; }
+.cont-pct{
+  font-family:var(--mono); font-size:11px; line-height:1; color:var(--ink-soft);
+  font-variant-numeric:tabular-nums; flex:none;
+}
+
+/* ── the stats card ────────────────────────────────────────────────────────
+   A door with three numbers on it and no chart. A graph here would invite the
+   reader to read the graph instead of opening the door, and the whole history
+   is rendered properly one tap away. */
+.statcard{
+  display:block; margin-top:30px;
+  padding:16px 18px 18px;
+  text-decoration:none; color:inherit;
+  background:var(--card-w); border:1px solid var(--rule);
+  border-radius:var(--r-md);
+  background-image:var(--grain); background-blend-mode:var(--grain-blend);
+  transition:border-color 160ms var(--ease);
+}
+.statcard:hover{ border-color:color-mix(in oklab, var(--ink) 34%, var(--rule)); }
+.statcard-head{
+  display:flex; align-items:center; gap:9px;
+  padding-bottom:14px; margin-bottom:14px;
+  border-bottom:1px solid var(--rule);
+}
+.statcard-head svg{ display:block; width:17px; height:17px; color:var(--ink-soft); flex:none; }
+.statcard-lbl{
+  font-family:var(--sans); font-size:11.5px; font-weight:500; line-height:1;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--ink-soft);
+  flex:1 1 auto;
+}
+.statcard-go{ font-size:18px; line-height:1; color:var(--ink-soft); flex:none; }
+.statcard-row{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; }
+.statcard-fig{ display:flex; flex-direction:column; gap:5px; min-width:0; }
+.statcard-n{
+  font-family:var(--serif); font-weight:500; font-size:22px; line-height:1;
+  letter-spacing:-.015em; color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+.statcard-k{
+  font-family:var(--sans); font-size:10.5px; font-weight:500; line-height:1.25;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--ink-soft);
+}
+
+/* ── a cover tile ──────────────────────────────────────────────────────────
+   Recently added. Cover, title, date — no progress, because a book that just
+   arrived has none and a 0% bar on every tile is a row of empty troughs. */
+.tile{ display:block; text-decoration:none; color:inherit; }
+.tile-cover{ display:block; border-radius:var(--r-img); overflow:hidden; }
+.tile-title{
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden;
+  margin-top:9px;
+  font-family:var(--serif); font-weight:500; font-size:12.5px; line-height:1.3;
+  color:var(--ink);
+}
+.tile-sub{
+  display:block; margin-top:3px;
+  font-family:var(--mono); font-size:10px; line-height:1.2; color:var(--ink-soft);
+}
+
+/* Two actions on an empty state, side by side and wrapping rather than
+   stacking full-width: the second is a real alternative, not a footnote. */
+.empty-do{ display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:22px; }
+
+/* ── back to the book ──────────────────────────────────────────────────────
+   Stats used to be reachable from inside the reader with no way home. It is a
+   tab now, so the bar is always under it — and this strip puts the book itself
+   one tap away instead of three. */
+.resume{
+  display:flex; align-items:center; gap:12px;
+  margin-bottom:26px; padding:12px 16px 12px 12px;
+  text-decoration:none; color:inherit;
+  background:var(--wash); border:1px solid var(--rule); border-radius:var(--r-md);
+  transition:border-color 160ms var(--ease);
+}
+.resume:hover{ border-color:color-mix(in oklab, var(--ink) 34%, var(--rule)); }
+.resume > svg{ display:block; width:18px; height:18px; color:var(--ink-soft); flex:none; }
+.resume-body{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+.resume-t{
+  font-family:var(--serif); font-weight:500; font-size:14.5px; line-height:1.25;
+  color:var(--ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* Wider than a phone: the rail's cards stop growing and let a third one show,
+   and the gutter bleed grows with the gutter because it is written in terms of
+   it rather than as a number. */
+@media (min-width:768px){
+  .rail-item{ width:330px; }
+  .rail-item--cover{ width:116px; }
+  .statcard-n{ font-size:26px; }
+  .home-sec{ margin-top:38px; }
+}
+
+/* ── collections ──────────────────────────────────────────────────────────
+   REBUILT, on the owner's note: "collections needs to be well built. they look
+   so small." They were — three 58px spines with no ground under them, which at
+   150px read as a thumbnail rather than as a shelf.
+
+   A tile is now a PLATE: a real surface with an aspect ratio, holding up to
+   three covers fanned around a centred front one, with the count as a badge in
+   the corner. Two per row on a phone, which is what makes it big: measured at
+   360px, that is a 152x190 plate and an 81px front cover, against the old 58px
+   spine. It holds at the floor too — 132x165 with a 70px cover at 320px.
+
+   The fan is symmetric — one behind on each side rather than a stack trailing
+   off to the left — because a one-sided fan puts the visual mass off-centre in
+   a box that is itself centred, and every tile in the grid then looks nudged.
+   No rotation and no shadow: the covers are separated by a hairline ring in the
+   plate's own colour, which is the same device the rail uses. */
+.coll-grid{
+  list-style:none; margin:0; padding:0;
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:26px 16px;
+}
+@media (min-width:560px){
+  .coll-grid{ grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:30px 20px; }
+}
+.coll{
+  display:flex; flex-direction:column; align-items:stretch; gap:0;
+  width:100%; padding:0; text-align:start;
+  background:transparent; border:0; cursor:pointer; color:inherit;
+}
+.coll-plate{
+  position:relative; display:block; width:100%; aspect-ratio:4/5;
+  margin-bottom:12px;
+  /* PRESENCE, measured. The plate was --wash on --paper, which is a step of
+     1.06 in light and — because sepia's --wash and --paper happen to land on
+     the same luminance — exactly 1.00 in sepia. A surface you cannot see is not
+     a surface, so the tile read as small however big the box was.
+
+     Both values are declared here as local tokens rather than inline, because
+     three children need the same two colours: the hairline between stacked
+     covers is the plate's own fill, and the badge ring and the empty-shelf
+     ghost are its own edge. One definition, so they cannot drift apart. */
+  --plate:color-mix(in oklab, var(--ink) 10%, var(--card-w));
+  /* 50%, not less: at 44% the badge ring and the ghost measured 2.82 against the
+     plate on sepia and 2.85 on ink — the two themes whose page and plate sit
+     closest together — and a boundary under 3:1 is one you have to look for. */
+  --plate-edge:color-mix(in oklab, var(--ink) 50%, var(--rule));
+  border:1px solid var(--plate-edge); border-radius:var(--r-lg);
+  background-color:var(--plate);
+  background-image:var(--grain); background-blend-mode:var(--grain-blend);
+  overflow:hidden;
+  transition:border-color 220ms var(--ease);
+}
+.coll:hover .coll-plate{ border-color:color-mix(in oklab, var(--ink) 62%, var(--rule)); }
+.coll:focus-visible{ outline:none; }
+.coll:focus-visible .coll-plate{ outline:2px solid var(--accent); outline-offset:2px; }
+
+/* The covers. Absolutely placed so the plate's height is fixed by its aspect
+   ratio and cannot change with how many books are on the shelf — a grid whose
+   rows are different heights because one collection has one book is the thing
+   that makes a tile grid look broken. */
+.coll-stack{ position:absolute; inset:0; display:grid; place-items:center; }
+.coll-spine{
+  position:absolute; width:54%; border-radius:var(--r-img); overflow:hidden;
+  /* A hairline ring, not a shadow: it is what separates one cover from the one
+     behind it, and the guardrail rules out the shadow that would do the job. */
+  box-shadow:0 0 0 1.5px var(--plate);
+  transition:transform 260ms var(--ease);
+}
+.coll-spine:nth-child(1){ z-index:3; transform:translateX(0) scale(1); }
+.coll-spine:nth-child(2){ z-index:2; transform:translateX(-30%) scale(.9); }
+.coll-spine:nth-child(3){ z-index:1; transform:translateX(30%) scale(.9); }
+/* The fan opens 4% each way on hover — enough to read as "these are separate
+   objects", small enough that nothing leaves the plate. */
+.coll:hover .coll-spine:nth-child(2){ transform:translateX(-34%) scale(.9); }
+.coll:hover .coll-spine:nth-child(3){ transform:translateX(34%) scale(.9); }
+
+/* An empty shelf, and the add tile. A ruled cover-shaped ghost rather than a
+   blank plate, so an empty collection still reads as a place books go. */
+.coll-ghost{
+  display:flex; align-items:center; justify-content:center;
+  width:54%; aspect-ratio:2/3; border-radius:var(--r-img);
+  border:1px dashed var(--plate-edge); color:var(--ink-soft);
+}
+.coll-ghost svg{ width:24px; height:24px; }
+.coll--add .coll-ghost{ border-style:solid; }
+
+/* The count, in the plate's trailing-bottom corner. It is the badge and not a
+   second line under the name because two counts on one tile is noise; the
+   spoken name still carries "7 books" via the visually-hidden span. */
+.coll-count{
+  position:absolute; inset-block-end:10px; inset-inline-end:10px;
+  min-width:26px; height:26px; padding:0 7px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:13px;
+  /* The ring, not the fill, is what makes the badge legible: --card-w against
+     the plate's ground measures 1.26 on the dark theme, so a plain card-coloured
+     pill vanishes there. It takes the plate's own edge colour — one boundary
+     weight on the whole tile, and it clears the 3:1 non-text floor everywhere. */
+  border:1px solid var(--plate-edge);
+  background:var(--card-w); color:var(--ink-soft);
+  font-family:var(--mono); font-size:11px; font-variant-numeric:tabular-nums;
+}
+.coll-name{
+  font-family:var(--sans); font-size:14.5px; font-weight:600; line-height:1.3;
+  color:var(--ink);
+  /* Two lines, then ellipsis — the name is the reader's own and can be long.
+     The box is that tall WHETHER OR NOT the name wraps, which is the only way
+     the rows stay level: a grid where one tile is a line taller because its
+     collection has a long name is the thing that makes a tile grid look broken,
+     and it is not hypothetical — the reader types these names. */
+  min-height:2.6em;
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden;
+}
+
+/* The inline create form takes a tile's place, so it is shaped like one rather
+   than collapsing the row it sits in. */
+.coll--new{
+  display:flex; flex-direction:column; justify-content:center; gap:12px;
+  min-height:0; padding:16px;
+  border:1px solid var(--ink); border-radius:var(--r-lg);
+  background:var(--card-w);
+}
+.coll--new input{
+  width:100%; height:38px; padding:0 2px;
+  background:transparent; color:var(--ink);
+  border:0; border-bottom:1px solid var(--rule);
+  font-family:var(--sans); font-size:15px;
+}
+.coll--new input:focus{ outline:none; border-bottom-color:var(--ink); }
+.coll-new-do{ display:flex; gap:6px; }
+
+/* The header of an opened collection — REBUILT. It used to be one wrapping flex
+   row holding all four things, so an 11.5px uppercase back link sat on the same
+   baseline as the collection's own name and competed with it, and at a narrow
+   width the row wrapped in whatever order it liked.
+
+   It is now the same two-part shape this app already uses for a book:
+   .detail-bar's row of controls (leading edge / trailing edge) above the
+   heading. Same structure, same 24px below, so the two pages read as the same
+   kind of page. Built-in collections have no tools, because there is nothing to
+   rename: Finished is finished. */
+.inside{ margin-bottom:24px; }
+.inside-bar{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  min-height:32px;
+}
+.inside .back{ margin:0; }
+.inside-head{
+  display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 14px;
+  margin-top:12px;
+}
+/* .ui-h's values — this IS the page's heading, so it is set like one rather
+   than at the 20px it had. Capped and ellipsised: a reader can name a
+   collection anything, and a 60-character name must not push the count off the
+   row or wrap into a paragraph. */
+.inside-name{
+  flex:0 1 auto; min-width:0; max-width:100%;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-family:var(--serif); font-weight:600; font-size:26px; line-height:1.15;
+  letter-spacing:-.012em; margin:0;
+}
+.inside-n{
+  flex:none;
+  font-family:var(--mono); font-size:10.5px; letter-spacing:.04em;
+  text-transform:uppercase; color:var(--ink-soft);
+}
+.inside-tools{ display:flex; gap:6px; flex:none; }
+
+.rename{
+  display:flex; align-items:flex-end; flex-wrap:wrap; gap:10px;
+  margin-top:22px; padding:16px;
+  background:var(--card-w); border:1px solid var(--rule); border-radius:var(--r-md);
+}
+.rename label, .collect-new label{ display:flex; flex-direction:column; gap:7px; flex:1 1 200px; }
+.rename input, .collect-new input{
+  height:38px; padding:0 12px;
+  background:var(--paper); color:var(--ink);
+  border:1px solid var(--rule); border-radius:var(--r-sm);
+  font-family:var(--sans); font-size:13.5px;
+}
+
+/* Naming a shelf from a book's own page. The same field as .rename above —
+   it is the same act — but a rule and a top margin instead of a card, because
+   this one lives INSIDE a panel and a box in a box reads as two subjects. */
+.collect-new{
+  display:flex; align-items:flex-end; flex-wrap:wrap; gap:10px;
+  margin-top:18px; padding-top:16px;
+  border-top:1px solid var(--rule);
+}
+/* 52ch, matching .ctl-note: a one-line explanation set to the full panel width
+   is a line the eye has to track back across for no reason. */
+.collect-note{ margin:16px 0 0; max-width:52ch; }
+/* Between the label and the chips: this says what a collection IS, so it sits
+   above the controls rather than under them, and .seg's own 18px top margin
+   supplies the gap below it. */
+.collect-intro{ margin:8px 0 0; max-width:56ch; }
+
+/* A radio row in the shared menu. The tick column is always there whether or
+   not the tick is drawn — see the note in Menu.tsx. */
+.menu-item--radio{ padding-inline-start:8px; }
+.menu-tick{
+  flex:none; display:inline-flex; align-items:center; justify-content:center;
+  width:19px; color:var(--ink);
+}
+.menu-tick svg{ width:15px; height:15px; }
+.menu-item[aria-checked="true"]{ font-weight:650; }
+
+/* ── Home: Recently added, grid or list ───────────────────────────────────
+   The switch is the Library's segmented control at a smaller size, because it
+   sits inside a section head rather than on a control bar of its own — a
+   full-size one there is taller than the h2 beside it.
+
+   The grid reuses .shelf-grid so a cover on Home and a cover in the Library are
+   the same object at the same size; only the column floor drops, because Home's
+   section is eight books and a 150px floor gives two columns at 360px where
+   three read better under a heading. */
+.seg-views--sm{ height:32px; padding:1px; }
+.seg-views--sm .seg-view{ height:28px; min-width:34px; padding:0 8px; }
+.seg-views--sm .seg-view svg{ width:16px; height:16px; }
+
+.shelf-grid--home{
+  /* 92px floor and a tighter gap, so 360px genuinely yields three columns:
+     3x92 + 2x12 = 300 inside a 320px column. At the Library's 150px floor and
+     24px gap this section rendered two 148px covers per row, which is the
+     Library's own layout repeated under a heading. */
+  grid-template-columns:repeat(auto-fill,minmax(92px,1fr));
+  gap:20px 12px;
+}
+@media (min-width:560px){
+  .shelf-grid--home{ grid-template-columns:repeat(auto-fill,minmax(126px,1fr)); gap:24px 16px; }
+}
+
+/* The "All books" link moves below the list when the switch takes its place in
+   the head. It keeps the section's trailing rhythm rather than sitting flush
+   against the last row. */
+.home-sec-foot{
+  margin:16px 0 0;
+  font-family:var(--mono); font-size:11px; letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.home-sec-foot a{ color:var(--ink-soft); text-decoration:none; border-bottom:1px solid var(--rule); }
+.home-sec-foot a:hover{ color:var(--ink); border-bottom-color:var(--ink); }
