@@ -4,6 +4,7 @@ import { DEFAULT_SETTINGS, clearDismissedSeeds, db, saveSettings, useSettings } 
 import { checkForUpdate, isIOS, promptInstall, requestPersistence, useInstall } from '../pwa'
 import { SEEDS, reseed } from '../seed'
 import { bytes, shortDate } from '../lib'
+import { ANY_FILE } from '../import'
 import { BackupRefused, backupName, exportBackup, importBackup, inspectBackup } from '../backup'
 import type { BackupSummary, RestoreResult } from '../backup'
 import type { Settings } from '../types'
@@ -268,15 +269,21 @@ export function SettingsPage() {
             <input
               ref={picker}
               type="file"
-              /* No accept list, for the same reason as the book picker in
-                 OpenBook.tsx: iOS resolves each entry to a Uniform Type
-                 Identifier and greys out everything that does not conform, and
-                 `.flyleaf` is an extension this app invented, so it is
-                 registered by nothing anywhere. The filter would have made a
-                 reader's own backup unpickable on the one platform they are
-                 most likely to restore onto. inspectBackup() reads the file and
+              /* `application/octet-stream` first, then the extension. Same
+                 two-sided iOS problem as the book picker, and the reasoning is
+                 with the constant (`src/import/index.ts` → ANY_FILE): the
+                 extension alone is a whitelist, and `.flyleaf` is an extension
+                 this app invented, so it is registered by nothing anywhere and
+                 a reader's own backup became unpickable on the one platform
+                 they are most likely to restore onto. Leaving the attribute off
+                 fixed that and made Safari offer the camera instead.
+
+                 `public.data` is also the honest answer here: a `.flyleaf` IS
+                 an octet stream — a binary header, a blob table and the
+                 payloads (`src/backup.ts`). inspectBackup() reads the file and
                  refuses a non-backup by name before anything is written, so the
-                 content is the authority here too. */
+                 content stays the authority either way. */
+              accept={`${ANY_FILE},.flyleaf`}
               className="sr-only"
               /* Not a tab stop, and not in the accessibility tree: the button
                  beside it is the control, and it already says so. */

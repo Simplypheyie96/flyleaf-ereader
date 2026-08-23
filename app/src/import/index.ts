@@ -181,3 +181,51 @@ export const ACCEPT: Record<Format, string[]> = {
 export const PICKER_ACCEPT: Record<string, string[]> = Object.fromEntries(
   (Object.keys(ACCEPT) as Format[]).map((format) => [MIME[format], ACCEPT[format]]),
 )
+
+/** `application/octet-stream`, and the reason a file input needs it.
+
+    iOS builds the picker's action sheet from the accept list. Include anything
+    that conforms to `public.image` or `public.movie` — or leave the attribute
+    OFF, which allows everything — and Safari offers Photo Library and Take
+    Photo or Video above the file browser. An ereader asking for the camera is
+    the sheet saying this app is something other than what it is.
+
+    Dropping the attribute was the fix for the opposite bug and caused this one:
+    an accept list of extensions is a whitelist on iOS, `.mobi`, `.azw3`, `.fb2`
+    and `.fbz` are registered by nothing on a stock iPhone, so they resolved to
+    no Uniform Type Identifier and could not be picked at all.
+
+    This token is what satisfies both. Safari resolves it to `public.data`,
+    conformance across the accept list is a union, and EVERY file conforms to
+    `public.data` — so nothing is greyed out, including the four extensions the
+    system has never heard of. It is not an image or a movie type, so the camera
+    and the photo library are not offered.
+
+    Exported because the backup picker in SettingsPage.tsx needs the same token
+    for the same reason, and this reasoning should exist once. */
+export const ANY_FILE = 'application/octet-stream'
+
+/** What the book input's `accept` says: ANY_FILE, then every extension this
+    app reads.
+
+    BE CLEAR ABOUT WHAT THE EXTENSIONS DO HERE, WHICH IS NOT FILTERING. Accept
+    is a union, ANY_FILE admits everything, so no dialog on any platform is
+    narrowed by the fifteen tokens after it. They are here to say in the DOM
+    what this app reads — the one place a reader with a devtools window can
+    check the claim the shelf makes — and so that a future platform which does
+    not need ANY_FILE has something to fall back to rather than an empty
+    attribute.
+
+    A real filter is not available: it costs `.mobi`, `.azw3`, `.fb2` and
+    `.fbz` on iOS, which is not a trade worth making for a tidier dialog.
+    Desktop Chrome and Edge get a genuine Books filter anyway, through
+    `showOpenFilePicker` and PICKER_ACCEPT above, where matching is not a UTI
+    lookup.
+
+    Sniffing is the authority everywhere and always was: `src/import/sniff.ts`
+    reads the bytes, so a non-book gets a sentence naming what it is instead of
+    a broken render. */
+export const INPUT_ACCEPT = [
+  ANY_FILE,
+  ...(Object.keys(ACCEPT) as Format[]).flatMap((format) => ACCEPT[format]),
+].join(',')

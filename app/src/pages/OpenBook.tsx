@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { PICKER_ACCEPT, importFile, type ImportResult } from '../import'
+import { INPUT_ACCEPT, PICKER_ACCEPT, importFile, type ImportResult } from '../import'
 import { useQueuedFiles } from '../openQueue'
 import { BackIcon, OpenIcon } from '../components/icons'
 import { bytes } from '../lib'
@@ -114,32 +114,20 @@ export function OpenBook() {
             ref={input}
             type="file"
             multiple
-            /* NO accept list, deliberately, and this is the one line on this
-               screen that has to stay wrong-looking.
+            /* `application/octet-stream`, then every extension this app
+               reads. The first token is the one doing the work, and the
+               reasoning is with the constant (`src/import/index.ts` →
+               ANY_FILE): extensions alone are a whitelist on iOS that makes
+               `.mobi` and `.azw3` unpickable, and no attribute at all makes
+               Safari offer the camera and the photo library. `public.data`
+               admits a file the system has never heard of without asking for a
+               photograph of one. The extensions after it filter nothing — they
+               state what this app reads.
 
-               It carried every extension in ACCEPT. On iOS that is not a hint,
-               it is a whitelist: Safari resolves each entry to a Uniform Type
-               Identifier and hands the set to the Files picker, which then
-               greys out everything that does not conform. `.epub`, `.txt`,
-               `.pdf`, `.html` and `.md` all resolve to real system types and
-               stayed selectable. `.mobi`, `.prc`, `.azw`, `.azw3`, `.kf8`,
-               `.fb2` and `.fbz` are registered by nothing on a stock iPhone,
-               so they resolved to nothing, and four formats this app parses
-               correctly and has fixtures for could not be picked at all. The
-               shelf advertised them; the picker refused to let them through.
-
-               A filter is a nicety. Sniffing is the authority — it always was,
-               it reads the bytes, and it names precisely what a non-book is
-               (`src/import/sniff.ts`). So the nicety goes, on every platform
-               rather than behind a user-agent test: the picker shows every
-               file, and a file that is not a book gets a sentence saying what
-               it is instead of being silently unreachable. Desktop Chrome and
-               Edge still get a real Books filter through
-               `showOpenFilePicker` above, where extension matching is not a
-               UTI lookup and demonstrably works.
-
-               Do not add an accept list back here without an iPhone and a
-               `.mobi` file. */
+               This attribute was absent for exactly one reason — the
+               unpickable formats — and it took the media options with it.
+               Do not remove it again, and do not remove ANY_FILE from it. */
+            accept={INPUT_ACCEPT}
             className="sr-only"
             /* Not a tab stop, and not in the accessibility tree either. It is
                1x1 and invisible; the button above is what operates it, and a
