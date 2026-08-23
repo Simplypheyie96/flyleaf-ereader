@@ -82,13 +82,13 @@ async function explain(response: Response): Promise<string> {
   }
 
   if (reason === 'insufficientPermissions' || reason === 'insufficientFilePermissions')
-    return 'Flyleaf was not given permission to use your Drive. Sign in again and leave the box ticked on Google’s screen.'
+    return 'Flyleaf eReader was not given permission to use your Drive. Sign in again and leave the box ticked on Google’s screen.'
   if (reason === 'storageQuotaExceeded')
     return 'Your Google Drive is full, so nothing could be saved to it.'
   if (reason === 'rateLimitExceeded' || reason === 'userRateLimitExceeded')
     return 'Google asked us to slow down. Sync will try again shortly.'
   if (response.status === 403)
-    return 'Google would not let Flyleaf into your Drive. Sign in again and leave the box ticked.'
+    return 'Google would not let Flyleaf eReader into your Drive. Sign in again and leave the box ticked.'
   if (response.status >= 500) return 'Google Drive is having trouble. Sync will try again shortly.'
   return 'Your library could not reach Google Drive. Check your connection and try again.'
 }

@@ -416,10 +416,29 @@ export function Reader() {
 
     /* The page geometry the margin bar needs, in the overlay's own
        coordinates. Read at draw time, never cached: a rotation changes both
-       numbers and the overlay redraws itself with the same options object. */
+       numbers and the overlay redraws itself with the same options object.
+
+       `gutter` is the padding upstream actually applies inside a page column,
+       which is NOT the `gap` percentage the setting is named after. Upstream
+       inverts the percentage to f⁻¹(g) = g/(1−g) so the outer padding and the
+       inner column gap come out equal (paginator.js:704–722), then lays the
+       column out with `padding: 0 gap/2` (paginator.js:329). So the text edge
+       sits at size·g / 2(1−g), a little over half of size·g.
+
+       Returning size·g — the setting read literally — was the bug: at 8% on a
+       612px pane it put the gutter at 49px when the text starts at 27px, so
+       the 2px bar landed 12px INSIDE the column and was drawn straight
+       through the first character of every marked line. Visible in a Coal
+       screenshot as a mustard rule between the “I” and the “t” of “It is a
+       truth universally acknowledged”.
+
+       A measure cap can inset the text further still (the grid at
+       paginator.js:487–491 centres a capped column), which only ever moves
+       the text right — so a bar placed off the padding edge stays clear. */
     const geom = useCallback(() => {
         const size = viewRef.current?.renderer?.size ?? 0
-        return { pageSize: size, gutter: size * (marginRef.current / 100) }
+        const g = Math.min(0.45, Math.max(0, marginRef.current / 100))
+        return { pageSize: size, gutter: (size * g) / (2 * (1 - g)) }
     }, [])
     function pageSize() {
         return viewRef.current?.renderer?.size ?? 0
@@ -570,14 +589,21 @@ export function Reader() {
         const root = stageRef.current?.closest('.reader')
         if (!r || !root) return
 
-        /* `gap` IS the per-side margin, one for one. Upstream computes the
-           column gap as f⁻¹(g) so that the outer padding and the inner gap
-           both come out at g% of the pane (paginator.js:696–714), which means
-           a page's text is inset by exactly `gap`% on each side. Measured on a
-           390px phone: gap 8% → 31px left, 31px right, symmetric to the pixel.
-           SPEC.md § 4 asks for 4–12% per side, so this is the number itself
-           and not twice it. `margin` is a different thing entirely: the head
-           and foot strip inside the pane. */
+        /* `gap` is the setting's own number, and upstream turns it into a
+           per-side inset of roughly HALF that. It computes the column gap as
+           f⁻¹(g) = g/(1−g) of the pane so the outer padding and the inner
+           column gap come out equal (paginator.js:704–722), then lays the
+           column out with `padding: 0 gap/2` on the book's own document
+           (paginator.js:329). So the text edge lands at size·g / 2(1−g).
+
+           Measured, not assumed: at 8% the text starts 26.59px in on a 612px
+           pane and 15.59px in on a 358.8px one — 4.35% a side, not 8%. An
+           earlier note here claimed the inset was `gap`% "symmetric to the
+           pixel"; it was reading the column gap, which is indeed g/(1−g), and
+           calling it the padding. Left as is on purpose: the slider range is a
+           look decision, not a bug, and doubling it would restyle every page.
+           `margin` is a different thing entirely: the head and foot strip
+           inside the pane. */
         marginRef.current = s.margin
         r.setAttribute('gap', `${s.margin}%`)
         r.setAttribute('margin', `${CHROME_INSET}px`)

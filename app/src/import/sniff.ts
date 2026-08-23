@@ -1,4 +1,7 @@
+import { BlobReader, BlobWriter, ZipReader, configure } from '@zip.js/zip.js'
+import type { Entry, FileEntry } from '@zip.js/zip.js'
 import type { Format } from '../types'
+import { isFile } from './zip'
 
 /* What is this file, really.
 
@@ -21,6 +24,12 @@ export type Sniffed =
   | { ok: true; format: Format; mime: string }
   | { ok: false; reason: 'drm'; what: string }
   | { ok: false; reason: 'unsupported'; what: string }
+  /* A zip with exactly one book inside it -- what a browser hands back when a
+     download was wrapped, which is most of them. Not an error and not a format:
+     the book is right there, so `importFile` unwraps it and imports that
+     instead. Telling somebody "this is a zip" when we can already see the EPUB
+     in it is a refusal dressed up as a diagnosis. */
+  | { ok: false; reason: 'wrapped'; what: string; inner: File }
 
 const MIME: Record<Format, string> = {
   epub: 'application/epub+zip',
@@ -38,6 +47,10 @@ const MIME: Record<Format, string> = {
    a 64KB slice, which is exactly the size of the central-directory scan below,
    and it fails as a stack overflow rather than as anything readable. latin1
    maps every byte to a codepoint, so a signature comparison is safe on it. */
+/* Same reason as import/epub.ts: zip.js spawns workers from a blob URL, and a
+   sniff is a few hundred bytes of central directory, not a decompression. */
+configure({ useWebWorkers: false })
+
 const latin1 = new TextDecoder('latin1')
 const ascii = (b: Uint8Array, from: number, len: number) =>
   latin1.decode(b.subarray(from, from + len))
@@ -92,29 +105,127 @@ export async function sniff(file: File): Promise<Sniffed> {
   return { ok: true, format: 'txt', mime: MIME.txt }
 }
 
+/* Entry names that mean "a book, in a bag". Deliberately narrower than ACCEPT
+   in import/index.ts: this list decides whether to UNWRAP an archive, and
+   unwrapping a .txt out of a zip full of them would be a guess, not a rescue. */
+const BOOKISH = /\.(epub|mobi|prc|azw3?|kf8|fb2|fbz|pdf)$/i
+const IMAGEY = /\.(jpe?g|png|webp|gif|avif|bmp|cbz|cbr)$/i
+
+/** The archive's directory, or null if it cannot be walked at all.
+
+    getEntries() reads the end-of-central-directory record and the directory
+    itself -- a few hundred bytes past the tail of the file -- and decompresses
+    nothing. On a 40MB EPUB that is two range reads, which is why this is
+    affordable inside a sniff. */
+async function readDirectory(file: File): Promise<Entry[] | null> {
+  try {
+    const reader = new ZipReader(new BlobReader(file))
+    const entries = await reader.getEntries()
+    await reader.close()
+    return entries
+  } catch {
+    return null
+  }
+}
+
 async function sniffZip(file: File, head: Uint8Array): Promise<Sniffed> {
-  /* An EPUB's first entry must be an uncompressed `mimetype` holding exactly
-     one string. Searching the first 200 bytes for it rather than parsing the
-     local header handles the files that carry an extra field there — which the
-     spec forbids and which exist anyway. */
-  if (ascii(head, 0, 200).includes('application/epub+zip')) {
-    /* META-INF/encryption.xml is how an EPUB says its contents are encrypted.
-       It is also how a legitimately obfuscated font is declared, so the
-       filename alone is not the answer — the entry is read in `readEpub`,
-       which can tell an obfuscated font from an encrypted chapter. Here we
-       only need to know it is worth looking. */
+  /* This function used to be four lines: look for the plain string
+     `application/epub+zip` in the first 200 bytes, call it an EPUB if it is
+     there, scan the tail for a `.fb2`, and call everything else "a zip file".
+
+     Which rejected ordinary EPUBs, and that is the worst kind of wrong. An
+     EPUB's first entry is *supposed* to be an uncompressed `mimetype`, so on a
+     file straight from a publisher the string is right there at the front. But
+     any EPUB that has been unzipped and zipped again has a deflated mimetype
+     written in whatever order the zipper walked the directory -- `zip -r` does
+     exactly that, and so does every repack script and every "I fixed the
+     metadata" pass. The string is not in the first 200 bytes and the entry is
+     not first, so the sniff refused the file.
+
+     None of those files are broken, and we could already read every one of
+     them: foliate-js opens an EPUB by reading META-INF/container.xml and never
+     looks at the mimetype entry at all (vendor/foliate-js/epub.js). The sniff
+     was stricter than the engine behind it, and the reader was told "Flyleaf
+     does not read a zip file" about a book that would have opened perfectly.
+
+     Reproduced before the fix by unzipping the shipped Time Machine and
+     re-zipping it with `zip -qr -X`: the entry order became META-INF/, then
+     container.xml, then a deflated mimetype, and the old sniff called it a zip.
+
+     So: read the directory. Every time, including for a file whose head looks
+     conforming -- the head-string shortcut was tried and deliberately removed,
+     because a truncated download keeps its first 512 bytes and loses its
+     directory, and the shortcut let one onto the shelf as a book with no
+     metadata that then failed to open. Verified: a 40KB head of the Time
+     Machine used to import as a book titled "truncated" and now refuses as an
+     unfinished download. Two range reads is the whole cost, and readMeta opens
+     the same archive a moment later regardless. */
+  const entries = await readDirectory(file)
+  if (!entries) {
+    /* Worth its own sentence. "Damaged" tells the reader to download it again;
+       "unsupported" tells them not to bother, and they are not the same
+       advice. */
+    return { ok: false, reason: 'unsupported', what: 'a damaged or unfinished download' }
+  }
+  const names = entries.map((e) => e.filename)
+  const has = (re: RegExp) => names.some((n) => re.test(n))
+
+  /* What foliate itself requires, and therefore the only test that matters. The
+     case-insensitive second look is for the handful of archives that store it
+     as META-INF/Container.xml, which is invalid and readable. */
+  if (has(/^META-INF\/container\.xml$/i)) {
     return { ok: true, format: 'epub', mime: MIME.epub }
   }
 
-  /* Not an EPUB. A zip containing a .fb2 is an FBZ; anything else is a zip we
-     have no business opening. Reading the central directory needs the tail of
-     the file, so this is the one sniff that touches two ends of it. */
-  const tailBytes = new Uint8Array(await file.slice(-Math.min(file.size, 65_557)).arrayBuffer())
-  const tail = ascii(tailBytes, 0, tailBytes.length)
-  if (/\.fb2\b/i.test(tail)) return { ok: true, format: 'fbz', mime: MIME.fbz }
-  if (/\.(cbz|jpe?g|png|webp)\b/i.test(tail)) {
+  /* The declared mimetype, now used for what it is actually good for: telling
+     a damaged EPUB from a zip that was never a book. */
+  const declared = ascii(head, 0, Math.min(head.length, 512)).includes('application/epub+zip')
+  if (has(/\.fb2$/i)) return { ok: true, format: 'fbz', mime: MIME.fbz }
+
+  /* One book in a bag -- a download that arrived wrapped, which is most of
+     them. The book is right there in the directory listing, so hand it back
+     rather than describing the bag. */
+  /* Typed predicate rather than a bare isFile(): the narrowing has to survive
+     the filter, or getData below is only reachable behind a non-null assertion
+     that would also silence a real mistake. */
+  const books = entries.filter(
+    (e): e is FileEntry => isFile(e) && BOOKISH.test(e.filename),
+  )
+  if (books.length === 1) {
+    const entry = books[0]
+    try {
+      const blob = await entry.getData(new BlobWriter())
+      const name = entry.filename.split('/').pop() || entry.filename
+      return {
+        ok: false,
+        reason: 'wrapped',
+        what: `a zip holding ${name}`,
+        inner: new File([blob], name, { lastModified: file.lastModified }),
+      }
+    } catch {
+      /* Encrypted (a password-protected zip) or corrupt. Either way the book is
+         visible and unreachable, which is worth saying precisely. */
+      return { ok: false, reason: 'unsupported', what: 'a zip whose contents could not be read' }
+    }
+  }
+  if (books.length > 1) {
+    return { ok: false, reason: 'unsupported', what: `a zip holding ${books.length} books` }
+  }
+
+  /* An OPF with no container.xml. Not an EPUB by any reader's definition, but
+     it is nearly one, and "this EPUB is missing META-INF/container.xml" is a
+     thing somebody can act on. */
+  if (declared || has(/\.opf$/i)) {
+    return { ok: false, reason: 'unsupported', what: 'an EPUB with no META-INF/container.xml' }
+  }
+
+  /* Images and nothing readable: a comic archive, which is out of scope by
+     decision rather than by omission. */
+  const files = entries.filter((e) => isFile(e))
+  if (files.length > 0 && files.every((e) => IMAGEY.test(e.filename))) {
     return { ok: false, reason: 'unsupported', what: 'a comic archive' }
   }
+
   return { ok: false, reason: 'unsupported', what: 'a zip file' }
 }
 

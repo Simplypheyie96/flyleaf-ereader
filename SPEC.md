@@ -540,6 +540,125 @@ reload; and the sheet contains **no type control at all** — absent, not disabl
 | **P4** | PDF on `pdfjs-dist` | Unchanged, plus: on a PDF the **stock tints the surround only**, and the type controls are **absent, not disabled**. A fixed page has no reflow to control, and pretending otherwise is a worse answer than an honest gap |
 | **P5** | Audit, offline, update, install, backup | **+ Restore included books, storage used** |
 
+### 11.1 The phone test, and the part of it a driver cannot do
+
+`CLAUDE.md` sets one gate above all the others: *"Test on a real phone, throttled, with a
+4MB EPUB. A reader that is smooth on a laptop and janky on a phone has failed the brief."*
+That gate has two halves, and only one of them can be automated here.
+
+**What is automated.** `audit/phone.mjs` runs a 390x844 viewport at 3x with touch and
+`isMobile`, throttles the CPU 4x through CDP, and uses `audit/fixtures/big.epub` — 4.2MB,
+grown from the seed book by `make-big.mjs`. It measures, one per acceptance criterion:
+
+| Criterion | What the driver measures | Measured |
+|---|---|---|
+| A turn touches only `transform` | Every rAF frame during a real touch drag: how many exceed 32ms, the worst one, and any longtask that ran while the finger was down | 0 frames over 32ms, worst 16.7ms, 0 longtasks |
+| The gesture tracks the finger 1:1 | The committed `translate3d` on `renderer.contentLayer`, differenced against the finger as the *page* read it, frame by frame — a peak drift in pixels | 0px peak drift over 202 paired frames, on all three drags; claim at 10px |
+| Open is instant on a reopen | The reopen's own clock, apart from boot and apart from the launch screen, against what importing and opening the file cost the first time | open 215ms against 770ms for the file path — 28% |
+| Nothing blocks on the network | The book is opened again with the context offline | opened, 1672ms |
+
+The gesture is dispatched as CDP touch, not as a Playwright mouse drag, because
+`turn.ts:342` branches on `pointerType === 'mouse'` and a mouse drag exercises a
+different path from the one a reader uses.
+
+**How those numbers were arrived at is part of the result.** Four of this driver's first
+findings turned out to be the driver and not the app, and saying so here is cheaper than
+finding out twice:
+
+- **The finger is read from the events the page receives, not from the dispatch clock**,
+  and it is read from `screenX`. Inside a paginated section iframe `clientX` is unusable:
+  measured across a 224px drag, `screenX` reported 320 → 96 exactly as dispatched while
+  `clientX` sat frozen at 1711.59 for every move, because the section document is a
+  container many pages wide that pagination scrolls horizontally under the finger. This is
+  what `turn.ts:147-155` already says. A driver that "corrected" it to `clientX` measured
+  220px of drift on a 220px drag and called the reader broken.
+- **Drift is anchored at the claim, not at touchstart.** `turn.ts`'s hysteresis
+  (`CLAIM_PX = 8`, `CLAIM_MS = 200`, `CLAIM_SPEED = 0.15`) is what stops a tap nudging the
+  page and lets a vertical scroll win; measured from touchstart it reads as a tracking
+  failure that no amount of good tracking can fix. The threshold is reported separately as
+  `claimPx`, on its own budget.
+- **`dragSlow` is a permanent control**, half the dispatch speed over the same distance.
+  It exists to tell sampling latency from a layer that is genuinely trailing: latency holds
+  in milliseconds and halves in pixels, trailing holds in pixels. A hypothesis that the
+  drift was one frame of rAF latency died on exactly this control.
+- **Five clocks for one open, because one clock drew a false conclusion.** `importMs`
+  (file → book), `coldOpenMs` (click → first page on a loaded page), `bootMs` (goto → read
+  button, a PWA-shell cost, reported uncompared), `splashMs` (the launch screen, § 11.2)
+  and `warmOpenMs` (click → first page after a full reload). The first version timed warm
+  from the `goto` and cold from the file picker, charging warm an entire app boot cold
+  never paid, and then reported the difference as a re-parse.
+- **A driver that cuts the network must not report its own cut.** The offline step's
+  severance errors are excluded from the console check only from the cut onward, and only
+  when they *are* severance errors.
+
+**What is not.** This machine has no iOS Simulator — `xcrun simctl` is absent, and
+`xcode-select -p` reports `/Library/Developer/CommandLineTools` rather than a full Xcode.
+Installing Xcode and running `sudo xcode-select -s` needs the owner's password. The
+simulator MCP is simulator-only in any case and cannot drive a physical device. So there
+is no route from here to a real phone, and the emulated numbers are **evidence, not a
+pass**. A 4x Chromium throttle on an M-series Mac is not an iPhone; it is a way of making
+a regression visible.
+
+**The owner's half, on the actual device.** Open `https://read.flyleaf.cc`, add it to the
+home screen, and then:
+
+1. **Open a 4MB book from cold.** Import a large EPUB. Time from tapping the file to the
+   first page of text. Anything that feels like a wait rather than a beat is a finding.
+2. **Reopen it.** Close the app entirely, reopen from the home screen icon, tap the book.
+   This must be immediate — it is reading a blob and a locator out of IndexedDB, not
+   parsing a file. The launch screen's beat (§ 11.2) is the only wait that belongs here.
+3. **Tap during the launch screen.** It should go, at once. The floor is deliberate; a tap
+   being eaten by it is not.
+4. **Drag a page slowly and hold.** The page must stay under the thumb the whole way, with
+   no catching up when the finger stops. Reverse mid-drag without lifting; it must follow.
+5. **Flick, hard.** The turn should commit at a speed that came from the flick.
+6. **Hit the ends.** First page and last page should resist and spring back, not stop dead.
+7. **Change the type size mid-chapter.** The sentence you were reading must still be on
+   screen afterwards — the same *sentence*, not the same percentage.
+8. **Turn on Airplane Mode and read.** Every part of it must still work.
+9. **Leave it for a day, come back.** It should open on the page you left.
+
+Any "no" there outranks every number in this file.
+
+### 11.2 The launch screen, and the tap it used to eat
+
+`#splash` lives in `index.html` and comes down in `main.tsx`. It is `position: fixed`,
+`inset: 0`, `z-index: 9999`, and until it fades it is hit-testable — so for as long as it
+is up it *is* the interface.
+
+Three waits gate it, and they are not the same kind of wait:
+
+| Wait | Value | Kind |
+|---|---|---|
+| `HOLD` | 1200ms **from navigation** | aesthetic floor — a launch screen that flashes for 40ms is worse than none |
+| `FONT_WAIT` | 1000ms ceiling on `document.fonts.ready` | correctness — the first frame should not be the app in a fallback face |
+| `SEEDING_WAIT` | 2500ms ceiling on the first-run seeding | correctness — the first frame should be a shelf with two books on it, never an empty state that fills in |
+
+`HOLD` counts from navigation so a slow bundle parse does not wait twice. The consequence,
+measured on the throttled phone profile: a warm start reaches `main.tsx` at ~100ms and then
+holds for the other ~1100ms. On the path a reader actually uses, the floor *is* the launch
+screen's whole duration — and the comment in `main.tsx` used to claim the opposite ("torn
+down a frame after it paints"), which is only true when the parse itself already took
+1200ms.
+
+**What that cost.** Measured: on a reopened book, the read button was un-hittable for
+1.15s after the load — `document.elementFromPoint` at its centre returned `#splash`, not
+the button. A tap in that window was swallowed by a curtain in front of a ready app. It
+also cost this driver a whole round of wrong diagnosis: 1.35s of a 1.5s "warm open" was the
+curtain and 160ms of it was the book, and with one clock for both the reader looked like it
+was re-parsing the file.
+
+**The fix is an escape hatch, not a shorter floor.** The floor is a decision (1.2s rather
+than Press's 1.8s, because this screen stands between a reader and the page they were on)
+and it stands. What changed is that the floor now yields to the first `pointerdown` or
+`keydown` — one tap and it resolves immediately. Only the floor: `FONT_WAIT` and
+`SEEDING_WAIT` are correctness waits and a tap does not skip them.
+
+Measured after: launch screen 1212ms when nobody touches it, **38ms** when somebody does.
+`phone.mjs` asserts both, on separate budgets (2200ms and 700ms), and the reopen's own
+clock — 215ms against 770ms to import and open the same file — is now measured apart from
+all of it.
+
 ---
 
 ## 12. Settled
@@ -941,6 +1060,37 @@ The § 14.6 lesson again, from the other direction: a finding that names a selec
 the app *and* the driver. A finding about a fixture-backed format is a claim about the app, the
 driver, *and* the fixture. Check which one moved.
 
+### 14.10 The install ask on Home
+
+Settings has always carried the honest, permanent version of this — § 14.4's first device
+sentence. What it did not have was anybody reading it. So Home carries an ask too: one strip
+under the header, above Continue, and it is the only place in the app that asks the reader for
+anything.
+
+Its rule is that it never appears where the ask cannot be acted on. Four branches, and three of
+them are silence:
+
+| state | strip | button |
+| --- | --- | --- |
+| `installed` — running standalone, or installed this session | none | — |
+| iOS/iPadOS (`manualOnly`) | `Add to home screen`, naming Share → Add to Home Screen exactly as iOS names them | **none** — there is no programmatic install to offer |
+| a real `beforeinstallprompt` is held, coarse pointer | `Add to home screen`, on opening back to the page you were on | Install |
+| the same, fine pointer | `Open books here`, on book files opening into the reader | Install |
+| no prompt held and not iOS | none | — |
+
+Two copies for the same capability, split on `pointer: coarse`, because "home screen" is not a
+thing on a laptop; and the desktop line leads on **file handling**, not on working offline —
+offline is true of the whole app and is deliberately not the headline anywhere in it. The eyebrow
+on the desktop branch is not "Install", because the button beside it already says that.
+
+**A dismissal is permanent.** It is written to `flyleaf.home.install` and the strip does not come
+back because the app decided enough time has passed — the same discipline as a deleted included
+book (§ 1.3). Settings is where a reader changes their mind.
+
+`audit/install.mjs` covers all of it, and is explicit that Chromium fires no real
+`beforeinstallprompt` headlessly: the prompt is synthetic, our branch and our `prompt()` call are
+real, and Chrome's own decision to offer the install is the part no driver here can exercise.
+
 ---
 
 ## 15. Google Drive sync (built, and dormant until one env var is set)
@@ -989,6 +1139,43 @@ The ID itself is **public by design** and safe in a repo, a bundle and an env va
 in it to rotate or leak. It is the same client Flyleaf Press already uses, so both apps share one
 consent screen. The scopes are `drive.appdata` — a hidden per-app folder, *not* the reader's Drive,
 which we cannot see outside of — and `userinfo.email`, only so the panel can name the account.
+
+#### The exact steps, because this is the one thing here nobody but the owner can do
+
+Signing in to Google Cloud Console means entering the owner's credentials, which is not something
+this project's tooling does or should do. So the work is written out instead, precisely enough to
+be followed once and never thought about again.
+
+1. Open **console.cloud.google.com/apis/credentials** and sign in as the account that owns the
+   client — the screenshot of the failure was taken under `ajayifey@gmail.com`.
+2. Select the project that holds the Flyleaf client. It is the **same OAuth client Flyleaf Press
+   uses**, so the project is whichever one Press was set up under; the client is identifiable by
+   its ID:
+
+   ```
+   997776608568-vfq90f4v1b1v82p2enm0li1f4sj72vrk.apps.googleusercontent.com
+   ```
+
+3. Under **OAuth 2.0 Client IDs**, click that client. It is of type *Web application*.
+4. In **Authorized JavaScript origins**, add all four entries from the block above — one per row,
+   scheme included, **no trailing slash**, and `http` (not `https`) for the two localhosts.
+5. Leave **Authorized redirect URIs** alone. Google Identity Services' token flow is
+   origin-checked, not redirect-checked; adding a redirect URI here changes nothing and removing
+   one could break Press.
+6. Save. Google's own note says changes can take five minutes to take effect, and in practice they
+   sometimes take longer.
+7. Then check it, rather than assuming: open `https://read.flyleaf.cc/settings`, press **Connect**,
+   and expect Google's account chooser. If the panel says *"Google turned this away"* with an
+   origin in it, that origin is the row that is still missing or mistyped — the message names it
+   deliberately so this loop needs one pass, not four.
+
+Two things worth knowing before touching that screen. The consent screen is **shared with Press**,
+so any edit to the app name, logo or scopes there changes Press too; adding origins does not.
+And nothing needs publishing to make this work: a client left in **Testing** mode signs in the
+owner's own account (and any address listed as a test user) without going near Google's
+verification review. Whether `drive.appdata` counts as sensitive for a *published* app is a
+question for the day this is offered to other people — it is not in the way of the owner using it,
+and it is not worth guessing at here.
 
 ### 15.2 Three documents, not one
 
@@ -1140,3 +1327,26 @@ marks against Vercel's intended ones. That is **expected** for a CNAME-configure
 error to chase. And the project identifiers live in the **repo root** `.vercel/project.json`, not
 in `app/.vercel/` — the linked directory is the root, and guessing the team ID instead of reading it
 returns a flat `Not authorized`.
+
+### 16.2 Where the address is written down
+
+A live domain is only half of it. Until the app itself knows its own address, a shared link has no
+title card, a search engine has two URLs for one page, and the repo gives a visitor nowhere to go.
+So the address is now recorded in exactly five places, and each is there for a different reason.
+
+| Where | What | Why it needs the absolute URL |
+|---|---|---|
+| `app/index.html` | `<link rel="canonical" href="https://read.flyleaf.cc/">` | A preview build and production serve the same page; canonical says which one is the page |
+| `app/index.html` | `og:url` | A share card has to link somewhere, and a relative path resolves against the wrong host |
+| `app/index.html` | `og:image` → `/icons/icon-512.png`, plus `og:image:width/height` and `twitter:card=summary` | Open Graph images cannot be relative — they are fetched by somebody else's server. `summary`, not `summary_large_image`, because the mark is square |
+| `app/package.json` | `homepage`, `repository` | Where the thing lives and where its source lives, for anything reading the manifest |
+| GitHub | repo homepage field + the URL on the first line of `README.md` | The repo is private, so this is the only signpost a collaborator gets |
+
+Two deliberate omissions:
+
+- **The manifest has no `start_url` change.** It stays relative, because the manifest is read by the
+  installed app from whatever origin installed it — hard-coding production there would break a
+  preview install.
+- **Settings' outbound links do not include this app.** `OUT` in `SettingsPage.tsx` lists
+  `flyleaf.cc`, `press.flyleaf.cc` and the maker's site — destinations *outside* the app. Linking
+  `read.flyleaf.cc` from inside `read.flyleaf.cc` is a link to where you already are.

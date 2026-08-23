@@ -3,6 +3,11 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "homepage": "https://read.flyleaf.cc",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Simplypheyie96/flyleaf-ereader.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -46,10 +46,15 @@ const INK = '#1B1917', SOFT = '#6B655C', RULE = '#E0DBD1'
 /* The app's five tints, restated for paper.
 
    On screen a tint is a WASH sitting behind text, so it is pale by design —
-   #F6EBD9 butter is 1.18:1 against white. As a 2pt bar on a printed sheet that
-   is invisible, and an invisible bar is worse than none, because the bar is the
-   one thing this export can say that Markdown and plain text cannot: which
-   highlighter the reader reached for.
+   #D6C19F butter clears its floor at 1.72:1 against white and no more. As a
+   2pt bar on a printed sheet that is nearly nothing, and a bar nobody can see
+   is worse than none, because the bar is the one thing this export can say
+   that Markdown and plain text cannot: which highlighter the reader reached
+   for. (The figure used to be 1.18:1, when the screen tints were still Press's
+   card grounds. Deepening those did not close the gap — a wash on a lit panel
+   and a 2pt bar on paper are far enough apart that the two sets still want
+   their own lightness. What they share is the hue, held to within half a
+   degree, so the paper set reads as the same four colours.)
 
    So each bar keeps its tint's OKLCH HUE and is given a printable lightness and
    chroma. Two pairs share a hue on screen — mustard/butter at 80° and
@@ -358,7 +363,7 @@ export function exportPdf(input: ExportInput): Uint8Array {
     d.rule()
     d.gap(13)
     const count = highlights.length + bookmarks.length
-    d.para(`${count} ${count === 1 ? 'mark' : 'marks'} · Flyleaf`, {
+    d.para(`${count} ${count === 1 ? 'mark' : 'marks'} · Flyleaf eReader`, {
         font: 'F4', size: 8, leading: 11, colour: SOFT, tc: 1.1, upper: true,
     })
     d.gap(26)

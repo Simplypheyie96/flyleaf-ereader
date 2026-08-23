@@ -521,3 +521,24 @@ export function SearchIcon() {
     </svg>
   )
 }
+
+export function CupIcon() {
+  /* A mug with two curls of steam. Drawn rather than sourced, per the note at
+     the top of this file: the tip jar's mark has to be in the same hand as the
+     other nineteen or it reads as a badge pasted onto the page.
+
+     The body tapers 0.9 of a grid step on each side between the rim and the
+     foot, which is what stops it reading as a rectangle with a handle. Steam
+     is two curls of different heights, not two of the same: matched curls look
+     like a symbol, mismatched ones look like steam. */
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <g {...strokeProps}>
+        <path d="M9.9 7.4 C 9 6.6 9 5.8 9.9 5 S 10.8 3.4 9.9 2.6" />
+        <path d="M13.1 7.4 C 12.4 6.8 12.4 6.2 13.1 5.6 S 13.8 4.4 13.1 3.8" />
+        <path d="M5.4 9.6 H 16.8 L 15.9 18 A 2.6 2.6 0 0 1 13.3 20.3 H 8.9 A 2.6 2.6 0 0 1 6.3 18 Z" />
+        <path d="M16.6 12 H 18.1 A 2.6 2.6 0 0 1 18.1 17.2 H 16.1" />
+      </g>
+    </svg>
+  )
+}

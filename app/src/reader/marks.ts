@@ -23,8 +23,11 @@
      Which of the two applies is not decided here either — index.css sets
      `--hl-blend` and the per-stock `--hl-fill-*` values, and this file reads
      them off the mounted reader root the way reader/palette.ts reads the stock.
-     Both alphas and the blend mode are measured by audit/tints.mjs: fifteen
-     dark pairs, four light stocks, and the underline against every ground.
+     Both alphas and the blend mode are measured by audit/tints.mjs, which
+     checks two bars on every one of the twenty-eight fills: 4.5:1 for the ink
+     read through the mark, and 1.7:1 for the mark against the bare page. The
+     second bar is the one the first shipped set had no floor on at all, and
+     the reason the tints here are Press's HUES rather than Press's values.
    ───────────────────────────────────────────────────────────── */
 
 import { bury, db } from '../db'
@@ -56,8 +59,8 @@ export interface MarkPaint {
 }
 
 const FALLBACK_SOLID: Record<HighlightColor, string> = {
-    mustard: '#DCA94C', pink: '#F3D9DD', blue: '#DAE4EE',
-    butter: '#F6EBD9', underline: '#1C5480',
+    mustard: '#DCA94C', pink: '#F0B3BE', blue: '#AFC9E3',
+    butter: '#D6C19F', underline: '#1C5480',
 }
 
 /** Read the tints off the mounted reader root. index.css stays the single

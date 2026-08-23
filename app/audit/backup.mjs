@@ -176,7 +176,12 @@ m.refusal = await pa.evaluate(() => ({
     alert: document.querySelector('[role=alert]')?.textContent?.trim() ?? null,
     confirm: !!document.querySelector('.set-confirm'),
 }))
-if (!/not a Flyleaf backup/i.test(m.refusal.alert ?? ''))
+/* Loose on the product name deliberately. The app says "not a Flyleaf eReader
+   backup file"; an exact-string assertion here failed the whole driver the
+   moment the naming sweep renamed the app, reporting a real refusal as a
+   missing one. What is being checked is that the sentence names the problem,
+   not how the product spells itself. */
+if (!/not a Flyleaf\b[^.]*backup/i.test(m.refusal.alert ?? ''))
     bad('refusal', `a .txt fed to the restore control said "${m.refusal.alert}" — not a sentence naming the problem`)
 else say(`refused a .txt: "${m.refusal.alert}"`)
 if (m.refusal.confirm)

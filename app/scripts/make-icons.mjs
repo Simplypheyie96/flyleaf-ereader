@@ -29,15 +29,13 @@ const INK = '#1B1917'
 
    The faces are the real ones, read straight out of the fontsource packages so
    they match what the app loads: Playfair Display 500 and Archivo 500, which
-   are the weights #splash b and #splash small use. When index.html's #splash
-   moves, this moves. */
+   are the weights #splash b and #splash small use. IBM Plex Mono was here too,
+   for a format list that #splash no longer carries. When index.html's #splash
+   moves, this moves — see CSS below, which is that block transcribed. */
 const req = createRequire(import.meta.url)
 const face = (pkg, file) => fontkit.openSync(join(dirname(req.resolve(pkg + '/package.json')), 'files', file))
 const SERIF = face('@fontsource/playfair-display', 'playfair-display-latin-500-normal.woff2')
 const SANS = face('@fontsource/archivo', 'archivo-latin-500-normal.woff2')
-/* The chrome's mono, for the format list — #splash sets that line at 400, not
-   500 like the two above it. */
-const MONO = face('@fontsource/ibm-plex-mono', 'ibm-plex-mono-latin-400-normal.woff2')
 
 /* One line of text as <path>s, centred on cx and sitting on baseline y.
    `track` is letter-spacing in user units, added between glyphs and — the part
@@ -60,39 +58,100 @@ function line(font, str, size, track, cx, y, ink, opacity = 1) {
   return paths.join('\n  ')
 }
 
-/* The same rosette the nav draws. Kept in sync with src/components/Mark.tsx by
-   hand, since the app imports it as a TS constant and this script runs outside
-   the bundle. */
-const MARK =
-  'M256 57.6 A74.67 59.73 -90 1 1 256 206.93 A74.67 59.73 -90 1 1 256 57.6 Z M444.69 194.69 A74.67 59.73 -18 1 1 302.66 240.85 A74.67 59.73 -18 1 1 444.69 194.69 Z M372.61 416.51 A74.67 59.73 54 1 1 284.84 295.68 A74.67 59.73 54 1 1 372.61 416.51 Z M139.39 416.51 A74.67 59.73 126 1 1 227.16 295.68 A74.67 59.73 126 1 1 139.39 416.51 Z M67.31 194.69 A74.67 59.73 198 1 1 209.34 240.85 A74.67 59.73 198 1 1 67.31 194.69 Z M217.6 256 A38.4 38.4 0 1 1 294.4 256 A38.4 38.4 0 1 1 217.6 256 Z'
+/* The same lozenge the nav draws. Kept in sync with src/components/Mark.tsx
+   by hand, since the app imports it as a TS constant and this script runs
+   outside the bundle. That file carries the reasoning and the winding rule the
+   counter depends on; this is only a copy of the string.
 
-/* The launch screen's layout, MEASURED off the rendered #splash rather than
-   guessed at, and expressed in the two units this function already works in:
-   `span`, the drawn rosette's height, and `base`, the bottom of the 512-unit
-   box it sits in.
+   MARK_FRAC is the fraction of the 512 box the ink actually spans, MEASURED
+   off the path's bounding box (116–396 × 48–464, so 416/512) rather than
+   guessed. `k` below turns a requested ink span into the scale that produces
+   it, so a stale fraction silently scales every icon: at the rosette's old
+   0.7575 this mark would come out 7% large. */
+const MARK = 'M256 48 L396 256 L256 464 L116 256 Z M256 164 L194 256 L256 348 L318 256 Z'
+const MARK_FRAC = 0.8125
 
-   The old numbers were derived as "the CSS size over 88", 88 being the box
-   the web splash draws the mark in. But `span` is the DRAWN path, which fills
-   only 0.7575 of that box — so every line came out 24% small and every gap
-   24% tight, and the native launch image and the in-page splash that replaces
-   it visibly disagreed at the handoff. These are the same layout in the same
-   units, so they do not.
+/* The launch screen's layout, as the CSS ITSELF rather than as measurements
+   of it. Every number below is copied straight from index.html's #splash
+   block, in the CSS px it is written in, and the baselines are then solved
+   from the same font metrics and the same box model the browser uses. So the
+   native launch image and the in-page splash that replaces it agree by
+   construction instead of by a table someone remembered to update.
 
-   To re-derive after changing #splash: /tmp/fl/geom.mjs reads the baselines
-   off the live overlay with a zero-width inline-block probe. */
-const L = {
-  /* size, tracking, and baseline offset from `base`, all in spans */
-  name: { size: 0.3750, track: 0, base: 0.6901 },
-  sent: { size: 0.1800, track: 0.0180, base: 1.1176 },
-  fmt: { size: 0.1650, track: 0.0099, base: 1.6155 },
-  /* The block, box top to the last line's line-box bottom, is 3.00 spans in
-     the web layout (200px against a 66.66px span), which is what centres it
-     here the way flex centres it there. */
-  height: 3.0,
+   Two earlier revisions of this got it wrong in opposite directions — one fed
+   CSS-over-88 fractions into a span-scaled layout and came out 24% small, the
+   other pinned the layout to the mark's ink height, so redrawing the mark
+   silently resized the wordmark. Both were tables of derived numbers. This is
+   not a table; when #splash changes, change these literals to match and the
+   arithmetic follows.
+
+   `box` is #splash svg's width/height, and it is the unit everything else is
+   expressed against, because it is the one length the two surfaces must agree
+   on exactly: iOS shows the PNG, the page paints over it, and nothing is
+   allowed to jump. */
+const CSS = {
+  box: 96,
+  name: { mt: 24, size: 30, lh: 1.1, em: -0.008, font: () => SERIF, text: 'Flyleaf eReader', op: 1 },
+  rule: { mt: 22, w: 40, h: 1, op: 0.18 },
+  claim: { mt: 20, size: 11, lh: 1.6, em: 0.16, font: () => SANS, text: 'READ WHAT YOU OWN', op: 0.55 },
 }
 
-/* the path itself spans about 78% of its 512 box, so `frac` is the share of
-   the canvas the DRAWN mark covers, not the share the box covers.
+/* Where the browser puts a baseline inside a line box: the leading left over
+   after the font's own ascent+descent is split above and below, then the
+   baseline sits one ascent down from there.
+
+   The three roundings are not cosmetic and were arrived at by measuring, not
+   by reading a spec. Blink rounds each font metric to a whole CSS pixel before
+   it does anything with them, floors the half-leading, and quantises the line
+   box to 1/64 px (its LayoutUnit). Compute this in ideal reals instead and the
+   baselines come out 0.97px and 0.47px low respectively for the two lines
+   here — under a pixel each, and still enough to see the wordmark twitch at
+   the handoff from the native launch image to the page.
+
+   Measured against the live #splash at 390x844: name baseline 148.0px below
+   the block top, claim baseline 208.0px. This function returns exactly those.
+
+   hhea ascent/descent, which is what Blink uses for both of these faces —
+   Playfair 1082/-251, Archivo 878/-210 against a 1000 upem. Their winAscent
+   pair would put the name a further 1.6px low. */
+function baselineIn(spec, lineTop) {
+  const f = spec.font()
+  const asc = Math.round((f.ascent / f.unitsPerEm) * spec.size)
+  const desc = Math.round((-f.descent / f.unitsPerEm) * spec.size)
+  return lineTop + Math.floor((lineBoxOf(spec) - (asc + desc)) / 2) + asc
+}
+
+/* size x line-height, quantised to Blink's 1/64 px LayoutUnit: 11 x 1.6 is
+   17.59375 on screen, not 17.6, and the stack is short enough that the
+   difference lands inside the centring. */
+const lineBoxOf = (spec) => Math.floor(spec.size * spec.lh * 64) / 64
+
+/* The stack under the mark, laid out in CSS px from the top of the mark's box
+   and emitted at `u` user units per CSS px. Returns the block's total height
+   in CSS px as well, which is what centres it the way flex centres it there.
+   Called twice per launch image — once to measure, once to draw — so the
+   measure pass cannot fall out of step with the draw. */
+function splashStack(u, cx, boxTop, ink) {
+  const out = []
+  let y = CSS.box
+  const put = (spec) => {
+    y += spec.mt
+    out.push(line(spec.font(), spec.text, spec.size * u, spec.em * spec.size * u,
+      cx, boxTop + baselineIn(spec, y) * u, ink, spec.op))
+    y += lineBoxOf(spec)
+  }
+  put(CSS.name)
+  y += CSS.rule.mt
+  out.push(`<rect x="${(cx - (CSS.rule.w * u) / 2).toFixed(2)}" y="${(boxTop + y * u).toFixed(2)}" ` +
+    `width="${(CSS.rule.w * u).toFixed(2)}" height="${Math.max(1, CSS.rule.h * u).toFixed(2)}" ` +
+    `fill="${ink}" fill-opacity="${CSS.rule.op}"/>`)
+  y += CSS.rule.h
+  put(CSS.claim)
+  return { body: out.join('\n  '), height: y }
+}
+
+/* `frac` is the share of the canvas the DRAWN mark covers, not the share the
+   box covers — MARK_FRAC above is what converts between the two.
    `words` adds the name and the two lines under it, for the launch images
    only — icons stay wordless. `spanPx` overrides `frac` with an absolute
    drawn-mark height, which is how the launch images stay identical to the web
@@ -100,22 +159,22 @@ const L = {
    fraction of the canvas can only match it on one of them. */
 function svg(w, h, frac, ground = PAPER, ink = INK, words = false, spanPx = null) {
   const span = spanPx ?? Math.min(w, h) * frac
-  const k = span / (512 * 0.7575)
+  const k = span / (512 * MARK_FRAC)
+  /* The CSS box that ink span corresponds to — the unit L is written in, so
+     the wordmark is pinned to #splash's px sizes and not to the mark's
+     silhouette. For the launch images this comes back out as exactly 88. */
+  const box = span / MARK_FRAC
+  /* user units per CSS px of #splash; comes out as the device pixel ratio */
+  const u = box / CSS.box
   const tx = w / 2 - 256 * k
   /* Centred as a BLOCK when there are words, so the lockup reads centred
      rather than the mark alone: the box top goes half the block's height
      above the middle. Without words the 512 box is simply centred. */
-  const ty = words ? h / 2 - span * (L.height / 2) : h / 2 - 256 * k
-  const base = ty + 512 * k
-  const text = words
-    ? [
-        line(SERIF, 'Flyleaf eReader', span * L.name.size, span * L.name.track, w / 2, base + span * L.name.base, ink),
-        line(SANS, 'READ WHAT YOU OWN', span * L.sent.size, span * L.sent.track, w / 2, base + span * L.sent.base, ink, 0.62),
-        /* The interpunct is U+00B7, which all three of these faces have; a
-           bullet would not sit on the same optical line as the caps above. */
-        line(MONO, 'EPUB \u00B7 MOBI \u00B7 AZW3 \u00B7 FB2 \u00B7 PDF', span * L.fmt.size, span * L.fmt.track, w / 2, base + span * L.fmt.base, ink, 0.42),
-      ].join('\n  ')
-    : ''
+  /* Centred as a BLOCK when there are words, so the lockup reads centred
+     rather than the mark alone: measure the stack, then put the mark's box top
+     half the block above the middle. */
+  const ty = words ? h / 2 - (splashStack(u, w / 2, 0, ink).height * u) / 2 : h / 2 - 256 * k
+  const text = words ? splashStack(u, w / 2, ty, ink).body : ''
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <rect width="${w}" height="${h}" fill="${ground}"/>
   <g transform="translate(${tx} ${ty}) scale(${k})"><path d="${MARK}" fill="${ink}"/></g>
@@ -134,12 +193,15 @@ mkdirSync(ICONS, { recursive: true })
 mkdirSync(SPLASH, { recursive: true })
 
 /* — install icons — full-bleed; iOS rounds the corners itself */
+/* 0.60, up from the rosette's 0.48: `frac` sets the ink's HEIGHT, and this
+   mark is 280 wide to 416 tall where the rosette was near-square, so the same
+   fraction would have read noticeably lighter in the same square icon. */
 for (const s of [64, 180, 192, 256, 384, 512]) {
-  png(join(ICONS, `icon-${s}.png`), s, s, 0.48)
+  png(join(ICONS, `icon-${s}.png`), s, s, 0.60)
 }
 /* — maskable — Android crops to a circle of 80% width, so the mark sits small */
 for (const s of [192, 512]) {
-  png(join(ICONS, `maskable-${s}.png`), s, s, 0.36)
+  png(join(ICONS, `maskable-${s}.png`), s, s, 0.44)
 }
 writeFileSync(join(ICONS, 'icon.svg'), svg(512, 512, 0.48))
 
@@ -151,11 +213,14 @@ const DEVICES = [
   [1125, 2436, 3], [1242, 2688, 3], [828, 1792, 2], [750, 1334, 2], [1242, 2208, 3],
   [1640, 2360, 2], [1668, 2388, 2], [2048, 2732, 2], [1536, 2048, 2], [1620, 2160, 2],
 ]
-/* #splash draws the mark in an 88px box, and the path fills 0.7575 of it. In
-   device pixels that is the span the launch image must use for the two screens
-   to be indistinguishable — which is the whole job of a launch image: iOS shows
-   it, the page paints over it, and nothing is allowed to jump. */
-const SPLASH_SPAN = 88 * 0.7575
+/* #splash draws the mark in a CSS.box-px box, and the ink fills MARK_FRAC of
+   it. In device pixels that is the span the launch image must use for the two
+   screens to be indistinguishable — which is the whole job of a launch image:
+   iOS shows it, the page paints over it, and nothing is allowed to jump.
+   Written against both constants rather than a literal, so it cannot drift
+   from either: svg() divides MARK_FRAC straight back out, giving u === dpr and
+   box === CSS.box × dpr exactly. */
+const SPLASH_SPAN = CSS.box * MARK_FRAC
 const links = []
 for (const [w, h, dpr] of DEVICES) {
   /* the name and both lines go here too, so the native launch image and the

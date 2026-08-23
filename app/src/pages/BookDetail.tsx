@@ -142,7 +142,18 @@ export function BookDetail() {
        is a button that surprises somebody once. */
     await db.transaction('rw', [db.books, db.locators, db.graves], async () => {
       await db.locators.delete(book.id)
-      await db.books.update(book.id, { progress: 0, finishedAt: null, editedAt: Date.now() })
+      /* openedAt goes too, and that is the whole difference between a reset
+         that works and one that only looks like it did. Every "are you part
+         way through this?" test in the app reads openedAt, not progress —
+         Home's Continue rail filters on it, and `started` here decides
+         whether the button says Continue or Start reading. Clearing only the
+         locator left the book sitting on the rail, still offering to continue,
+         pointing at a position that no longer existed. It cost the "Last
+         opened" fact, which is the right trade: you have just told the app
+         you are starting this book again. */
+      await db.books.update(book.id, {
+        progress: 0, openedAt: null, finishedAt: null, editedAt: Date.now(),
+      })
       /* The position is a synced row like any other, so throwing it away has
          to be recorded or the next merge hands it straight back. By fingerprint,
          like every book-shaped stone — see `removeBook`. */

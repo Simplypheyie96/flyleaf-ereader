@@ -59,12 +59,14 @@ else setTimeout(wake, 2000)
    up to a beat — on a slow connection the app is more use than the right
    serif, and the splash must never be what somebody stares at.
 
-   The floor matters more than the ceiling. On a warm start the fonts are
-   cached and document.fonts.ready settles in ~10ms, so the screen is torn down
-   a frame after it paints — present in the DOM, never present to the eye,
-   which reads as "there is no launch screen at all". HOLD is measured from
-   navigation rather than from here, so the bundle's own parse time counts
-   toward it and a slow start does not wait twice.
+   The floor matters more than the ceiling, and it is a floor: HOLD is measured
+   from navigation rather than from here, so the bundle's own parse time counts
+   toward it and a slow start does not wait twice — but a fast start still
+   waits out the remainder. Measured on a throttled phone profile, a warm start
+   reaches this line at ~100ms and then holds for the other ~1100ms, so on the
+   path a reader actually uses the floor IS the launch screen's whole duration.
+   That is the intent. What is not the intent is a tap being eaten by it, which
+   is what `nudge` below is for.
 
    1.2s rather than Press's 1.8: Press's launch screen introduces a thing you
    are about to write in, and can afford a beat. This one stands between a
@@ -89,7 +91,35 @@ if (splash) {
        optimised away — never leave a full-screen overlay pinned over the app */
     setTimeout(() => splash.remove(), 600)
   }
-  const held = new Promise((r) => setTimeout(r, Math.max(0, HOLD - performance.now())))
+  /* The floor, and the way out of it. HOLD is an aesthetic minimum — a
+     launch screen that flashes for 40ms is worse than none — but it is not a
+     correctness wait, and for its whole length the overlay sits at z-index
+     9999 with pointer-events on. Measured before this existed: the button on
+     a reopened book was un-hittable for 1.15s after the load, which is a tap
+     silently swallowed by a curtain in front of a ready app.
+
+     So the floor yields to the first sign of a reader: one pointerdown or one
+     keydown and it resolves now. Only the floor — `fonts` and `seeded` below
+     are correctness waits and a tap does not skip them, because the reason
+     they exist is to keep a fallback face and an empty shelf off the first
+     frame. Interaction, not `click`: the point is to beat the tap that caused
+     it, and pointerdown is the earliest the browser will say so. */
+  const held = new Promise((r) => {
+    const t = setTimeout(r, Math.max(0, HOLD - performance.now()))
+    const EVENTS = ['pointerdown', 'keydown'] as const
+    /* Detached by hand rather than with `once`, which would only ever remove
+       the listener that actually fired and leave the other one attached for
+       the life of the page. Two dead listeners is not a leak worth worrying
+       about; a hatch that closes itself is one less thing that is true only
+       until somebody reads it. */
+    const nudge = () => {
+      clearTimeout(t)
+      for (const ev of EVENTS) window.removeEventListener(ev, nudge, true)
+      r(null)
+    }
+    for (const ev of EVENTS)
+      window.addEventListener(ev, nudge, { capture: true, passive: true })
+  })
   const fonts = Promise.race([
     document.fonts.ready,
     new Promise((r) => setTimeout(r, FONT_WAIT)),

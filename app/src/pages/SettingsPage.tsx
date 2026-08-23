@@ -9,6 +9,7 @@ import type { BackupSummary, RestoreResult } from '../backup'
 import type { Settings } from '../types'
 import { LeaveIcon } from '../components/icons'
 import { SyncPanel } from '../components/SyncPanel'
+import { Tip } from '../components/Tip'
 
 /* Everywhere this app points outside itself, in one place.
 
@@ -20,15 +21,18 @@ import { SyncPanel } from '../components/SyncPanel'
    third. An earlier version of this panel said "two apps, one name" and gave
    Press the journal's description, which got both of them wrong at once.
 
-   The tip jar is Press's, deliberately. Press already runs the Paystack
-   function and already holds the secret; a second integration here would mean
-   a second key to rotate and a checkout that is broken until somebody pastes
-   it in. A row that opens a jar which works today beats an in-app jar that
-   does not. */
+   The tip jar is NOT in here any more. It used to be a fourth entry pointing
+   at Press's settings, on the reasoning that Press already runs the Paystack
+   function and already holds the secret, so one working jar beat two. The
+   reader's experience of that reasoning was tapping a row in this app and
+   landing in a different app's settings with no explanation — "why is buy me a
+   coffee redirecting to press flyleaf? it should have it's own." It has its
+   own now: `components/Tip.tsx`, Paystack Inline on the public key, its own
+   panel above this one. The trade-off that choice makes is written down there
+   rather than here. */
 const OUT = {
   journal: 'https://flyleaf.cc',
   press: 'https://press.flyleaf.cc',
-  tip: 'https://press.flyleaf.cc/settings',
   maker: 'https://simplypheyie.is-a.dev',
 } as const
 
@@ -195,7 +199,7 @@ export function SettingsPage() {
             {install.installed
               ? 'Installed. The app runs from your home screen and works with no connection.'
               : install.canPrompt
-                ? 'Install it and the app opens from your home screen, offline, and can be set as the default opener for book files.'
+                ? 'Install it and the app opens from your home screen, and can be set as the default opener for book files.'
                 : isIOS()
                   ? 'To install: tap Share, then Add to Home Screen. iOS has no install button to offer — that menu is the whole mechanism.'
                   : 'Your browser has not offered an install for this app yet.'}
@@ -276,7 +280,7 @@ export function SettingsPage() {
               <p className="ui-p">
                 {pending.sum.createdAt
                   ? `A backup from ${shortDate(pending.sum.createdAt)}.`
-                  : 'A Flyleaf backup.'}{' '}
+                  : 'A Flyleaf eReader backup.'}{' '}
                 {[
                   `${pending.sum.books} ${pending.sum.books === 1 ? 'book' : 'books'}`,
                   `${pending.sum.highlights} ${pending.sum.highlights === 1 ? 'highlight' : 'highlights'}`,
@@ -378,6 +382,12 @@ export function SettingsPage() {
           </p>
         </section>
 
+        {/* Above the apps panel, not inside it: a jar is not a destination, and
+            the one place it must not be is a row in a list of other places.
+            Sixth of nine panels — past the settings somebody came here to
+            change, and well clear of the small print they never scroll to. */}
+        <Tip />
+
         <section className="panel">
           <p className="ui-lbl">The Flyleaf apps</p>
           <p className="ui-p" style={{ marginTop: 8 }}>
@@ -396,11 +406,6 @@ export function SettingsPage() {
               href={OUT.press}
               label="Flyleaf Press"
               note="Long reviews, printed as cards — and every month and year collaged into what you finished."
-            />
-            <Leave
-              href={OUT.tip}
-              label="Buy the maker a coffee"
-              note="Free, and it stays free — this is a thank-you, never a gate. The jar lives in Press."
             />
             <Leave
               href={OUT.maker}
