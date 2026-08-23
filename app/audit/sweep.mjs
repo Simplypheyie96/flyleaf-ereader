@@ -41,7 +41,7 @@ const GATE = [
     'routes', 'states', 'sheet', 'stats',
     'reader', 'controls', 'marks', 'text',
     'a11y', 'panels', 'measure', 'ghost',
-    'appdata',
+    'appdata', 'covers',
 ]
 const SLOW = ['formats', 'mobi', 'pdf', 'backup', 'install', 'tip', 'origin', 'phone']
 const REST = ['tints', 'darkstock', 'swatches', 'ramp', 'faces', 'settings', 'sync', 'turn']
