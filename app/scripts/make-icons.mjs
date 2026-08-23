@@ -16,6 +16,9 @@ import * as fontkit from 'fontkit'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const ICONS = join(ROOT, 'public/icons')
 const SPLASH = join(ROOT, 'public/splash')
+/* the repo root, one level above the app — for the standalone mark asset,
+   which is not part of the bundle and does not want to be served */
+const ASSETS = join(ROOT, '..', 'assets')
 
 const PAPER = '#F4F2ED'
 const INK = '#1B1917'
@@ -58,18 +61,21 @@ function line(font, str, size, track, cx, y, ink, opacity = 1) {
   return paths.join('\n  ')
 }
 
-/* The same lozenge the nav draws. Kept in sync with src/components/Mark.tsx
-   by hand, since the app imports it as a TS constant and this script runs
-   outside the bundle. That file carries the reasoning and the winding rule the
-   counter depends on; this is only a copy of the string.
+/* The same block the nav draws. Kept in sync with src/components/Mark.tsx by
+   hand, since the app imports these as TS constants and this script runs
+   outside the bundle. That file carries the reasoning, the disjointness proof
+   the evenodd knockout depends on, and the note that MARK is Press's rosette
+   character for character; this is only a copy of the strings.
 
-   MARK_FRAC is the fraction of the 512 box the ink actually spans, MEASURED
-   off the path's bounding box (116–396 × 48–464, so 416/512) rather than
-   guessed. `k` below turns a requested ink span into the scale that produces
-   it, so a stale fraction silently scales every icon: at the rosette's old
-   0.7575 this mark would come out 7% large. */
-const MARK = 'M256 48 L396 256 L256 464 L116 256 Z M256 164 L194 256 L256 348 L318 256 Z'
-const MARK_FRAC = 0.8125
+   VB is the viewBox those strings are drawn in. Two things follow from it and
+   both matter here: the block fills the box EXACTLY, so there is no
+   ink-fraction to convert any more — a requested span is the drawn span — and
+   the box centre (x + s/2, y + s/2) = (256, 242) is the rosette's INK centre
+   rather than the 512 box's, which is why `ty` below is not symmetric with
+   `tx`. Change any of these three and every icon moves. */
+const MARK = 'M256 57.6 A74.67 59.73 -90 1 1 256 206.93 A74.67 59.73 -90 1 1 256 57.6 Z M444.69 194.69 A74.67 59.73 -18 1 1 302.66 240.85 A74.67 59.73 -18 1 1 444.69 194.69 Z M372.61 416.51 A74.67 59.73 54 1 1 284.84 295.68 A74.67 59.73 54 1 1 372.61 416.51 Z M139.39 416.51 A74.67 59.73 126 1 1 227.16 295.68 A74.67 59.73 126 1 1 139.39 416.51 Z M67.31 194.69 A74.67 59.73 198 1 1 209.34 240.85 A74.67 59.73 198 1 1 67.31 194.69 Z M217.6 256 A38.4 38.4 0 1 1 294.4 256 A38.4 38.4 0 1 1 217.6 256 Z'
+const TILE = 'M97 -49 H415 A132 132 0 0 1 547 83 V401 A132 132 0 0 1 415 533 H97 A132 132 0 0 1 -35 401 V83 A132 132 0 0 1 97 -49 Z'
+const VB = { x: -35, y: -49, s: 582 }
 
 /* The launch screen's layout, as the CSS ITSELF rather than as measurements
    of it. Every number below is copied straight from index.html's #splash
@@ -90,7 +96,7 @@ const MARK_FRAC = 0.8125
    on exactly: iOS shows the PNG, the page paints over it, and nothing is
    allowed to jump. */
 const CSS = {
-  box: 96,
+  box: 80,
   name: { mt: 24, size: 30, lh: 1.1, em: -0.008, font: () => SERIF, text: 'Flyleaf eReader', op: 1 },
   rule: { mt: 22, w: 40, h: 1, op: 0.18 },
   claim: { mt: 20, size: 11, lh: 1.6, em: 0.16, font: () => SANS, text: 'READ WHAT YOU OWN', op: 0.55 },
@@ -150,34 +156,44 @@ function splashStack(u, cx, boxTop, ink) {
   return { body: out.join('\n  '), height: y }
 }
 
-/* `frac` is the share of the canvas the DRAWN mark covers, not the share the
-   box covers — MARK_FRAC above is what converts between the two.
+/* `frac` is the share of the canvas the drawn block covers. Because the block
+   fills its viewBox exactly, that is also the share of the canvas its box
+   covers — the two were different quantities while the mark was an open form
+   inside a padded box, and collapsing them is the one simplification this
+   presentation buys.
    `words` adds the name and the two lines under it, for the launch images
    only — icons stay wordless. `spanPx` overrides `frac` with an absolute
-   drawn-mark height, which is how the launch images stay identical to the web
-   splash: that draws the mark at a fixed 88 CSS px on every screen, so a
-   fraction of the canvas can only match it on one of them. */
+   drawn size, which is how the launch images stay identical to the web splash:
+   that draws the block at a fixed CSS.box px on every screen, so a fraction of
+   the canvas can only match it on one of them. */
 function svg(w, h, frac, ground = PAPER, ink = INK, words = false, spanPx = null) {
   const span = spanPx ?? Math.min(w, h) * frac
-  const k = span / (512 * MARK_FRAC)
-  /* The CSS box that ink span corresponds to — the unit L is written in, so
-     the wordmark is pinned to #splash's px sizes and not to the mark's
-     silhouette. For the launch images this comes back out as exactly 88. */
-  const box = span / MARK_FRAC
+  const k = span / VB.s
+  /* The CSS box that span corresponds to — the unit the lockup is written in,
+     so the wordmark is pinned to #splash's px sizes. Identical to `span` now
+     that the block fills its box; kept as its own name because the lockup
+     reads in CSS px and the canvas reads in device px, and conflating them is
+     exactly the bug the comment on CSS records. */
+  const box = span
   /* user units per CSS px of #splash; comes out as the device pixel ratio */
   const u = box / CSS.box
-  const tx = w / 2 - 256 * k
-  /* Centred as a BLOCK when there are words, so the lockup reads centred
-     rather than the mark alone: the box top goes half the block's height
-     above the middle. Without words the 512 box is simply centred. */
-  /* Centred as a BLOCK when there are words, so the lockup reads centred
-     rather than the mark alone: measure the stack, then put the mark's box top
-     half the block above the middle. */
-  const ty = words ? h / 2 - (splashStack(u, w / 2, 0, ink).height * u) / 2 : h / 2 - 256 * k
-  const text = words ? splashStack(u, w / 2, ty, ink).body : ''
+  /* Where the block's own box starts. Centred as a BLOCK when there are words,
+     so the lockup reads centred rather than the mark alone: measure the stack,
+     then put the box top half the stack above the middle. Without words the box
+     is simply centred on the canvas. This is also the text cursor's origin, so
+     the wordmark hangs off the same number the mark does. */
+  const top = words ? h / 2 - (splashStack(u, w / 2, 0, ink).height * u) / 2 : h / 2 - box / 2
+  /* The viewBox does not start at 0,0 — it starts at (-35,-49), because it is
+     centred on the rosette's ink rather than on the 512 box (DESIGN.md -> The
+     mark). So both translate components have to subtract the origin, or the
+     drawn block sits VB.y*k above where the layout thinks it does: 20 device px
+     at dpr 3, which is exactly the parity failure this line once shipped. */
+  const tx = w / 2 - (VB.x + VB.s / 2) * k
+  const ty = top - VB.y * k
+  const text = words ? splashStack(u, w / 2, top, ink).body : ''
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <rect width="${w}" height="${h}" fill="${ground}"/>
-  <g transform="translate(${tx} ${ty}) scale(${k})"><path d="${MARK}" fill="${ink}"/></g>
+  <g transform="translate(${tx} ${ty}) scale(${k})"><path d="${TILE} ${MARK}" fill-rule="evenodd" fill="${ink}"/></g>
   ${text}
 </svg>`
 }
@@ -193,17 +209,24 @@ mkdirSync(ICONS, { recursive: true })
 mkdirSync(SPLASH, { recursive: true })
 
 /* — install icons — full-bleed; iOS rounds the corners itself */
-/* 0.60, up from the rosette's 0.48: `frac` sets the ink's HEIGHT, and this
-   mark is 280 wide to 416 tall where the rosette was near-square, so the same
-   fraction would have read noticeably lighter in the same square icon. */
+/* 0.76: the block is a filled tile with its own 0.227 corner radius, so it is
+   deliberately NOT full-bleed — iOS rounds the canvas itself, and two radii
+   fighting over the same corner is the one thing that makes an icon look
+   home-made. 12% of paper on every side is what iOS's own rounding eats, so
+   nothing but ground is ever clipped. */
 for (const s of [64, 180, 192, 256, 384, 512]) {
-  png(join(ICONS, `icon-${s}.png`), s, s, 0.60)
+  png(join(ICONS, `icon-${s}.png`), s, s, 0.76)
 }
-/* — maskable — Android crops to a circle of 80% width, so the mark sits small */
+/* — maskable — Android crops to a circle of 80% width (radius 0.40 of the
+   icon). A rounded square of side s with 0.227s corners reaches
+   √2×(s/2 − 0.227s) + 0.227s = 0.613s from the centre at its corner arc, so
+   0.62 puts the furthest ink at 0.380 — inside the allowance with room, and
+   the arithmetic is here so the next change to the corner radius is checked
+   against it rather than eyeballed. */
 for (const s of [192, 512]) {
-  png(join(ICONS, `maskable-${s}.png`), s, s, 0.44)
+  png(join(ICONS, `maskable-${s}.png`), s, s, 0.62)
 }
-writeFileSync(join(ICONS, 'icon.svg'), svg(512, 512, 0.48))
+writeFileSync(join(ICONS, 'icon.svg'), svg(512, 512, 0.76))
 
 /* — iOS launch images — the device pixel sizes Safari matches on, portrait.
    Landscape falls back to the icon-less ground, which is the right thing: a
@@ -213,14 +236,13 @@ const DEVICES = [
   [1125, 2436, 3], [1242, 2688, 3], [828, 1792, 2], [750, 1334, 2], [1242, 2208, 3],
   [1640, 2360, 2], [1668, 2388, 2], [2048, 2732, 2], [1536, 2048, 2], [1620, 2160, 2],
 ]
-/* #splash draws the mark in a CSS.box-px box, and the ink fills MARK_FRAC of
-   it. In device pixels that is the span the launch image must use for the two
-   screens to be indistinguishable — which is the whole job of a launch image:
-   iOS shows it, the page paints over it, and nothing is allowed to jump.
-   Written against both constants rather than a literal, so it cannot drift
-   from either: svg() divides MARK_FRAC straight back out, giving u === dpr and
-   box === CSS.box × dpr exactly. */
-const SPLASH_SPAN = CSS.box * MARK_FRAC
+/* #splash draws the block in a CSS.box-px box and the block fills it, so that
+   IS the span, and in device pixels it is the span the launch image must use
+   for the two screens to be indistinguishable — which is the whole job of a
+   launch image: iOS shows it, the page paints over it, and nothing is allowed
+   to jump. Written against the constant rather than as a literal so it cannot
+   drift: svg() then gives u === dpr and box === CSS.box × dpr exactly. */
+const SPLASH_SPAN = CSS.box
 const links = []
 for (const [w, h, dpr] of DEVICES) {
   /* the name and both lines go here too, so the native launch image and the
@@ -235,4 +257,21 @@ for (const [w, h, dpr] of DEVICES) {
    hand-typed and never drift from the files that actually exist */
 writeFileSync(join(SPLASH, 'links.html'), links.join('\n') + '\n')
 
-console.log(`Wrote 9 icons, ${DEVICES.length * 2} launch images, and public/splash/links.html.`)
+/* — the standalone mark, at the repo root — */
+/* assets/flyleaf-mark-source.svg is what anything outside this build takes the
+   mark from: a store listing, a favicon service, a print sheet. It is
+   GENERATED, and that is the whole point — the file it replaces was a
+   hand-typed second copy of the path, which is the drift this script exists to
+   prevent, and it carried a blue gradient sky that this project's guardrails
+   ban. Full-bleed and transparent: no ground is assumed, because whoever
+   consumes it has their own, and `currentColor` is meaningless in a file
+   opened outside a stylesheet, so the ink is stated. */
+mkdirSync(ASSETS, { recursive: true })
+writeFileSync(join(ASSETS, 'flyleaf-mark-source.svg'),
+  `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="${VB.x} ${VB.y} ${VB.s} ${VB.s}">
+  <title>Flyleaf eReader</title>
+  <path d="${TILE} ${MARK}" fill-rule="evenodd" fill="${INK}"/>
+</svg>
+`)
+
+console.log(`Wrote 9 icons, ${DEVICES.length * 2} launch images, public/splash/links.html and assets/flyleaf-mark-source.svg.`)
