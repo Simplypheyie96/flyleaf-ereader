@@ -1277,10 +1277,11 @@ under the shared client does not merely disappear from view: it becomes unreacha
 delete**, because only the client that wrote it can see it. Those bytes would sit in the reader's
 quota permanently with no interface anywhere able to remove them.
 
-That is a serious migration in six months and approximately free today. The Drive panel was invisible
-until `VITE_GOOGLE_CLIENT_ID` was set on 22–23 Aug 2026, so the set of readers holding an eReader
-backup under the shared client is the owner, and possibly nobody. **Separate now and it costs
-nothing; separate later and it is silent data loss.**
+That is a serious migration in six months and free today — established, not assumed. The Drive panel
+was invisible until `VITE_GOOGLE_CLIENT_ID` was set on 22–23 Aug 2026, and Connect could not have
+written anything even then, because it was still meeting `origin_mismatch` until the origins went on
+the client. The set of documents this app has ever put in the shared folder is **empty**; see step 1
+below. **Separate now and it costs nothing; separate later and it is silent data loss.**
 
 Nothing shipped above is wasted by the split. With its own folder, `ours` matches everything this app
 wrote, so behaviour is unchanged and the tag becomes insurance against ever sharing again. The
@@ -1299,6 +1300,15 @@ is a third product that could one day share a client, which is the reason to shi
 1. Sign in to the Drive panel on this app under the *current* shared client and press **remove the
    copy from my Drive**. This is the only moment those files are reachable. Skip it and they are
    orphaned in the reader's quota forever.
+
+   **Not applicable this time — there is nothing to clear.** Kept because it applies to any future
+   change of client, and because the reasoning is the reason the split is free. No eReader document
+   has ever reached the shared folder: Connect met `origin_mismatch` at Google until the origins were
+   registered on 23 Aug 2026, so it never held a token to write with, and the run that proved the
+   registration worked stops at Google's sign-in page by design and grants no consent. The owner
+   confirms the same from the other direction — nothing was ever synced, because it never worked. Two
+   independent lines agreeing, so the migration cost of separating is not "approximately zero", it is
+   zero.
 2. Create the new project, consent screen and client (below).
 3. Swap `VITE_GOOGLE_CLIENT_ID` locally and in all three Vercel environments, then redeploy — it is
    a build-time `import.meta.env` value, so an env change alone does nothing.
