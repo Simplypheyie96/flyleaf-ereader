@@ -81,13 +81,29 @@ export async function readEpub(file: File): Promise<Meta> {
       description: one('description'),
     }
 
-    const coverPath = findCover(opf, opfPath)
+    let coverPath = findCover(opf, opfPath)
     if (coverPath) {
-      const entry = find(coverPath)
+      let entry = find(coverPath)
       if (isFile(entry)) {
-        const type = opf.querySelector(`item[href$="${coverPath.split('/').pop()}"]`)
-          ?.getAttribute('media-type') ?? 'image/jpeg'
-        meta.cover = await entry.getData(new BlobWriter(type))
+        let type = opf.querySelector(`item[href$="${coverPath.split('/').pop()!}"]`)?.getAttribute('media-type')
+        
+        if (type === 'application/xhtml+xml' || type === 'text/html') {
+          const htmlText = await entry.getData(new TextWriter())
+          const htmlDoc = xml(htmlText)
+          const img = htmlDoc.querySelector('img, image')
+          const src = img?.getAttribute('src') || img?.getAttribute('href') || img?.getAttribute('xlink:href')
+          if (src) {
+            coverPath = resolve(coverPath, src)
+            entry = find(coverPath)
+            if (entry && isFile(entry)) {
+               type = opf.querySelector(`item[href$="${coverPath.split('/').pop()!}"]`)?.getAttribute('media-type')
+            }
+          }
+        }
+        
+        if (entry && isFile(entry) && (!type || type.startsWith('image/'))) {
+          meta.cover = await entry.getData(new BlobWriter(type ?? 'image/jpeg'))
+        }
       }
     }
     return meta

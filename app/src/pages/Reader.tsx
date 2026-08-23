@@ -1038,7 +1038,12 @@ export function Reader() {
                     initialTab={panelTab}
                     search={runSearch}
                     clearSearch={stopSearch}
-                    onGoCFI={cfi => { setPanelOpen(false); void viewRef.current?.goTo(cfi) }}
+                    onGoCFI={cfi => {
+                        setPanelOpen(false)
+                        void viewRef.current?.goTo(cfi).then(() => {
+                            setTimeout(() => stopSearch(), 2000)
+                        })
+                    }}
                     onEditNote={a => { setPanelOpen(false); setNoteFor(a) }}
                     onRemoveAnnotation={a => void removeAnnotation(a.id)}
                     onRemoveBookmark={b => void removeBookmark(b.id)}

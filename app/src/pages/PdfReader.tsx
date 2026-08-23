@@ -509,7 +509,11 @@ export function PdfReader() {
                     initialTab={panelTab}
                     search={runSearch}
                     clearSearch={stopSearch}
-                    onGoCFI={cfi => { setPanelOpen(false); goTo(cfi) }}
+                    onGoCFI={cfi => {
+                        setPanelOpen(false)
+                        goTo(cfi)
+                        setTimeout(() => stopSearch(), 2000)
+                    }}
                     onEditNote={() => {}}
                     onRemoveAnnotation={() => {}}
                     onRemoveBookmark={b => void removeBookmark(b.id)}

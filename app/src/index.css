@@ -799,6 +799,33 @@ body::before{
 .seg-swatch[data-sw="system"]{ background:linear-gradient(90deg,#F4F2ED 0 50%,#151515 50% 100%); }
 .seg-swatch[data-sw="system"]::after{ display:none; }
 .set-acts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+/* THE WAYS OUT, as rows rather than as a plate. Lifted verbatim from Press
+   (../Review app/app/src/index.css) — same primitive, same comments, because a
+   destructive control that shouts before it is pressed reads as an error
+   report, and under a line saying "Synced" it read as the sync having failed.
+   Danger lives on the button alone; the warning sentence waits for the press. */
+.set-rows{ margin-top:18px; border-top:1px solid var(--rule); }
+.set-row{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:16px; padding:16px 0; border-bottom:1px solid var(--rule);
+}
+.set-row:last-child{ border-bottom:0; }
+/* the action never breaks across two lines — at 360px a two-word label like
+   "Sync now" wrapped while every other button in the app stayed on one */
+.set-row > .btn{ white-space:nowrap; flex:none; }
+/* A row whose copy is a paragraph rather than a line puts its button
+   UNDERNEATH. Beside is right for a one-liner, and the button sits level with
+   it. It is wrong the moment the text wraps three or four times: the button
+   floats at the vertical middle of a block it has no relationship to, level
+   with nothing, and the row reads as two things that failed to line up rather
+   than one control with its explanation. Stacked, the button starts at the same
+   left edge as the label above it, and the paragraph gets the full width
+   instead of being squeezed into whatever the button left over. */
+.set-row--stack{ display:block; }
+.set-row--stack > .btn{ margin-top:12px; }
+.set-row-txt{ min-width:0; }
+.set-row-txt p{ font-size:12px; line-height:1.55; color:var(--ink-soft); margin-top:4px; }
+.set-row-txt .ui-lbl{ color:var(--ink); }
 /* A step inside a panel, not a second panel: the confirm belongs to the control
    above it, and a nested card would say it was a separate thing. A rule and an
    indent are enough — DESIGN.md § Space, group with space before lines. */
@@ -813,6 +840,19 @@ body::before{
 /* first-child, not a blanket margin: a panel that opens on a label should not
    start with 6px of nothing above it */
 .panel > .ui-lbl:first-child{ margin-bottom:0; }
+/* A panel put away. The whole label row is the target — 22px of panel padding
+   on each side of it, so the press lands anywhere along the top of the card and
+   not only on eleven-and-a-half-point capitals. The label keeps every one of
+   its own values: the button contributes no colour, no size and no weight, only
+   the press. */
+.fold-hd{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  width:100%; min-height:24px; margin:-6px 0; padding:6px 0;
+  background:none; border:0; text-align:start; cursor:pointer; color:inherit;
+  font:inherit;
+}
+.fold-caret{ flex:none; display:inline-flex; color:var(--ink-soft); }
+.fold-caret svg{ width:14px; height:14px; }
 
 /* ── rows that leave the app ───────────────────────────────────────────────
    Three destinations in one panel, grouped by space and not by rules: a
@@ -1028,7 +1068,7 @@ body::before{
   display:block; position:relative;
   aspect-ratio:2 / 3; width:100%;
   border-radius:var(--r-img); overflow:hidden;
-  transform:rotate(var(--lean,0deg));
+  
   transition:transform 180ms var(--ease);
   /* A container, so the coverless ghost inside can size itself to the box it
      is actually in rather than to the viewport. The same component is drawn at
