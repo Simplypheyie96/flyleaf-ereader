@@ -1226,6 +1226,75 @@ copy" still takes this app's shelf, marks, position and every backed-up book wit
 mirror of the change above — its own `APP = 'press'` tag and a `name = 'library.json'` bridge — and
 it is a different product with its own deploy, so it is not changed here on this app's say-so.
 
+#### Decided: this app gets its own OAuth client
+
+Sharing was a defensible call and it is being undone, on the owner's decision of 23 Aug 2026, for
+reasons that only got clearer once the delete bug was understood. What sharing bought was real: one
+consent screen, so a reader who has already granted Drive access in Press gets a token here with no
+second prompt; one origins list; and one verification review, which matters because `drive.appdata`
+is a **sensitive** scope and a published app needs Google to review it.
+
+What it costs is more:
+
+- **One hidden folder for two products, permanently.** The bug above is the shape of that, and every
+  further app that joins the client inherits the hazard rather than being protected from it.
+- **Revocation is joint.** A reader who disconnects Press in their Google account settings
+  disconnects this app in the same act. There is no way to keep one and drop the other.
+- **The consent screen carries one name.** Branding is configured **per project**, not per client,
+  so a reader deciding whether to trust the reading app is shown Press's identity on the screen where
+  they decide it. Three distinct products, one name, on the one surface where the distinction counts.
+- **No per-app usage figure, ever** — see the note on `quota()`.
+
+**Against that, separating has exactly one cost, and it is the whole reason this is being done now.**
+`appDataFolder` is per-client, so a new client sees a new, *empty* folder. Anything already backed up
+under the shared client does not merely disappear from view: it becomes unreachable **even to
+delete**, because only the client that wrote it can see it. Those bytes would sit in the reader's
+quota permanently with no interface anywhere able to remove them.
+
+That is a serious migration in six months and approximately free today. The Drive panel was invisible
+until `VITE_GOOGLE_CLIENT_ID` was set on 22–23 Aug 2026, so the set of readers holding an eReader
+backup under the shared client is the owner, and possibly nobody. **Separate now and it costs
+nothing; separate later and it is silent data loss.**
+
+Nothing shipped above is wasted by the split. With its own folder, `ours` matches everything this app
+wrote, so behaviour is unchanged and the tag becomes insurance against ever sharing again. The
+undeduped-listing fix was a real bug regardless. And the fix makes the migration itself safe: the
+"remove the copy from my Drive" press that has to happen *before* the switch now clears only this
+app's files and leaves Press's `library.json` alone, which is precisely what it would not have done
+the day before.
+
+It also downgrades Press's half. Once this app is on its own client, `dropLibraries` can no longer
+reach this app's documents, so the mirror fix in Press stops being an urgent data-loss fix and
+becomes hygiene — still correct, still worth shipping, no longer racing anything. The Flyleaf journal
+is a third product that could one day share a client, which is the reason to ship it at all.
+
+**The order matters and there is only one order.**
+
+1. Sign in to the Drive panel on this app under the *current* shared client and press **remove the
+   copy from my Drive**. This is the only moment those files are reachable. Skip it and they are
+   orphaned in the reader's quota forever.
+2. Create the new project, consent screen and client (below).
+3. Swap `VITE_GOOGLE_CLIENT_ID` locally and in all three Vercel environments, then redeploy — it is
+   a build-time `import.meta.env` value, so an env change alone does nothing.
+4. Reconnect in the panel. The folder is new and empty; the first sync repopulates it from local,
+   which is the direction that cannot lose anything.
+
+**What cannot be automated, and why — checked, not assumed.** There is no `gcloud` on this machine,
+and installing it does not help: `gcloud auth login` is an authentication flow, which this tooling
+does not perform. The Resource Manager REST API needs a `cloud-platform` token, obtainable only the
+same way. So the project and client have to be made in the Console UI, in a session that is already
+signed in — and on 23 Aug 2026 both routes to one were shut:
+
+- The Claude in Chrome extension reported itself **not connected**.
+- Playwright cannot drive the real profile at all. Chrome 136+ refuses automation against the default
+  user-data-dir outright — *"DevTools remote debugging requires a non-default data directory"* — and
+  independently of that, Playwright always passes `--use-mock-keychain`, so the sign-in tokens fail
+  to decrypt even when it does launch. The only way round both is copying the owner's whole Google
+  session store to a scratch profile, which is not a thing to do to somebody's account.
+
+So steps 2's Console clicks are the owner's or the extension's. Everything else — the env vars, the
+deploy, the code, this document — is not.
+
 #### The steps, kept because a client can be recreated or an origin can move
 
 Done once already, and written out so it needs no rediscovering. Note that step 1 is still the
