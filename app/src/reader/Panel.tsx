@@ -252,7 +252,7 @@ export function Panel(p: PanelProps) {
                     ? <Results
                         groups={groups} busy={busy} hits={hits}
                         limit={limit} onMore={() => setLimit(n => n + PAGE_OF_HITS)}
-                        onGo={cfi => { p.onGoCFI(cfi); p.onClose() }}
+                        onGo={p.onGoCFI}
                     />
                     : tab === 'contents'
                         ? p.tocNode
@@ -261,7 +261,7 @@ export function Panel(p: PanelProps) {
                                 kind={kind} setKind={setKind} kinds={kinds}
                                 annotations={p.annotations} bookmarks={p.bookmarks}
                                 tints={p.tints}
-                                onGo={cfi => { p.onGoCFI(cfi); p.onClose() }}
+                                onGo={p.onGoCFI}
                                 onEditNote={p.onEditNote}
                                 onRemoveAnnotation={p.onRemoveAnnotation}
                                 onRemoveBookmark={p.onRemoveBookmark}

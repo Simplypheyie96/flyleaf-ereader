@@ -65,7 +65,7 @@ export function Cover({ book, lean = true }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shape])
 
-  const style = lean ? { ['--lean' as string]: `${tilt(book.id)}deg` } : undefined
+  const style = undefined
 
   return (
     /* data-family, not a colour: which step of the ramp a format wears is a
