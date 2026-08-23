@@ -76,6 +76,29 @@
   --ease:cubic-bezier(.2,0,0,1);
   --gutter:32px;
 
+  /* ── NEW: the chrome measure ───────────────────────────────────────────
+     Press has no token for this because Press's prose lives on printed
+     cards of a fixed width; here the same paragraph is set in a 634px
+     settings panel, a 680px page column and a 320px reader sheet, and every
+     one of those had its own hand-picked cap — 34ch, 46ch, 52ch, 56ch, 62ch
+     — none of them related to the box it ended up in.
+
+     Measured, on the built app, at 1280 and 1024: .fine dd stopped at 452px
+     inside a 634px panel (29% of the box empty), .tip-head .ui-p at 340px
+     inside 582px (46% empty) and .app-sub at 383px inside 680px (44%
+     empty). All three read as a bug rather than as a measure — which is the
+     complaint, in the owner's words, that this "is such a reoccuring
+     problem".
+
+     74ch is the top of the comfortable 60–75 range, so it is still a
+     measure and not "fill the box": at 13px it lands at ~551px, which is
+     87% of the settings panel and 81% of the page column. Wide contexts get
+     this token; the genuinely narrow ones — a centred refusal, an empty
+     state, the PDF sheet's lede — keep their own tighter caps, because a
+     34ch block in a 320px box was never the bug and widening it would be a
+     change nothing measured. audit/measure.mjs is the check. */
+  --measure:74ch;
+
   /* ── NEW: the page turn ────────────────────────────────────────────────
      The only easing in either app that is not --ease. A turn is a thrown
      object coming to rest, not a UI transition: --ease decelerates from a
@@ -858,7 +881,7 @@ body::before{
 .tip-mark > svg{ width:20px; height:20px; }
 /* 46ch on the paragraph beside a 38px mark: the text column is already inset,
    and left uncapped it ran to the full panel width on a tablet. */
-.tip-head .ui-p{ max-width:46ch; }
+.tip-head .ui-p{ max-width:var(--measure); }
 
 /* Three amounts in a row that wraps rather than shrinks — a ₦10,000 pill
    squeezed to fit beside two others is unreadable at exactly the moment
@@ -922,9 +945,9 @@ body::before{
 /* Three notes, three jobs, and they are deliberately not one class: the floor
    is a fact about Paystack, the failure is a thing that just happened, and the
    fine print is a standing reassurance. Same 52ch cap as .ctl-note. */
-.tip-note{ margin:14px 0 0; max-width:52ch; }
-.tip-why{ margin:14px 0 0; max-width:52ch; color:var(--danger); }
-.tip-fine{ margin:14px 0 0; max-width:52ch; font-size:12.5px; }
+.tip-note{ margin:14px 0 0; max-width:var(--measure); }
+.tip-why{ margin:14px 0 0; max-width:var(--measure); color:var(--danger); }
+.tip-fine{ margin:14px 0 0; max-width:var(--measure); font-size:12.5px; }
 
 /* ── the small print ───────────────────────────────────────────────────────
    A definition list, because that is what it is: five things, each named and
@@ -942,8 +965,10 @@ body::before{
   margin:5px 0 0; font-size:13px; line-height:1.55; color:var(--ink-soft);
   /* Capped in the panel as well as on the page: these are the longest
      paragraphs in Settings, and at 1280px the panel is wide enough to run them
-     past a comfortable measure. */
-  max-width:62ch;
+     past a comfortable measure. The cap is the shared one — at 62ch these
+     stopped 182px short of the panel's edge, which read as a broken column
+     rather than as a measure. */
+  max-width:var(--measure);
 }
 .fine-name{ font-family:var(--mono); font-size:12px; }
 
@@ -977,6 +1002,12 @@ body::before{
   border-radius:var(--r-img); overflow:hidden;
   transform:rotate(var(--lean,0deg));
   transition:transform 180ms var(--ease);
+  /* A container, so the coverless ghost inside can size itself to the box it
+     is actually in rather than to the viewport. The same component is drawn at
+     22px in a week stack, 44px in a shelf row, 64px on the Continue card, 104
+     and 132 on a detail sheet, and ~166 in the grid — one media query cannot
+     tell those apart, because they all happen at the same viewport width. */
+  container-type:inline-size; container-name:cover;
 }
 .cover img{
   display:block; width:100%; height:100%;
@@ -990,16 +1021,72 @@ body::before{
   /* A ghost, not a generated cover: no artwork, no fabricated title page, no
      author. One mono label saying what the file is, on a wash of the theme's
      own ink. The format used to be carried by a hue as well; the hues are
-     gone, so the label is the only channel — which is also the accessible
-     one, because it was never safe to read a format off a colour alone. */
+     gone, so the label is the accessible channel — it was never safe to read
+     a format off a colour alone — and the mark below carries the same fact a
+     second time in weight. */
   background:var(--wash);
   border:1px solid var(--rule); border-radius:var(--r-img);
   text-align:center; padding:8px;
 }
+/* One mark, at the format family's step of the graph ramp. DESIGN.md → the
+   graph ramp: "a chart, a tile and a coverless ghost" are the ink at a
+   STRENGTH rather than a hue, and --graph-1..5 are marks — never a surface,
+   never type. So the step lands on this rule and not on the ghost's
+   background or on the label's colour, and the ramp reads the same way here
+   as it does on the shelf's format mix.
+
+   It is the first flex item by construction: .cover-ghost is already a
+   centred column with gap:4px, so a ::before needs no DOM change and needs
+   no margin of its own. Width is capped in ch of the mono label so it stays
+   proportional to the type at every cover size — 44px in a shelf row, 132px
+   on a detail sheet. */
+.cover-ghost::before{
+  content:""; flex:none;
+  width:min(2.4ch, 46%); height:2px; border-radius:1px;
+  background:var(--seg, var(--graph-3));
+}
+/* The same family → step mapping as the shelf's mix, so a Kindle book is the
+   same weight wherever it is drawn. */
+.cover[data-family="epub"]   .cover-ghost{ --seg:var(--graph-5); }
+.cover[data-family="kindle"] .cover-ghost{ --seg:var(--graph-4); }
+.cover[data-family="fb2"]    .cover-ghost{ --seg:var(--graph-3); }
+.cover[data-family="text"]   .cover-ghost{ --seg:var(--graph-2); }
+.cover[data-family="pdf"]    .cover-ghost{ --seg:var(--graph-1); }
 .cover-ghost-fmt{
   font-family:var(--mono); font-size:11.5px; letter-spacing:.08em; color:var(--ink);
 }
 .cover-ghost-note{ font-size:11.5px; color:var(--ink-soft); }
+
+/* ── the ghost at thumbnail sizes ──
+   Measured, not guessed: at 44px the longest label, "Markdown", is 62.6px
+   wide in a 26px content box — it overflowed by 10px and was clipped by the
+   cover's own overflow:hidden, which is exactly the kind of break that is
+   invisible until something measures it. Three tiers, by the cover's OWN
+   width rather than the viewport's:
+
+     · under 104px the note goes. "No cover" is the redundant half — the
+       ghost being a ghost already says it — and the format is the fact worth
+       keeping. The label then tracks the container in cqw, floored at 9px so
+       it never becomes decoration.
+     · under 60px nothing legible fits, so the ghost is the mark alone. This
+       is only the 44px shelf row and the 22px week stack, and the shelf row
+       prints "Markdown · 12 KB · 22 Aug" in its own mono meta line a few
+       pixels to the right — so the label there was a duplicate that did not
+       fit, not information being dropped. The mark goes to 3px, because a
+       lone 2px rule reads as a hairline rather than as a mark. */
+@container cover (max-width: 104px){
+  .cover-ghost{ padding:6px; gap:3px; }
+  .cover-ghost-note{ display:none; }
+  .cover-ghost-fmt{ font-size:max(9px, min(11.5px, 15cqw)); letter-spacing:.02em; }
+}
+@container cover (max-width: 72px){
+  .cover-ghost{ padding:4px; }
+}
+@container cover (max-width: 60px){
+  .cover-ghost{ padding:5px; gap:0; }
+  .cover-ghost-fmt{ display:none; }
+  .cover-ghost::before{ height:3px; }
+}
 
 /* ── the progress hairline ──
    A 2px rule, not a rounded capsule: it is the same hairline the rest of the
@@ -1951,7 +2038,7 @@ body::before{
 }
 .ctl-opts{ display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
 .ctl-note{
-  margin:8px 0 0; max-width:52ch;
+  margin:8px 0 0; max-width:var(--measure);
   font-family:var(--sans); font-size:12px; line-height:1.45; color:var(--ink-soft);
 }
 
@@ -2703,7 +2790,7 @@ body::before{
 
 .app-sub{
   font-size:13px; line-height:1.5; color:var(--ink-soft);
-  flex:1 1 100%; margin-top:2px; max-width:52ch;
+  flex:1 1 100%; margin-top:2px; max-width:var(--measure);
 }
 
 /* Four figures, two up on a phone. minmax(0,1fr) rather than 1fr so a long
@@ -3466,13 +3553,14 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
   margin-top:18px; padding-top:16px;
   border-top:1px solid var(--rule);
 }
-/* 52ch, matching .ctl-note: a one-line explanation set to the full panel width
-   is a line the eye has to track back across for no reason. */
-.collect-note{ margin:16px 0 0; max-width:52ch; }
+/* The shared measure, matching .ctl-note: a one-line explanation set to the
+   full panel width is a line the eye has to track back across for no reason —
+   but 52ch in a 634px panel was leaving a third of the box empty. */
+.collect-note{ margin:16px 0 0; max-width:var(--measure); }
 /* Between the label and the chips: this says what a collection IS, so it sits
    above the controls rather than under them, and .seg's own 18px top margin
    supplies the gap below it. */
-.collect-intro{ margin:8px 0 0; max-width:56ch; }
+.collect-intro{ margin:8px 0 0; max-width:var(--measure); }
 
 /* A radio row in the shared menu. The tick column is always there whether or
    not the tick is drawn — see the note in Menu.tsx. */

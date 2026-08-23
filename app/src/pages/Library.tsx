@@ -250,6 +250,14 @@ export function Library() {
                       key={id}
                       type="button"
                       className="seg-view"
+                      /* Always labelled, not only when the label is drawn.
+                         Below 480px .seg-view-lbl is display:none and the icon
+                         is aria-hidden, which left all three of these buttons
+                         with NO accessible name on every phone — measured:
+                         empty text, no aria-label, no title. A screen reader
+                         announced "button, pressed" three times, and a driver
+                         looking for the List view could never find it. */
+                      aria-label={label}
                       aria-pressed={view === id}
                       onClick={() => setViewAnd(id)}
                     >

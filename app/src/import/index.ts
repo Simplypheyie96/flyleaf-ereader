@@ -1,7 +1,7 @@
 import { addBook, db } from '../db'
 import type { Book, BookFile, Format } from '../types'
 import { plainText, readMeta, titleFromName } from './meta'
-import { sniff } from './sniff'
+import { MIME, sniff } from './sniff'
 
 /* Import. One function, one path, every entry point.
 
@@ -154,18 +154,30 @@ async function shrinkCover(blob: Blob): Promise<Blob> {
   }
 }
 
-/** For the drop target and the picker: the extensions worth accepting. Sniffing
-    still decides — this only stops the file dialog showing a folder of noise. */
+/** For the picker's filter dropdown: the extensions each format answers to.
+    Sniffing still decides what a file actually is — this only names the filter.
+
+    `.fb2.zip` used to sit under fbz and is gone. It is not one extension, and
+    an `accept` token with two dots in it is a token no dialog can match; the
+    file it was meant to catch is a zip, and a zip holding one book is unwrapped
+    by `sniffZip` regardless of what it is called. */
 export const ACCEPT: Record<Format, string[]> = {
   epub: ['.epub'],
   mobi: ['.mobi', '.prc'],
   azw3: ['.azw3', '.azw', '.kf8'],
   fb2: ['.fb2'],
-  fbz: ['.fbz', '.fb2.zip'],
+  fbz: ['.fbz'],
   txt: ['.txt'],
   markdown: ['.md', '.markdown'],
   html: ['.html', '.htm', '.xhtml'],
   pdf: ['.pdf'],
 }
 
-export const ACCEPT_ATTR = Object.values(ACCEPT).flat().join(',')
+/** The File System Access dialog's one filter group, derived rather than typed.
+
+    It was typed out by hand next to the picker call, and a hand-kept second
+    copy of a list is a list that drifts. Built from ACCEPT and MIME so the
+    dialog cannot offer a narrower set of formats than the sniff can read. */
+export const PICKER_ACCEPT: Record<string, string[]> = Object.fromEntries(
+  (Object.keys(ACCEPT) as Format[]).map((format) => [MIME[format], ACCEPT[format]]),
+)

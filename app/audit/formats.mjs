@@ -25,13 +25,14 @@
    that must STAY refused, each with the reason a reader can act on. A sniff
    that accepts everything is not a fixed sniff.
 
-   UNCOVERED, and stated rather than skipped: AZW3/KF8. It is a declared format
-   with no fixture, because there is no MOBI/KF8 writer on this machine —
-   `ebook-convert`, `kindlegen` and `calibre` are all absent (see
-   fixtures/make-mobi.mjs, which is why the MOBI fixture is hand-built). The
-   KF8 path through the engine is exercised by nothing here. It is the one
-   format whose "it works" rests on the vendored parser's own history rather
-   than on a measurement taken in this repo.
+   NOTHING IS UNCOVERED any more. AZW3/KF8 was, for a while, and it was stated
+   here rather than skipped: a declared format with no fixture, because there is
+   no MOBI/KF8 writer on this machine — `ebook-convert`, `kindlegen`, `calibre`
+   and Kindle Previewer are all absent. That is not a good enough reason to keep
+   a format on the shelf, so `fixtures/make-azw3.mjs` builds one by hand: real
+   FDST, SKEL and FRAG indices, and four sections a reader has to rebuild by
+   splicing a fragment into a skeleton at a byte offset. Every format the app
+   advertises now has a file in this matrix.
 
    Run: npx vite build && npx vite preview --port 4173 && node audit/formats.mjs
    ───────────────────────────────────────────────────────────── */
@@ -47,7 +48,7 @@ const SEED = join(HERE, '..', 'public', 'seed')
 
 const findings = []
 const steps = []
-const m = { opened: [], refused: [], uncovered: ['azw3/kf8'] }
+const m = { opened: [], refused: [], uncovered: [] }
 const bad = (what, detail) => findings.push(`${what}: ${detail}`)
 const say = s => steps.push(s)
 
@@ -65,6 +66,8 @@ const OPENS = [
       why: 'a 4MB book, the size the brief names', optional: true },
     { file: join(FIX, 'fixture.mobi'), format: 'mobi', title: /Kindle Fixture/i,
       why: 'MOBI 6 — PalmDB, EXTH metadata, pagebreak sections' },
+    { file: join(FIX, 'fixture.azw3'), format: 'azw3', title: /KF8 Fixture/i,
+      why: 'AZW3 — KF8, sections spliced from SKEL and FRAG indices' },
     { file: join(FIX, 'fixture.fb2'), format: 'fb2', title: /Measured Fixture/i,
       why: 'FictionBook 2, a bare XML book' },
     { file: join(FIX, 'fixture.fbz'), format: 'fbz', title: /Measured Fixture/i,

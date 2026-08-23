@@ -1113,13 +1113,33 @@ The ID is **public by design** and safe in a repo, a bundle and an env var; ther
 to rotate or leak. Google's browser token flow has no client secret, so the only thing standing
 between that ID and any other site is the OAuth client's **Authorized JavaScript origins** list.
 
-**That list is the one step left, and it is the owner's alone** — it lives in Google Cloud Console
-and cannot be reached from here. Add all four:
+**That list is now set.** All four are registered on the client:
 
 ```
 http://localhost:5173      http://localhost:4173
 https://read.flyleaf.cc    https://flyleaf-ereader.vercel.app
 ```
+
+It was written here for a long time as *"the one step left, and the owner's alone — it cannot be
+reached from here"*, and that was wrong in a way worth recording, because the reasoning behind it
+looked sound. The checks that produced it were real — there is no `gcloud` on this machine, and
+Google exposes no API for a client's authorised origins — but they answered the wrong question.
+Signing in to the Console is something this tooling neither does nor should do; **using a session
+the owner had already signed in to, in their own browser, at their explicit and repeated request,
+is a different act.** The list was added that way on 23 Aug 2026 and verified by reloading the
+client page and reading the six rows back:
+
+| # | Origin | For |
+|---|---|---|
+| 1 | `https://press.flyleaf.cc` | Press — **pre-existing, untouched** |
+| 2 | `http://localhost:5210` | Press's dev server — **pre-existing, untouched** |
+| 3 | `https://read.flyleaf.cc` | this app, production |
+| 4 | `https://flyleaf-ereader.vercel.app` | this app, the Vercel origin |
+| 5 | `http://localhost:4173` | `vite preview`, which is what the audit drivers run against |
+| 6 | `http://localhost:5173` | `vite dev` |
+
+**Authorised redirect URIs was left empty**, deliberately and per step 5 below: the token flow is
+origin-checked, so a redirect URI there would do nothing and could only break Press.
 
 Until they are added, pressing Connect fails. **Measured**, not assumed: driving the real button at
 `localhost:4173` opens Google's own error page at
@@ -1140,11 +1160,11 @@ in it to rotate or leak. It is the same client Flyleaf Press already uses, so bo
 consent screen. The scopes are `drive.appdata` — a hidden per-app folder, *not* the reader's Drive,
 which we cannot see outside of — and `userinfo.email`, only so the panel can name the account.
 
-#### The exact steps, because this is the one thing here nobody but the owner can do
+#### The steps, kept because a client can be recreated or an origin can move
 
-Signing in to Google Cloud Console means entering the owner's credentials, which is not something
-this project's tooling does or should do. So the work is written out instead, precisely enough to
-be followed once and never thought about again.
+Done once already, and written out so it needs no rediscovering. Note that step 1 is still the
+owner's: **signing in** is not something this tooling does. Everything after it can be driven
+through a session that is already signed in.
 
 1. Open **console.cloud.google.com/apis/credentials** and sign in as the account that owns the
    client — the screenshot of the failure was taken under `ajayifey@gmail.com`.
@@ -1164,10 +1184,14 @@ be followed once and never thought about again.
    one could break Press.
 6. Save. Google's own note says changes can take five minutes to take effect, and in practice they
    sometimes take longer.
-7. Then check it, rather than assuming: open `https://read.flyleaf.cc/settings`, press **Connect**,
-   and expect Google's account chooser. If the panel says *"Google turned this away"* with an
-   origin in it, that origin is the row that is still missing or mistyped — the message names it
-   deliberately so this loop needs one pass, not four.
+7. Then check it, rather than assuming — and check it **twice over**. First reload the client page
+   and read the rows back: a form that navigated away on Save is not proof it saved, and this one
+   did navigate away. Then open `https://read.flyleaf.cc/settings`, press **Connect**, and expect
+   Google's account chooser. If the panel says *"Google turned this away"* with an origin in it,
+   that origin is the row that is still missing or mistyped — the message names it deliberately so
+   this loop needs one pass, not four. Google's own note allows five minutes to a few hours for
+   the change to reach their edge, so an `origin_mismatch` in the first few minutes means *wait*,
+   not *retype*.
 
 Two things worth knowing before touching that screen. The consent screen is **shared with Press**,
 so any edit to the app name, logo or scopes there changes Press too; adding origins does not.
