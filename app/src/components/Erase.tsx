@@ -30,48 +30,63 @@ export function Erase() {
   }
 
   return (
-    <details className="set-group" open={open} onToggle={(e) => {
-      const next = (e.currentTarget as HTMLDetailsElement).open
-      setOpen(next)
-      if (!next) setWord('')
-    }}>
-      <summary className="set-row set-row--fold">
-        <div className="set-row-text">
-          <span className="ui-lbl">ERASE EVERYTHING</span>
-          <span className="ui-p ui-p--soft">Delete all books and data from this device</span>
+    <section className="panel">
+      <p className="ui-lbl">Erase everything</p>
+      <p className="ui-p" style={{ marginTop: 8 }}>
+        This will permanently delete all books, reading progress, highlights, and settings from this device. There is no undo.
+      </p>
+      
+      {!open ? (
+        <div className="set-acts">
+          <button
+            className="btn btn--danger btn--sm"
+            type="button"
+            onClick={() => setOpen(true)}
+          >
+            Erase library…
+          </button>
         </div>
-      </summary>
-      <div className="set-fold" style={{ padding: '0 var(--sp-4) var(--sp-4)' }}>
-        <p className="ui-p" style={{ marginBottom: 'var(--sp-4)' }}>
-          This will permanently delete all books, reading progress, highlights, and settings from this device. There is no undo.
-        </p>
-        <label className="ui-lbl" htmlFor="erase-word" style={{ display: 'block', marginBottom: 'var(--sp-2)' }}>
-          Type <b>{WORD}</b> to confirm
-        </label>
-        <input
-          id="erase-word"
-          ref={field}
-          type="text"
-          className="ui-fld"
-          value={word}
-          placeholder={WORD}
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="none"
-          spellCheck={false}
-          disabled={busy}
-          onChange={(e) => setWord(e.target.value)}
-          style={{ marginBottom: 'var(--sp-4)', width: '100%' }}
-        />
-        <button
-          type="button"
-          className="btn btn--no"
-          disabled={!armed}
-          onClick={erase}
-        >
-          {busy ? 'Erasing…' : 'Erase everything'}
-        </button>
-      </div>
-    </details>
+      ) : (
+        <div className="erase-field">
+          <label className="ui-lbl" htmlFor="erase-word">
+            Type <b>{WORD}</b> to confirm
+          </label>
+          <input
+            id="erase-word"
+            ref={field}
+            type="text"
+            value={word}
+            placeholder={WORD}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            disabled={busy}
+            onChange={(e) => setWord(e.target.value)}
+          />
+          <div className="set-acts">
+            <button
+              type="button"
+              className="btn btn--danger-solid btn--sm"
+              disabled={!armed}
+              onClick={erase}
+            >
+              {busy ? 'Erasing…' : 'Delete all data'}
+            </button>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              disabled={busy}
+              onClick={() => {
+                setOpen(false)
+                setWord('')
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   )
 }

@@ -925,17 +925,28 @@ body::before{
 .tip-field{ display:flex; flex-direction:column; gap:7px; margin-top:14px; max-width:320px; }
 .tip-field + .tip-field{ margin-top:32px; }
 .tip-field input{
-  width:100%; height:40px; padding:0 2px;
-  background:transparent; color:var(--ink);
-  border:0; border-bottom:1px solid var(--rule);
-  /* 16px: see the note on .find input. Under it, focusing either of these
-     zooms the whole settings page on iOS, which is exactly the layout shift
-     the reader reported. No media query — iPadOS zooms too. */
+  width:100%; height:42px; padding:0 12px;
+  background:var(--card-w); color:var(--ink);
+  border:1px solid var(--rule); border-radius:var(--r-sm);
   font-family:var(--sans); font-size:16px;
   font-variant-numeric:tabular-nums;
+  transition:border-color 160ms var(--ease);
+  -webkit-appearance:none; appearance:none;
 }
-.tip-field input:focus{ outline:none; border-bottom-color:var(--ink); }
+.tip-field input:focus{ outline:none; border-color:var(--ink); }
 .tip-field input::placeholder{ color:var(--ink-soft); }
+
+.erase-field{ display:flex; flex-direction:column; gap:7px; margin-top:14px; max-width:320px; }
+.erase-field input{
+  width:100%; height:42px; padding:0 12px;
+  background:var(--card-w); color:var(--ink);
+  border:1px solid var(--rule); border-radius:var(--r-sm);
+  font-family:var(--sans); font-size:16px;
+  transition:border-color 160ms var(--ease);
+  -webkit-appearance:none; appearance:none;
+}
+.erase-field input:focus{ outline:none; border-color:var(--ink); }
+.erase-field input::placeholder{ color:var(--ink-soft); }
 
 /* Three notes, three jobs, and they are deliberately not one class: the floor
    is a fact about Paystack, the failure is a thing that just happened, and the
