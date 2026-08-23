@@ -182,6 +182,7 @@ export function Reader() {
     }, [id])
 
     const toggleChrome = useCallback(() => {
+        stopSearch()
         chromeRef.current = !chromeRef.current
         setChrome(chromeRef.current)
         if (!chromeRef.current) {
@@ -805,6 +806,8 @@ export function Reader() {
         if (!view) return (async function* () {})() as AsyncIterable<SearchYield>
         return view.search({
             query, matchCase: false, matchDiacritics: false, matchWholeWords: wholeWords,
+            draw: Overlayer.underline,
+            drawOptions: { color: 'currentColor', width: 2 }
         }) as AsyncIterable<SearchYield>
     }, [])
     const stopSearch = useCallback(() => { viewRef.current?.clearSearch() }, [])
@@ -1040,9 +1043,7 @@ export function Reader() {
                     clearSearch={stopSearch}
                     onGoCFI={cfi => {
                         setPanelOpen(false)
-                        void viewRef.current?.goTo(cfi).then(() => {
-                            setTimeout(() => stopSearch(), 2000)
-                        })
+                        void viewRef.current?.goTo(cfi)
                     }}
                     onEditNote={a => { setPanelOpen(false); setNoteFor(a) }}
                     onRemoveAnnotation={a => void removeAnnotation(a.id)}
