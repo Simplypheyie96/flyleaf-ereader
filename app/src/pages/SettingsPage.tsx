@@ -13,6 +13,7 @@ import { LeaveIcon } from '../components/icons'
 import { SyncPanel } from '../components/SyncPanel'
 import { Tip } from '../components/Tip'
 import { Erase } from '../components/Erase'
+import { Fold } from '../components/Fold'
 
 /* Everywhere this app points outside itself, in one place.
 
@@ -249,8 +250,7 @@ export function SettingsPage() {
           </p>
         </section>
 
-        <section className="panel">
-          <p className="ui-lbl">Backup</p>
+        <Fold label="Backup" open>
           <p className="ui-p" style={{ marginTop: 8 }}>
             One file with every book, where you are in it, and every highlight, note
             and bookmark. It is written to this device and goes nowhere else — moving
@@ -368,7 +368,7 @@ export function SettingsPage() {
           )}
 
           {refused && <p className="ui-p ui-p--warn" style={{ marginTop: 12 }} role="alert">{refused}</p>}
-        </section>
+        </Fold>
 
         {/* Directly below the hand-carried backup, because the two answer the
             same worry and the honest difference between them is who does the
@@ -376,8 +376,7 @@ export function SettingsPage() {
             Google client ID. */}
         <SyncPanel />
 
-        <section className="panel">
-          <p className="ui-lbl">Included books</p>
+        <Fold label="Included books">
           <p className="ui-p" style={{ marginTop: 8 }}>
             Flyleaf eReader ships with {SEEDS.length} public-domain books in your library. Delete
             them like any other book — an update will never put them back on its own.
@@ -409,10 +408,9 @@ export function SettingsPage() {
                 ? 'All of them are in your library.'
                 : `${shelf.missing} of ${SEEDS.length} ${shelf.missing === 1 ? 'is' : 'are'} not in your library right now.`}
           </p>
-        </section>
+        </Fold>
 
-        <section className="panel">
-          <p className="ui-lbl">The Flyleaf apps</p>
+        <Fold label="The Flyleaf apps">
           <p className="ui-p" style={{ marginTop: 8 }}>
             Three of them, built in this order, and none needs the others or an
             account. Flyleaf is the journal you keep while reading. Flyleaf Press is
@@ -436,10 +434,9 @@ export function SettingsPage() {
               note="Design and code, and the rest of the work."
             />
           </div>
-        </section>
+        </Fold>
 
-        <section className="panel">
-          <p className="ui-lbl">The small print</p>
+        <Fold label="The small print">
           {/* Four things a reader of a local-first app actually needs told, in
               the order they would want to know them: where their books live,
               what this refuses to open, whose books are already in your library,
@@ -491,7 +488,7 @@ export function SettingsPage() {
             <Link className="btn btn--ghost btn--sm" to="/privacy">Privacy</Link>
             <Link className="btn btn--ghost btn--sm" to="/terms">Terms of use</Link>
           </div>
-        </section>
+        </Fold>
 
         <Erase />
         <section className="panel">

@@ -358,19 +358,7 @@ export function SyncPanel() {
                 <button className="btn btn--ghost btn--sm" type="button" onClick={() => void now()} disabled={!!busy}>
                   {busy === 'sync' ? 'Syncing…' : 'Sync now'}
                 </button>
-                <button
-                  className="btn btn--ghost btn--sm"
-                  type="button"
-                  onClick={() => void disconnect()}
-                  disabled={!!busy}
-                >
-                  {busy === 'off' ? 'Disconnecting…' : 'Disconnect'}
-                </button>
               </div>
-              <p className="ui-p ui-p--soft" style={{ marginTop: 10 }}>
-                Disconnecting ends syncing on this device and leaves the copy in your Drive where it
-                is, so connecting again picks it back up.
-              </p>
             </>
           )}
         </>
@@ -420,45 +408,73 @@ export function SyncPanel() {
       )}
 
       {on && !stale && !asking && (
-        /* THE LAST WAY OUT, in its own plate, because it is the only control
-           here that deletes anything — and it is the ONLY place it can be
-           done: the folder is hidden from Drive's own screens, so there is no
-           row over there to delete. */
-        <div className="panel panel--danger">
-          <p className="ui-lbl">Remove the copy from Drive</p>
-          <p className="ui-p" style={{ marginTop: 8 }}>
-            Deletes the copy in your Google Drive and disconnects this device. Your library here is
-            untouched — but any other device that was syncing will stop finding it.
-          </p>
-          {dropping ? (
-            <div className="set-confirm">
-              <p className="ui-p">This cannot be undone from here or from Drive.</p>
-              <div className="set-acts" style={{ marginTop: 14 }}>
-                <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => void drop()}>
-                  {busy === 'drop' ? 'Removing…' : 'Remove the copy'}
-                </button>
-                <button
-                  className="btn btn--ghost btn--sm"
-                  type="button"
-                  disabled={!!busy}
-                  onClick={() => setDropping(false)}
-                >
-                  Keep it
-                </button>
-              </div>
+        /* THE TWO WAYS OUT, adjacent, because the only thing separating them is
+           whether the copy in Drive survives. They used to be a button beside
+           Sync now and a red plate below it — and the plate, sitting directly
+           under a line saying "Synced", read as a report that the sync had
+           failed. Rows instead: the label states the outcome plainly, the
+           danger lives on the button alone, and the sentence about what cannot
+           be undone waits for the press. Press's shape, verbatim. */
+        <div className="set-rows">
+          <div className="set-row set-row--stack">
+            <div className="set-row-txt">
+              <div className="ui-lbl">Stop syncing</div>
+              <p>
+                Ends syncing on this device. The copy already in your Drive is left where it is, so
+                connecting again picks it back up.
+              </p>
             </div>
-          ) : (
-            <div className="set-acts">
+            <button
+              className="btn btn--ghost btn--sm"
+              type="button"
+              disabled={!!busy}
+              onClick={() => void disconnect()}
+            >
+              {busy === 'off' ? 'Disconnecting…' : 'Disconnect'}
+            </button>
+          </div>
+          <div className="set-row set-row--stack">
+            <div className="set-row-txt">
+              <div className="ui-lbl">Remove the copy from Drive</div>
+              {/* worth saying where it can be done: the folder is hidden from
+                  Drive's own screens, so this button is the only way out */}
+              <p>
+                Deletes the copy from your Drive — the only place this can be done — and
+                disconnects. Your library here is untouched, but any other device that was syncing
+                will stop finding it.
+              </p>
+            </div>
+            {dropping ? (
+              /* ASKED IN THE ROW, not over it. This app has no modal confirm,
+                 and the inline block is what the merge above and the restore two
+                 panels down both use. */
+              <div className="set-confirm">
+                <p className="ui-p">This cannot be undone from here or from Drive.</p>
+                <div className="set-acts" style={{ marginTop: 14 }}>
+                  <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => void drop()}>
+                    {busy === 'drop' ? 'Removing…' : 'Remove the copy'}
+                  </button>
+                  <button
+                    className="btn btn--ghost btn--sm"
+                    type="button"
+                    disabled={!!busy}
+                    onClick={() => setDropping(false)}
+                  >
+                    Keep it
+                  </button>
+                </div>
+              </div>
+            ) : (
               <button
                 className="btn btn--danger btn--sm"
                 type="button"
                 disabled={!!busy}
                 onClick={() => setDropping(true)}
               >
-                Remove the copy
+                Remove
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </section>

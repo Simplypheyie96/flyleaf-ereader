@@ -103,6 +103,12 @@ for (const theme of ['light', 'dark']) {
   // ---- restore, still offline -----------------------------------------
   await page.goto(BASE + '/settings', { waitUntil: 'load' })
   await page.waitForTimeout(900)
+  /* Included books lives behind a fold now — three of the eight Settings
+     panels are put away by default, so the driver opens the one it needs
+     rather than assuming every control is on screen. */
+  const fold = page.locator('.fold-hd', { hasText: 'Included books' })
+  if (await fold.getAttribute('aria-expanded') === 'false') await fold.click()
+  await page.waitForTimeout(200)
   await page.locator('button', { hasText: 'Restore included books' }).click()
   await page.waitForTimeout(3000)
   await page.goto(BASE + '/', { waitUntil: 'load' })

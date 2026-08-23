@@ -1093,7 +1093,7 @@ real, and Chrome's own decision to offer the install is the part no driver here 
 
 ---
 
-## 15. Google Drive sync (built, visible, and never yet run against a real Drive)
+## 15. Google Drive sync (built, visible, and confirmed working on 22 Aug 2026)
 
 The one networked feature in the app, and it is built so that the sentence *"no feature that needs
 a network to work"* stays true: the reader who never connects is not an unsynced reader, they are
@@ -1503,13 +1503,52 @@ one case where two libraries genuinely diverged with nobody able to watch it hap
 are held while that question is up; an explicit `syncNow` still runs, because it is only ever called
 by something somebody pressed.
 
-### 15.6 What is not verified
+### 15.6 What is verified, and what still is not
 
-Everything in § 15 typechecks and builds, and none of it has been exercised against Drive, because
-that needs an OAuth consent flow and a signed-in account. **No driver in `app/audit/` covers sync**
-— stated plainly rather than left to be inferred from a clean sweep. The first real run should be
-watched on two devices with a book added on each while both are offline, which is the case § 15.5
-exists for.
+- **The round trip works.** The owner connected on their phone on 22 Aug 2026 and the panel read
+  *On, syncing to their account · last synced just now* / *Connected. Synced.* That is the first
+  real grant this app has had, and it settles the questions a driver cannot reach: the consent
+  screen, the token, the hidden folder, the write.
+- **`app/audit/sync.mjs` covers the record layer** — identity by file, tombstones, a deleted book
+  staying deleted, a foreign device's stones kept, and the signature moving and then holding
+  steady. It needs a dev server (`npx vite --port 5199`), which is why it is not in `sweep.mjs`.
+- **Still unverified:** two devices diverging *while both are offline* and then meeting, which is
+  the case § 15.5 exists for; and the OAuth popup inside an **installed** iOS PWA, where
+  `display: standalone` may swallow the window. The first connect on a phone should be made in
+  Safari for that reason.
+
+### 15.7 The panel says "synced", so nothing beside it may say "wrong"
+
+The connected panel used to end in a plate outlined in `--danger`, headed *Remove the copy from
+Drive*. It was drawn that way because it is the only control in the app that deletes something in
+somebody else's account — and it was wrong, for a reason no amount of correct copy could fix: it
+sat directly under the line reading *Connected. Synced.*, and a red-outlined block under a success
+message reads as the report of a failure. The owner's words on seeing it were that it *"gives the
+impression that the sync was not successful."*
+
+It is now **two rows and no plate**, Press's shape verbatim (`DESIGN.md` → *The settings row*):
+
+| | Row | Button | What survives |
+|---|---|---|---|
+| 1 | **Stop syncing** | `Disconnect`, ghost | The copy in Drive. Connecting again picks it back up |
+| 2 | **Remove the copy from Drive** | `Remove`, danger | Only the library on this device |
+
+Both were already reachable — Disconnect was a button beside *Sync now* with its explanation in a
+paragraph below, which put the two exits at opposite ends of the panel when the only thing
+separating them is whether the copy in Drive survives. Adjacent, that difference is the whole
+comparison. And the sentence *this cannot be undone from here or from Drive* now appears **on the
+press**, in the inline confirm, rather than sitting on screen warning about something nobody has
+done yet.
+
+### 15.8 Four of the eight Settings panels fold
+
+Settings reached eight panels and roughly four phone screens, most of it read once: what the app
+refuses to open, which two books came included, what it is built out of. **Backup**, **Included
+books**, **The Flyleaf apps** and **The small print** are now `Fold`s. Backup opens by default
+because it carries live state and a status line; the other three are closed. The affordance is
+Press's `.disclose` — a `<button aria-expanded>` around the label with a chevron on the trailing
+edge — drawn with this app's own `ChevronIcon`. `app/audit/states.mjs` opens *Included books*
+before pressing *Restore included books*, because that control now lives behind a press.
 
 ---
 
