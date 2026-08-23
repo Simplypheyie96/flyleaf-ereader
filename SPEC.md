@@ -1157,8 +1157,74 @@ https://read.flyleaf.cc is not an authorised origin on the sync app's Google cre
 
 The ID itself is **public by design** and safe in a repo, a bundle and an env var; there is nothing
 in it to rotate or leak. It is the same client Flyleaf Press already uses, so both apps share one
-consent screen. The scopes are `drive.appdata` — a hidden per-app folder, *not* the reader's Drive,
-which we cannot see outside of — and `userinfo.email`, only so the panel can name the account.
+consent screen. The scopes are `drive.appdata` — a hidden folder, *not* the reader's Drive, which we
+cannot see outside of — and `userinfo.email`, only so the panel can name the account.
+
+#### What sharing the client actually shares
+
+Called a "per-app folder" everywhere including, until now, this document. It is not. **`appDataFolder`
+is scoped to the OAuth client**, and sharing the client therefore shares the folder. One client, one
+hidden folder, and both products' documents sitting in it:
+
+| File | Written by |
+|---|---|
+| `library.json` | Flyleaf Press |
+| `shelf.json` · `marks.json` · `place.json` | this app |
+| `book-<fingerprint>`, one per backed-up book | this app |
+
+**Reading and writing were never at risk**, and it is worth saying why rather than being relieved
+about it. Every name is distinct, and neither app ever enumerates the folder looking for something
+that might be its own: Press asks Drive for one name (`q=name = 'library.json'`), and this app lists
+the folder but only ever reads it through an exact `folder.get(SHELF | MARKS | PLACE | book-<fp>)`.
+Nothing generic, nothing by pattern, nothing "whatever is newest". So no document of one product can
+be parsed, overwritten, or counted as the other's.
+
+**Deleting was.** `dropAll` took *every file in the folder*, and the comment above it argued for
+exactly that — an old name or a half-written upload cannot be left behind claiming to be a backup if
+nothing is left behind at all. Sound reasoning about a folder you own alone, and this is not one. The
+consequence was that **"remove the copy from my Drive" in the reading app deleted Flyleaf Press's
+entire cloud backup**, in one press, with no warning, and the sentence shown afterwards — *"The copy
+was removed from your Drive. Your library here is untouched."* — was true of this app and false of
+the other one. Press's own equivalent, `dropLibraries`, is the exact mirror of it and does the same
+thing in the other direction.
+
+Nothing about it looked wrong in the source, which is the part worth keeping. Both functions read
+correctly, both were well argued, and the bug lived entirely in an assumption about Google's
+scoping that neither file stated. It was found by the owner asking whether sharing one client could
+let two products touch each other's contents.
+
+**The fix is ownership, and it needs two halves.** `ours` in `record.ts` decides, and `dropAll` now
+takes it as an argument rather than deleting on its own authority:
+
+- **The tag.** Every file written from this app carries `appProperties.app = 'ereader'`. A file
+  tagged as another app's is never ours to delete *whatever it is called*, so renaming a document in
+  some later version cannot bring the bug back.
+- **The names.** A backup made before the tag existed carries no tag, and it is still ours and should
+  still go — so an untagged file matching one of our four shapes is deleted too.
+
+Anything else is left where it is. Stranding a stranger's file costs a few kilobytes of somebody's
+quota; deleting it costs them their backup, and those are not the same mistake.
+
+A second bug in the same function, found while fixing the first: `dropAll` was listing through
+`listFolder`, which collapses duplicate names and keeps the newest. So the one case its own comment
+named — *a half-written upload that was retried* — was the one case it could not clean, because the
+listing handed back one of the two files and silently stranded the other. The paged listing is now
+split out as `everything()`, undeduped; `listFolder` still dedupes for readers, and the delete no
+longer does.
+
+Proven by `audit/appdata.mjs`, in the permanent gate. Sixteen rows, built to look like the real
+shared folder — our files tagged and untagged, a retried duplicate, a document renamed in a future
+version, Press's backup both as it is today (untagged) and as it would be if Press tags too, and a
+file from an app that does not exist yet. It bundles the real predicate and the real `APP` constant
+with only Dexie stubbed, so a rename in `drive.ts` fails the driver instead of quietly passing it.
+There is no browser in it and no click to make: signing in to a real Drive is the one thing an audit
+run must not do, so the folder is synthetic and the predicate is real.
+
+**The other half of this is Press's, and it is not fixed by this repo.** `dropLibraries` in
+`../Review app/app/src/sync/drive.ts` still deletes everything in the folder, so Press's "remove the
+copy" still takes this app's shelf, marks, position and every backed-up book with it. It needs the
+mirror of the change above — its own `APP = 'press'` tag and a `name = 'library.json'` bridge — and
+it is a different product with its own deploy, so it is not changed here on this app's say-so.
 
 #### The steps, kept because a client can be recreated or an origin can move
 

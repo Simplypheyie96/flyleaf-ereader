@@ -36,6 +36,7 @@ import {
   mergeMarks,
   mergePlace,
   mergeShelf,
+  ours,
   packBook,
   signatures,
   unpackBook,
@@ -430,7 +431,10 @@ export async function forgetDrive(interactive = false): Promise<number> {
   pauseAutoSync()
   try {
     if (!tokenHeld() && interactive) await signIn()
-    const count = await dropAll(await silentToken())
+    /* `ours` and not everything in the folder — Flyleaf Press's backup lives
+       in the same hidden folder and is not this app's to delete. See the note
+       on `dropAll`. */
+    const count = await dropAll(await silentToken(), ours)
     /* The marks described files that no longer exist. Left behind, a later
        reconnection could match one and skip the transfer that would have put
        the library back up. */

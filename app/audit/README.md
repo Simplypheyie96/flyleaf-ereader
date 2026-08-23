@@ -1,6 +1,6 @@
 # The measured audit
 
-Twenty-eight drivers over one probe, and one runner. Run them against a **production preview**, not the dev
+Twenty-nine drivers over one probe, and one runner. Run them against a **production preview**, not the dev
 server — the service worker, the split parser chunks and the real font files only
 exist in a build, and several of the checks are about exactly those.
 
@@ -83,6 +83,7 @@ node audit/a11y.mjs        # the half of accessibility that has no geometry
 node audit/panels.mjs      # every panel Settings ships is on screen, the Drive gate included
 node audit/measure.mjs     # every cap on prose against the box it actually sits in
 node audit/ghost.mjs       # the coverless ghost, at all five sizes it is drawn at
+node audit/appdata.mjs     # whose file is it — the shared Drive folder, and what may be deleted
 node audit/backup.mjs      # the backup round trip, across two browser contexts
 node audit/install.mjs     # the install ask on Home, in all four of its branches
 node audit/tip.mjs         # the tip jar, up to but never through a charge
@@ -107,6 +108,22 @@ clipped silently by the cover's own `overflow:hidden`. It resolves every colour 
 it to a 1×1 canvas first, because the whole palette is authored in `color-mix(in oklab, …)`
 and `getComputedStyle` hands back `oklab()`, whose three channels are nothing like r,g,b —
 reading them as RGB is how an earlier pass reported every label at 1.2:1.
+
+`appdata.mjs` is the only driver here with no browser in it, and the reason is the bug it
+was written for. The hidden Drive folder is scoped to the OAuth client, this app shares its
+client with Flyleaf Press on purpose, so both products' documents live in one folder — and
+`dropAll` used to delete *everything in it*. One press of "remove the copy from my Drive" in
+a reading app took Press's entire cloud backup with it, silently, and the sentence printed
+afterwards ("Your library here is untouched") was true of this app and false of the other.
+Reading and writing were never at risk: the names are distinct and every access is an exact
+lookup. Only the delete was, and nothing in the source looked wrong — the comment on
+`dropAll` argued *for* taking everything, which is correct reasoning about a folder you own
+alone. So the driver builds the shared folder as it really is — our four shapes, our
+pre-tag files, a retried duplicate, Press's `library.json` both tagged and not, and a name
+from an app that does not exist yet — and asserts the verdict on all sixteen. It bundles the
+real `record.ts` and `record.ts`'s real `APP`, with only Dexie stubbed, so the tag under
+test is the same string the writer stamps rather than one retyped in a driver. There is no
+click to make: signing in to a real Drive is the one thing an audit run must not do.
 
 `install.mjs`, `tip.mjs`, `origin.mjs` and `phone.mjs` are the drivers that cannot test the
 whole path, and all four say so rather than implying they did.
