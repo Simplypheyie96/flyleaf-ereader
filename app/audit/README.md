@@ -1,6 +1,6 @@
 # The measured audit
 
-Seventeen drivers over one probe. Run them against a **production preview**, not the dev
+Twenty-one drivers over one probe. Run them against a **production preview**, not the dev
 server — the service worker, the split parser chunks and the real font files only
 exist in a build, and several of the checks are about exactly those.
 
@@ -42,6 +42,7 @@ The gate:
 
 ```
 node audit/a11y.mjs        # the half of accessibility that has no geometry
+node audit/panels.mjs      # every panel Settings ships is on screen, the Drive gate included
 node audit/backup.mjs      # the backup round trip, across two browser contexts
 ```
 
