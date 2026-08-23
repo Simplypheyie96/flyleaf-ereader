@@ -1226,6 +1226,32 @@ copy" still takes this app's shelf, marks, position and every backed-up book wit
 mirror of the change above — its own `APP = 'press'` tag and a `name = 'library.json'` bridge — and
 it is a different product with its own deploy, so it is not changed here on this app's say-so.
 
+#### Billing: no card, and none needed
+
+The Console account is on the **free trial** ($300, expiring Sep 2026) and there is no budget to
+upgrade. That turns out not to matter, and the reasoning is worth keeping so nobody pays for this
+later out of vague anxiety.
+
+Nothing any Flyleaf app uses is billable. Projects, OAuth consent screens, OAuth clients and the
+Drive API for `drive.appdata` are free, and none of them require a billing account to be *attached*
+in the first place. The exposure is therefore not a bill; it is that a project tied to a billing
+account which lapses can be carried into a suspended state along with it — and that project holds the
+client the apps authenticate against.
+
+**So the posture is detached billing, not an upgrade.** A project with no billing account attached is
+the permanently-free state: no card, no trial clock, nothing to expire. Google's "free tier" is not
+an account type that can be chosen — it is a set of always-free limits on a normal account, and
+reaching a normal account means attaching a payment method. Detaching billing gets the same outcome
+here without one.
+
+Which means, concretely: detach billing from `flyleaf-press` and `flyleaf-505004`, and create the new
+`flyleaf-ereader` project **without** billing attached — new projects sometimes auto-attach to an
+existing trial account, so it wants checking after creation rather than assuming. Verify first that
+nothing else in those projects uses a paid API; for Flyleaf it is OAuth and Drive only.
+
+Not done from here: billing is account configuration behind a payment method, which is the owner's
+alone.
+
 #### Decided: this app gets its own OAuth client
 
 Sharing was a defensible call and it is being undone, on the owner's decision of 23 Aug 2026, for
