@@ -60,14 +60,43 @@ The gate:
 ```
 node audit/a11y.mjs        # the half of accessibility that has no geometry
 node audit/panels.mjs      # every panel Settings ships is on screen, the Drive gate included
+node audit/measure.mjs     # every cap on prose against the box it actually sits in
+node audit/ghost.mjs       # the coverless ghost, at all five sizes it is drawn at
 node audit/backup.mjs      # the backup round trip, across two browser contexts
 node audit/install.mjs     # the install ask on Home, in all four of its branches
 node audit/tip.mjs         # the tip jar, up to but never through a charge
+node audit/origin.mjs      # does Google accept this origin — up to the sign-in page, never through
 node audit/phone.mjs       # the phone test, emulated: 4x CPU, touch, the 4MB EPUB
 ```
 
-`install.mjs`, `tip.mjs` and `phone.mjs` are the three drivers that cannot test the
-whole path, and all three say so rather than implying they did.
+`measure.mjs` exists because "the words wrap before they fill the container" kept coming
+back, and it kept coming back because it is invisible in the source: every `max-width` on
+prose reads fine on its own, and the break only exists in the *relationship* between that
+cap and whatever box ended up around it. Nothing measured that relationship until this. It
+walks each block of prose with a `Range`, merges the client rects by line box — an inline
+`<code>` splits one visual line into several rects and would otherwise count as two lines —
+finds the nearest ancestor wider than the widest line, and fails past 28% slack. Run it at
+`SLACK=0.20` to see the near misses; the survivors there are natural rag and deliberately
+centred ledes, and `DESIGN.md` → *The chrome measure* says which.
+
+`ghost.mjs` measures the one component that is drawn at 22, 44, 64, 104, 132 and 166px **at
+a single viewport width**, which is why the ghost is sized in container queries and why no
+media query could have caught the bug it found: `Markdown` overflowing a 44px cover by 10px,
+clipped silently by the cover's own `overflow:hidden`. It resolves every colour by painting
+it to a 1×1 canvas first, because the whole palette is authored in `color-mix(in oklab, …)`
+and `getComputedStyle` hands back `oklab()`, whose three channels are nothing like r,g,b —
+reading them as RGB is how an earlier pass reported every label at 1.2:1.
+
+`install.mjs`, `tip.mjs`, `origin.mjs` and `phone.mjs` are the drivers that cannot test the
+whole path, and all four say so rather than implying they did.
+
+`origin.mjs` stops at Google's sign-in page and signs in to nothing — reaching that page *is*
+the proof, and going through it would grant a real account's consent, which is not a thing an
+audit run does. It reads the **popup's URL** rather than the panel's message, because the
+panel's message is the thing that used to lie: `origin_mismatch` reaches the GSI SDK as
+`popup_closed`, so the app blamed the reader for closing a window Google had in fact
+rejected. A failure in the first few minutes after a Console change means *wait*, not
+*retype* — Google allows five minutes to a few hours to propagate.
 
 `install.mjs` dispatches a **synthetic** `beforeinstallprompt`, because Chromium never
 fires a real one headlessly — there is no flag for it and the engagement heuristics do
@@ -115,6 +144,7 @@ because no MOBI writer and no EPUB writer exist on this machine:
 
 ```
 node audit/fixtures/make-mobi.mjs        # fixture.mobi — PalmDB + PalmDOC + MOBI 6 + EXTH
+node audit/fixtures/make-azw3.mjs        # fixture.azw3 — KF8, spliced from SKEL and FRAG
 node audit/fixtures/make-inked-book.mjs  # inked.epub — an EPUB that fights the stock
 node audit/fixtures/make-fb2.mjs         # fixture.fb2 + fixture.fbz — FictionBook 2
 node audit/fixtures/make-zip-shapes.mjs  # the six awkward archives formats.mjs opens
