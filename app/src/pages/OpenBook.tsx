@@ -44,11 +44,19 @@ export function OpenBook() {
       setBusy(null)
       setRows((previous) => [...done, ...previous])
 
-      /* One new book, and it worked: go to it. A results list with a single
-         green line on it is a receipt for something the reader can already see
-         happened. Two or more, or anything refused, and the list is the point. */
+      /* One book, and it worked: go to it. A results list with a single green
+         line on it is a receipt for something the reader can already see
+         happened. Two or more, or anything refused, and the list is the point.
+
+         A duplicate counts. The row for one says "opening the one you have",
+         and it used to be excluded here, so the sentence was a promise the
+         code did not keep -- a reader who picked a file they already had was
+         left on the picker being told they were being taken somewhere. Either
+         the words or the behaviour had to change, and the behaviour was the
+         one that was wrong: somebody who opens a file wants to read the book,
+         and whether it arrived just now or last week is not their question. */
       const [only] = done
-      if (done.length === 1 && only.result.ok && !only.result.duplicate) {
+      if (done.length === 1 && only.result.ok) {
         navigate(`/book/${only.result.book.id}`, { replace: true })
       }
     },
@@ -154,8 +162,8 @@ export function OpenBook() {
                     <span className="result-title">{name}</span>
                     <span className="ui-p ui-p--soft">
                       {result.reason === 'drm'
-                        ? 'This file is DRM-protected, so its text is encrypted and no reader can open it without the shop’s key. Flyleaf does not support DRM and never will. A DRM-free copy of the same book will open.'
-                        : `Flyleaf does not read ${result.what}. Reflowable books and PDFs only — EPUB, MOBI, AZW3, FB2, TXT, Markdown, HTML, PDF.`}
+                        ? 'This file is DRM-protected, so its text is encrypted and no reader can open it without the shop’s key. Flyleaf eReader does not support DRM and never will. A DRM-free copy of the same book will open.'
+                        : `Flyleaf eReader does not read ${result.what}. Reflowable books and PDFs only — EPUB, MOBI, AZW3, FB2, TXT, Markdown, HTML, PDF.`}
                     </span>
                   </>
                 )}

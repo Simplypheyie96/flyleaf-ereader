@@ -12,3 +12,8 @@ dist
 
 # Scratch output from the Playwright MCP server, not part of the app.
 .playwright-mcp
+
+# The 4MB test book. Generated, not authored — `node audit/fixtures/make-big.mjs`
+# grows it from the seed EPUB that IS in the repo, so a clone can rebuild it and
+# git never carries 4.2MB of undiffable zip.
+app/audit/fixtures/big.epub

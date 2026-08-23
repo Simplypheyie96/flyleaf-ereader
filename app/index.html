@@ -3,17 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="description" content="Read what you own. EPUB, MOBI, AZW3, FB2, PDF — paginated, offline, no account. Your library lives on your device." />
+    <meta name="description" content="Read what you own. EPUB, MOBI, AZW3, FB2, PDF — paginated, with your place kept to the sentence and your library on your own device." />
     <meta property="og:site_name" content="Flyleaf eReader" />
     <meta property="og:title" content="Flyleaf eReader" />
-    <meta property="og:description" content="Read what you own. Paginated, offline, no account." />
+    <meta property="og:description" content="Read what you own. Paginated, and your place kept to the sentence." />
     <meta property="og:type" content="website" />
+    <!-- The one place the app's own address is written down. Absolute, because a
+         canonical and an og:image cannot be relative: a shared link has to
+         resolve from somebody else's server. Production is canonical even when
+         this build is serving from a preview URL — that is what canonical means. -->
+    <link rel="canonical" href="https://read.flyleaf.cc/" />
+    <meta property="og:url" content="https://read.flyleaf.cc/" />
+    <meta property="og:image" content="https://read.flyleaf.cc/icons/icon-512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta name="twitter:card" content="summary" />
     <meta name="theme-color" content="#F4F2ED" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F2ED" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#151515" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Flyleaf Read" />
+    <meta name="apple-mobile-web-app-title" content="Flyleaf eReader" />
     <meta name="mobile-web-app-capable" content="yes" />
     <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
@@ -65,50 +75,55 @@
            in main.tsx, which is what guarantees the overlay never sticks. */
         transition:opacity 420ms cubic-bezier(.22,1,.36,1);
       }
-      /* The mark, the NAME, and two lines saying what this is.
+      /* The mark, the NAME, a printer's rule, and one line saying what this
+         is — four elements, and the rule is what makes them read as two
+         groups rather than a list of four.
 
          It used to read "Flyleaf" over a line about the device, which named
          the family and the privacy promise and never once said the thing you
          were waiting for was an ereader — a cold start looked like Press
-         loading slowly. The name carries it now, in the same form Press uses
-         ("Flyleaf Press"), and the format list under it settles the question
-         before the app has painted a single page.
+         loading slowly. The name carries that now, in the same form Press
+         uses ("Flyleaf Press").
+
+         What ALSO used to be here was a fourth line listing five file
+         extensions in a third typeface. It went, and the screen is
+         significantly better for it: three stacked text lines under a mark is
+         a manifest, not a welcome, and the extension list was the weakest of
+         the three — a spec sheet where the reader wanted a name. Everything it
+         was defending against ("is this Press loading slowly?") the word
+         eReader already settles. It also cost a whole third face, a
+         no-wrap constraint that pinned the copy to what fits inside 32px
+         padding at 320px, and the awkwardness of setting a list and a
+         sentence in one stack. If it comes back, it belongs on Home next to
+         the import control, where a reader is actually choosing a file.
 
          Local font stacks only: the web fonts are still in flight at this
          point and a swap mid-fade is worse than the fallback. */
       #splash-in{ display:flex; flex-direction:column; align-items:center; text-align:center; padding:0 32px; }
-      #splash svg{ width:88px; height:88px; }
+      /* 96, not 88: the lozenge is 280 wide to 416 tall where the rosette it
+         replaced was near-square, so at equal box height it reads
+         appreciably lighter. 96 puts its ink at 78px tall by 52px wide, which
+         carries the same weight on the screen as the rosette's 67px did. */
+      #splash svg{ width:96px; height:96px; }
       #splash b{
-        display:block; margin-top:22px; font:500 25px/1.1 "Playfair Display",Georgia,serif;
-        letter-spacing:.005em;
+        display:block; margin-top:24px; font:500 30px/1.1 "Playfair Display",Georgia,serif;
+        /* Negative at this size, where 25px wanted a hair positive: display
+           type reads loose as it grows. */
+        letter-spacing:-.008em;
+      }
+      /* A printer's rule, hairline and short. It separates the identity from
+         the statement about it — the one hierarchy this screen has — and does
+         it with 1px instead of the 3rd typeface and 4th line that used to.
+         currentColor at .18 so it derives from the ground and needs no token
+         of its own on either scheme. */
+      #splash i{
+        display:block; width:40px; height:1px; margin-top:22px;
+        background:currentColor; opacity:.18;
       }
       #splash small{
-        display:block; margin-top:12px; max-width:24em;
-        font:500 12px/1.6 "Archivo",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-        letter-spacing:.1em; text-transform:uppercase; opacity:.62;
-      }
-      /* The formats, in the chrome's mono — a different voice from the line
-         above it, because it is a different KIND of statement: that one is a
-         sentence, this one is a list of file extensions, and setting them
-         identically (as Press sets its two lines) would read as one wrapped
-         paragraph. Quieter, wider, and monospaced, which is what makes it
-         legible as a list at a glance.
-
-         No max-width: this must not wrap. A format list broken over two lines
-         reads as prose that ran out of room, and this one is what tells a
-         reader on a cold start that the thing loading opens book files.
-
-         Five formats, not the six it started with, and not the nine the app
-         actually reads. Six measured 261px against the 256px available inside
-         the 32px padding at 320px — the narrowest phone supported here, and
-         the one my first note forgot, having checked 375 and called it the
-         floor. Five measures 218px there, with room to spare. It reads as
-         "these among others", which is what it is; the exhaustive list lives
-         in Settings, where there is width for it. */
-      #splash small.fmt{
-        margin-top:16px; max-width:none; text-transform:none;
-        font:400 11px/1.4 "IBM Plex Mono",ui-monospace,monospace;
-        letter-spacing:.06em; opacity:.42;
+        display:block; margin-top:20px; max-width:24em;
+        font:500 11px/1.6 "Archivo",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+        letter-spacing:.16em; text-transform:uppercase; opacity:.55;
       }
       #splash.is-out{ opacity:0; pointer-events:none; }
       @media (prefers-color-scheme: dark){
@@ -117,10 +132,10 @@
     </style>
     <div id="splash" aria-hidden="true">
       <div id="splash-in">
-        <svg viewBox="0 0 512 512"><path fill="currentColor" d="M256 57.6 A74.67 59.73 -90 1 1 256 206.93 A74.67 59.73 -90 1 1 256 57.6 Z M444.69 194.69 A74.67 59.73 -18 1 1 302.66 240.85 A74.67 59.73 -18 1 1 444.69 194.69 Z M372.61 416.51 A74.67 59.73 54 1 1 284.84 295.68 A74.67 59.73 54 1 1 372.61 416.51 Z M139.39 416.51 A74.67 59.73 126 1 1 227.16 295.68 A74.67 59.73 126 1 1 139.39 416.51 Z M67.31 194.69 A74.67 59.73 198 1 1 209.34 240.85 A74.67 59.73 198 1 1 67.31 194.69 Z M217.6 256 A38.4 38.4 0 1 1 294.4 256 A38.4 38.4 0 1 1 217.6 256 Z"/></svg>
+        <svg viewBox="0 0 512 512"><path fill="currentColor" d="M256 48 L396 256 L256 464 L116 256 Z M256 164 L194 256 L256 348 L318 256 Z"/></svg>
         <b>Flyleaf eReader</b>
+        <i></i>
         <small>Read what you own</small>
-        <small class="fmt">EPUB &middot; MOBI &middot; AZW3 &middot; FB2 &middot; PDF</small>
       </div>
     </div>
     <div id="root"></div>

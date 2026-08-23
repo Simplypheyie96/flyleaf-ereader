@@ -124,23 +124,49 @@
      carry it themselves, via background-image + background-blend-mode against
      their own fill. No extra element, no shadow, no filter.
 
-     STRENGTH, per the owner: "the texture shouldn't be too grainy. subtle but
-     visible." The tile was opacity .36 at baseFrequency .9, which is a fine
-     high-frequency noise — the frequency is what made it read as grain rather
-     than as stock. Now .20 at .62/4 octaves: a coarser, softer mottle, so the
-     eye reads an uneven surface instead of individual specks.
+     STRENGTH, per the owner twice: "the texture shouldn't be too grainy.
+     subtle but visible", then "it needs to just be subtle, the paper texture,
+     not overly pronounced." The tile was opacity .36 at baseFrequency .9, which
+     is a fine high-frequency noise — the frequency is what made it read as
+     grain rather than as stock. .62 at 4 octaves is a coarser, softer mottle,
+     so the eye reads an uneven surface instead of individual specks.
 
-     --grain-blend is per theme because multiply is only right on a light
-     ground: multiplying noise into #1B2430 is invisible, so dark themes screen
-     it back out at a lower strength instead.
+     Then measured against the PAGE, which is the comparison that matters and
+     the one nobody had run: body::before paints the same tile over the whole
+     viewport, but at .20 x an element opacity of .5 in light and .14 in dark.
+     Two empty probes wearing the two exact stacks, luminance sd in 8-bit
+     levels -- card vs page: light 1.78 / 1.15, sepia 1.48 / 1.06, dark 1.81 /
+     0.74, ink 1.63 / 0.40. Every card was between 1.4x and 4x rougher than the
+     paper it sat on, and on the dark grounds screen also lifted the card's mean
+     (36.4 against 32.7 on dark, 50.8 against 46.9 on ink), so a card read as
+     both grainier AND greyer than its own page. That is what "too grainy in the
+     cards" was.
+
+     So the light tile drops .16 -> .10 and the dark one .08 -> .04. Re-measured
+     the same way, card vs page: light 1.17 / 1.15, sepia 1.07 / 1.06, dark 0.75
+     / 0.74, ink 0.78 / 0.40 -- parity on three of the four, and the mean lift on
+     the dark grounds down to under a level (33.5 against 32.7, 47.5 against
+     46.9). Texture you feel rather than see.
+
+     Ink still measures 1.94x its page, and that one is left alone on purpose:
+     its page layer is only sd 0.40, so parity there would mean a 2-level range,
+     which is not a subtle texture but no texture at all -- and a near-black card
+     is the one surface where the tile does real work, keeping it from reading as
+     flat black. 4.9 levels peak-to-trough is the floor of visible, not a slab.
+
+     The tile is per theme, not just the blend, because the two blends are not
+     each other's mirror: multiply on near-white costs about 6.8 luminance
+     levels where screen on near-black ADDS 16.6 at the same opacity, 2.4x the
+     effect. A CSS variable cannot be interpolated into a url() data URI, which
+     is why the dark strength is a second literal tile below rather than one
+     tile times a number.
 
      It still does NOT reach running text. .stage below paints its stock plain,
      because DESIGN.md bans texture over the text and grain under a paragraph
      read for an hour is texture whatever its opacity. The reader's CHROME is
      grained; the book's page is not. */
-  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.62' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.20'/%3E%3C/svg%3E");
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.62' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.10'/%3E%3C/svg%3E");
   --grain-blend:multiply;
-  --grain-op:1;
 }
 @media (max-width:640px){ :root{ --gutter:20px; } }
 
@@ -149,6 +175,7 @@
    it: the page carries its own stock, chosen separately, and .stock below
    re-pins whichever one that is. Applied via data-theme on <html>. ── */
 :root[data-theme="dark"]{
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.62' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
   --grain-blend:screen;
   --paper:#151515;
   --card-w:#1E1E1E;
@@ -204,6 +231,7 @@
   --danger-fg:#FDF7F5;
 }
 :root[data-theme="ink"]{
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.62' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
   --grain-blend:screen;
   /* ── RE-HUED by the owner's instruction ─────────────────────────────────
      Ink was a warm brown borrowed from the Dusk stock. The owner's call:
@@ -300,10 +328,21 @@
 [data-stock="pitch"]{ --stock-bg:#000000; --stock-ink:#BFBAB2; --stock-soft:#8A857E; --stock-rule:#2A2A2A; }
 
 /* ── NEW ROLE: highlighter tints ─────────────────────────────────────────
-   Press's pastels, doing a second job. These are FILLS, drawn behind the
-   words — see DESIGN.md — and terracotta is the exception: a 2px underline,
-   never a fill, because a fill in the brand's own strong colour buries the
-   sentence it is meant to mark.
+   Press's pastel HUES, at a fill's own weight. These are FILLS, drawn behind
+   the words — see DESIGN.md — and terracotta is the exception: a 2px
+   underline, never a fill, because a fill in the brand's own strong colour
+   buries the sentence it is meant to mark.
+
+   They started as Press's four card grounds, unchanged, and that was wrong.
+   A card ground has to be barely-off-white so type can sit on top of it; a
+   fill has to separate from the page it is lying on. One hex cannot do both,
+   and the first set was tuned for only the first job — 4.5:1 on the ink and
+   no floor at all on the mark itself. The owner's report was "the highlight
+   colors don't show well", and butter measured 1.17:1 against Press: a cream
+   mark on a cream page. Pink, blue and butter were re-solved in OKLCH with
+   Press's hue held exactly and the 1.7:1 floor met by giving up as little
+   lightness as possible, spending the rest on chroma. Mustard is Press's
+   value untouched — it already cleared the floor at 2.02:1.
 
    Two families, because the two do different jobs:
 
@@ -319,16 +358,18 @@
    Every value below was computed, not chosen by eye: audit/tints.mjs. */
 :root{
   --hl-mustard:#DCA94C;
-  --hl-pink:#F3D9DD;
-  --hl-blue:#DAE4EE;
-  --hl-butter:#F6EBD9;
+  --hl-pink:#F0B3BE;
+  --hl-blue:#AFC9E3;
+  --hl-butter:#D6C19F;
   --hl-underline:#1C5480;
 
   /* Light stocks: paint the solid tint and let multiply do the work. Ink ×
-     pastel is still ink (worst body pair across the four light stocks and four
-     tints: 6.37:1, on Tea + mustard); page × pastel is the pastel, so the mark
-     itself stays visible against the page (1.17:1 at the faintest, Press +
-     butter). No margin bar — the fill reads on its own. */
+     pastel is still ink (worst body pair across the four light stocks and
+     four tints: 6.37:1, on Tea + mustard); page × pastel is the pastel, so
+     the mark itself separates from the page — 1.70:1 at the faintest, which
+     is the floor, and 2.14:1 at the strongest. Both bars are enforced by
+     audit/tints.mjs, which fails the run if either is missed. No margin bar:
+     at these values the fill reads on its own. */
   --hl-fill-mustard:var(--hl-mustard);
   --hl-fill-pink:var(--hl-pink);
   --hl-fill-blue:var(--hl-blue);
@@ -344,6 +385,9 @@
 
    The twelve alphas below are the measured ones — the largest value, in 0.01
    steps, that still leaves the stock's ink at 4.8:1 or better through the wash.
+   Re-measured against the deeper fills: a stronger tint separates from the page
+   faster per unit of alpha, so most of the twelve gained a point or two and the
+   wash:page figures moved from 1.89–3.00 up to 2.06–2.62.
    The bar is 4.8 and not 4.5 on purpose: maximising against 4.5 put every pair
    between 4.51 and 4.63, which is AA passing by a rounding error, and the
    browser composites in its own colour space rather than in the model the
@@ -357,9 +401,9 @@
 }
 [data-stock="coal"]{
   --hl-fill-mustard:rgba(220,169,76,.4);
-  --hl-fill-pink:rgba(243,217,221,.37);
-  --hl-fill-blue:rgba(218,228,238,.36);
-  --hl-fill-butter:rgba(246,235,217,.36);
+  --hl-fill-pink:rgba(240,179,190,.39);
+  --hl-fill-blue:rgba(175,201,227,.39);
+  --hl-fill-butter:rgba(214,193,159,.39);
 }
 /* Re-measured after Dusk became the blue stock — a lighter page than the warm
    dusk it replaced (L 12.17:1 ink, up from 10.42), so every wash can carry a
@@ -367,15 +411,15 @@
    audit/tints.mjs, largest alpha in .01 steps that holds. */
 [data-stock="dusk"]{
   --hl-fill-mustard:rgba(220,169,76,.35);
-  --hl-fill-pink:rgba(243,217,221,.32);
-  --hl-fill-blue:rgba(218,228,238,.32);
-  --hl-fill-butter:rgba(246,235,217,.31);
+  --hl-fill-pink:rgba(240,179,190,.34);
+  --hl-fill-blue:rgba(175,201,227,.34);
+  --hl-fill-butter:rgba(214,193,159,.34);
 }
 [data-stock="pitch"]{
   --hl-fill-mustard:rgba(220,169,76,.38);
-  --hl-fill-pink:rgba(243,217,221,.35);
-  --hl-fill-blue:rgba(218,228,238,.35);
-  --hl-fill-butter:rgba(246,235,217,.35);
+  --hl-fill-pink:rgba(240,179,190,.37);
+  --hl-fill-blue:rgba(175,201,227,.37);
+  --hl-fill-butter:rgba(214,193,159,.37);
 }
 
 *,*::before,*::after{ box-sizing:border-box; }
@@ -392,6 +436,14 @@ body{
      mid-gesture — and pull-to-refresh at the top of a chapter reloads the app.
      Set globally because the reader is the app's main screen, not a modal. */
   overscroll-behavior:none;
+  /* Playfair Display defaults to OLDSTYLE figures, where 0 sits at x-height:
+     measured, its zero inked 87px against a 113px cap (ratio 0.770), so "0m"
+     on the stats card read as "om". The face has lining figures - the same
+     measurement with the feature on gives 117, ratio 1.035 - so this is a
+     one-property fix, not a font swap. Set here rather than on the three
+     classes it was spotted in, because it is true of every serif figure in the
+     chrome. It cannot reach a book: foliate renders those in an iframe. */
+  font-variant-numeric:lining-nums;
 }
 button{ font-family:var(--sans); }
 img{ max-width:100%; }
@@ -413,25 +465,30 @@ body::before{
   mix-blend-mode:multiply;
 }
 
-/* Grain on the chrome surfaces, blended against each surface's OWN fill.
+/* There WAS a shared grain rule here, listing nine chrome surfaces. It was
+   measured on every route it covers and it was dead on all nine: .panel,
+   .tab-pill, .stat, .reader-btn, .reader-title and .reader-readout each declare
+   a `background:` SHORTHAND further down this file, and the shorthand resets
+   background-image to none. Same specificity, later wins, no tile.
 
-   Every selector here has to have an opaque background-color. background-blend-mode
-   blends the image against the element's background-COLOR, not against what is
-   behind the element — so on a transparent box the noise paints at full strength
-   as a grey rectangle with hard edges. That is a real bug this rule shipped with
-   once (the theme row in Settings, which is a bare flex container), so the list
-   is now only surfaces whose fill is declared in this file, and adding to it
-   means checking for that fill first. */
-/* .reader-bar is NOT in this list, and the rule above is exactly why. The
-   floating rows have no fill of their own — the fills moved to the three
-   capsules inside them, so those are what carry the grain. Putting the bar
-   back here would paint a hard-edged grey rectangle across the page, which is
-   the bug the paragraph above is about. */
-.panel,.strip,.tabbar,.menu,.continue,.stat,.sheet,
-.reader-btn,.reader-title,.reader-readout{
-  background-image:var(--grain);
-  background-blend-mode:var(--grain-blend);
-}
+   Its one live effect in the whole app was a bug. .tabbar was in the list and
+   is the only member with no fill of its own — it is a bare positioning
+   wrapper — so nothing reset it, and background-blend-mode blends against the
+   element's own background-COLOR rather than against what is behind it. On a
+   transparent box that means the noise painted at full strength: an 88x332
+   grey slab behind the desktop rail, which is what the owner reported as "the
+   navigation has a weird background that shouldn't be there at all".
+
+   So the list is gone rather than repaired. Grain lives on the three surfaces
+   that declare it next to their own fill — .cont, .statcard and .coll-plate —
+   which is the pattern that actually works, and the only pattern that was ever
+   visibly shipping. Reviving the nine would have ADDED texture to the panels,
+   the stats tiles and the three reader capsules, which is the opposite of the
+   instruction that came with this fix ("too grainy in the cards"); that is a
+   look decision, not a bug fix, so it is left for the owner to ask for.
+
+   If a surface is ever added: declare background-image/-blend-mode INSIDE its
+   own rule, after its fill, and never on a box without an opaque fill. */
 /* A cover is a photograph. Grain on it is dirt on a photograph. */
 .cover,.cover img{ background-image:none; }
 /* on a near-black ground multiply has nothing to darken, so the grain has to
@@ -462,7 +519,7 @@ body::before{
   font-family:var(--serif); font-weight:500; font-size:19px; line-height:1;
   letter-spacing:-.01em; display:flex; align-items:center; gap:9px;
 }
-/* neutral chrome: the rosette prints in ink here, not a colour */
+/* neutral chrome: the mark prints in ink here, not a colour */
 .app-head h1 svg{ display:block; color:var(--ink); }
 .app-head > span{
   font-size:11.5px; font-weight:500; letter-spacing:.14em;
@@ -525,6 +582,44 @@ body::before{
   padding:22px;
 }
 .panel + .panel{ margin-top:16px; }
+
+/* ── the install strip ────────────────────────────────────────────────────
+   Home's ask, and the only one in the app. A strip and not a card: the same
+   hairline box as a .panel but shorter, one rule of the column's width, and
+   gone for good on the ×.
+
+   Three children in a row that wraps: the copy, an optional Install button,
+   and the dismiss. The dismiss is absolutely positioned so wrapping can never
+   move it, and it is a 44px box whose 15px glyph lands on the strip's own
+   padding box — 18px in from the trailing edge, 16px down from the top — so
+   the target is full size without the glyph sitting off-grid. The halves in
+   those offsets are (44 - 15) / 2 taken back off: they are what makes the
+   glyph's own edges land on the padding box rather than half a pixel inside it.
+
+   flex-basis 220px on the copy is what wraps the button underneath at the
+   narrow end: at 320px the column's content box is 288px, the copy claims 220
+   and the button cannot fit beside it, so it drops to its own line. */
+.instl{
+  position:relative;
+  display:flex; flex-wrap:wrap; align-items:center; gap:14px 18px;
+  background:var(--card-w); border-radius:var(--r-md); border:1px solid var(--rule);
+  padding:16px 18px;
+  margin:0 0 28px;
+}
+.instl-txt{ flex:1 1 220px; min-width:0; padding-inline-end:24px; }
+.instl-txt .ui-lbl{ margin:0 0 5px; }
+.instl-txt .ui-p{ margin:0; max-width:46ch; }
+.instl .btn--sm{ flex:0 0 auto; }
+.instl-x{
+  position:absolute; top:1.5px; inset-inline-end:3.5px;
+  width:44px; height:44px;
+  display:grid; place-items:center;
+  border:0; background:none; cursor:pointer;
+  color:var(--ink-soft); border-radius:999px;
+  -webkit-tap-highlight-color:transparent;
+}
+.instl-x svg{ display:block; width:15px; height:15px; }
+.instl-x:active{ transform:scale(.92); }
 
 /* ── focus ────────────────────────────────────────────────────────────────
    One ring, everywhere, and it is drawn in ink rather than the UA's blue —
@@ -742,6 +837,95 @@ body::before{
   .set-link:hover .set-link-go{ transform:none; }
 }
 
+/* ── the tip jar ───────────────────────────────────────────────────────────
+   Its own panel, because it used to be the third row of a four-row link list
+   near the bottom of the page and the owner's report was that it was "too
+   hidden". A row in a list of destinations is not a jar; it is a footnote.
+
+   The cup sits BESIDE the paragraph rather than above it, so the panel opens
+   with one object and one sentence instead of a stack of two blocks. It is the
+   only illustrated mark in Settings, which is the whole reason it reads as a
+   jar and not as another section. */
+.tip-head{ display:flex; align-items:flex-start; gap:14px; margin-top:12px; }
+.tip-mark{
+  flex:none; display:inline-flex; align-items:center; justify-content:center;
+  width:38px; height:38px; border-radius:999px;
+  /* --wash, not the accent: a filled terracotta disc here would compete with
+     the button underneath it, and § Buttons says the accent means "the thing to
+     do" and nothing else. The cup is a picture, not the action. */
+  background:var(--wash); color:var(--ink);
+}
+.tip-mark > svg{ width:20px; height:20px; }
+/* 46ch on the paragraph beside a 38px mark: the text column is already inset,
+   and left uncapped it ran to the full panel width on a tablet. */
+.tip-head .ui-p{ max-width:46ch; }
+
+/* Three amounts in a row that wraps rather than shrinks — a ₦10,000 pill
+   squeezed to fit beside two others is unreadable at exactly the moment
+   somebody is choosing a number. */
+.tip-amounts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.tip-amount{
+  min-height:44px; padding:0 16px;
+  background:var(--card-w); color:var(--ink);
+  border:1px solid var(--rule); border-radius:999px;
+  /* Tabular figures, and not for alignment: without them ₦2,000 and ₦10,000
+     set at different widths per digit, so the three pills jitter in size for a
+     reason that has nothing to do with the amounts. */
+  font-family:var(--sans); font-size:14px; font-weight:600;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-.004em; cursor:pointer;
+  transition:border-color 140ms var(--ease), transform 140ms var(--ease);
+}
+.tip-amount:active{ transform:scale(.97); }
+/* Chosen is drawn in ink on ink's own ground, the same way a pressed .btn--ghost
+   is: a selection, not an action. Border AND fill change, so the state does not
+   rest on colour alone. */
+.tip-amount[aria-pressed="true"]{
+  background:var(--ink); color:var(--accent-fg); border-color:var(--ink);
+}
+@media (hover:hover) and (pointer:fine){
+  .tip-amount:hover{ border-color:var(--ink); }
+}
+@media (prefers-reduced-motion:reduce){
+  .tip-amount{ transition:border-color 140ms var(--ease); }
+  .tip-amount:active{ transform:none; }
+}
+
+/* The two fields. Same shape as .rename input — an underline, not a box, so a
+   field inside a panel inside a card is not a third nested rectangle.
+
+   CAPPED at 320px, which is the fix for the thing the rendered panel showed:
+   left to the panel's width these ran to 1264px on desktop, and a 1264px rule
+   under a nine-character amount is not a field, it is a horizon. 320px is
+   wider than the longest thing either one holds.
+
+   The 14/32 rhythm is the grouping rule and not a guess. The custom amount
+   answers the SAME question as the three pills above it — how much — so it
+   sits close to them; the email is a different question and gets more than
+   twice the gap. Measured at 16/16 first, where the label "Or another amount"
+   was equidistant from the pills and the email and belonged to neither. */
+.tip-field{ display:flex; flex-direction:column; gap:7px; margin-top:14px; max-width:320px; }
+.tip-field + .tip-field{ margin-top:32px; }
+.tip-field input{
+  width:100%; height:40px; padding:0 2px;
+  background:transparent; color:var(--ink);
+  border:0; border-bottom:1px solid var(--rule);
+  /* 16px: see the note on .find input. Under it, focusing either of these
+     zooms the whole settings page on iOS, which is exactly the layout shift
+     the reader reported. No media query — iPadOS zooms too. */
+  font-family:var(--sans); font-size:16px;
+  font-variant-numeric:tabular-nums;
+}
+.tip-field input:focus{ outline:none; border-bottom-color:var(--ink); }
+.tip-field input::placeholder{ color:var(--ink-soft); }
+
+/* Three notes, three jobs, and they are deliberately not one class: the floor
+   is a fact about Paystack, the failure is a thing that just happened, and the
+   fine print is a standing reassurance. Same 52ch cap as .ctl-note. */
+.tip-note{ margin:14px 0 0; max-width:52ch; }
+.tip-why{ margin:14px 0 0; max-width:52ch; color:var(--danger); }
+.tip-fine{ margin:14px 0 0; max-width:52ch; font-size:12.5px; }
+
 /* ── the small print ───────────────────────────────────────────────────────
    A definition list, because that is what it is: five things, each named and
    then explained. The name carries the weight and the explanation carries the
@@ -900,10 +1084,28 @@ body::before{
   flex:none; width:17px; height:17px; margin-inline:13px 0;
   color:var(--ink-soft); pointer-events:none;
 }
+/* 16px, not the 14 this field was designed at, and not a judgement about how
+   big a search field should look. iOS Safari ZOOMS THE WHOLE PAGE when a
+   focused input's text measures under 16px -- it is the platform's own
+   defence against unreadably small fields, it cannot be turned off from CSS,
+   and the only viewport meta that suppresses it (maximum-scale=1) blocks
+   pinch-zoom in every other browser and fails WCAG, so it is not an option.
+   The reader reported it as "clicking on the input in the app shifts the
+   entire layout in a bad way", and that is exactly what it looks like: the
+   layout jumps to a scale you did not ask for and has to be pinched back.
+
+   Measured before the change: our own boxes did not move a pixel on focus
+   (.page, .page-inner, .find, .shelf-bar, .tabbar all identical before and
+   after), which is what proves the shift was the platform's and not ours.
+
+   .panel-find-field and .note-field were already at 16 for the same reason.
+   These three were the holdouts: .find input at 14, .coll--new input at 15,
+   .rename/.collect-new input at 13.5. No media query -- iPadOS zooms too, so a
+   width breakpoint would gate the fix on the wrong condition. */
 .find input{
   flex:1; min-width:0; height:42px; padding:0 12px;
   background:transparent; color:var(--ink); border:0;
-  font-family:var(--sans); font-size:14px;
+  font-family:var(--sans); font-size:16px;
 }
 .find input:focus{ outline:none; }
 .find input::placeholder{ color:var(--ink-soft); }
@@ -1509,7 +1711,7 @@ body::before{
   background:var(--lift);
   font-family:var(--mono); font-size:10px; font-weight:500;
   letter-spacing:.09em; text-transform:uppercase;
-  font-variant-numeric:tabular-nums;
+  font-variant-numeric:lining-nums tabular-nums;
   /* Full ink, not --ink-soft. Soft was correct while the readout floated bare
      on the page: the page was the ground it was measured against. On --lift it
      is measured against a ground already 8% toward the ink, and that ate the
@@ -1745,7 +1947,7 @@ body::before{
   flex:none;
   font-family:var(--mono); font-size:11px; font-weight:500; line-height:1.2;
   letter-spacing:.04em; color:var(--ink);
-  font-variant-numeric:tabular-nums;
+  font-variant-numeric:lining-nums tabular-nums;
 }
 .ctl-opts{ display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
 .ctl-note{
@@ -2067,7 +2269,7 @@ body::before{
   margin:0; padding:2px 2px 10px;
   font-family:var(--mono); font-size:10px; font-weight:500;
   letter-spacing:.09em; text-transform:uppercase;
-  font-variant-numeric:tabular-nums;
+  font-variant-numeric:lining-nums tabular-nums;
   color:var(--ink-soft);
 }
 .panel-count-n{ color:var(--ink); }
@@ -2113,7 +2315,7 @@ body::before{
 .panel-kind[aria-selected="true"]{ background:var(--ink); color:var(--stock-bg); }
 .panel-kind-count{
   font-size:10px; letter-spacing:.04em;
-  font-variant-numeric:tabular-nums;
+  font-variant-numeric:lining-nums tabular-nums;
   opacity:.7;
 }
 
@@ -2129,7 +2331,7 @@ body::before{
   color:var(--ink-soft);
 }
 .panel-group-label{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.panel-group-count{ flex:none; font-size:10px; letter-spacing:.04em; font-variant-numeric:tabular-nums; opacity:.7; }
+.panel-group-count{ flex:none; font-size:10px; letter-spacing:.04em; font-variant-numeric:lining-nums tabular-nums; opacity:.7; }
 
 /* ── one row ──────────────────────────────────────────────────────────────
    A mark row is the row button plus an actions control beside it; a search
@@ -2263,7 +2465,7 @@ body::before{
   font-family:var(--sans); font-size:11.5px; letter-spacing:.02em;
   color:var(--ink-soft);
 }
-.panel-tail-note .mono{ font-variant-numeric:tabular-nums; }
+.panel-tail-note .mono{ font-variant-numeric:lining-nums tabular-nums; }
 
 /* ═══ the selection menu ═══════════════════════════════════════════════════
    Absolute over the page, above the seam and below the panel. It is the one
@@ -2367,22 +2569,28 @@ body::before{
   flex:1 1 auto; min-height:0;
   width:100%;
   padding:12px 14px;
-  border:1px solid var(--rule); border-radius:var(--r-md);
-  background:var(--card-w);
+  border:1px solid var(--stock-rule); border-radius:var(--r-md);
+  /* --lift, not --card-w. --card-w is CHROME; this surface is on the reading
+     page, and the chrome theme and the stock are chosen independently. With the
+     chrome dark and the stock light, --card-w painted a near-black field on
+     cream paper while [data-stock] re-pinned the text to the light stock's
+     dark ink: a note you could not read as you typed it. --lift is the stock's
+     own raised surface, so the field tracks the paper it lies on. */
+  background:var(--lift);
   font-family:var(--hand); font-size:16px; line-height:1.5;
-  color:var(--ink);
+  color:var(--stock-ink);
   resize:none;
   user-select:text; -webkit-user-select:text;
 }
-.note-field:focus{ outline:2px solid var(--ink); outline-offset:1px; }
-.note-field::placeholder{ font-family:var(--sans); font-size:14px; color:var(--ink-soft); }
+.note-field:focus{ outline:2px solid var(--stock-ink); outline-offset:1px; }
+.note-field::placeholder{ font-family:var(--sans); font-size:14px; color:var(--stock-soft); }
 .note-acts{ flex:none; display:flex; align-items:center; gap:10px; }
 .note-drop{
   display:inline-flex; align-items:center; gap:7px;
   min-height:42px; padding:0 14px;
-  border:1px solid color-mix(in oklab, var(--accent) 40%, var(--rule));
+  border:1px solid color-mix(in oklab, var(--stock-ink) 40%, var(--stock-rule));
   border-radius:999px;
-  background:transparent; color:var(--accent);
+  background:transparent; color:var(--stock-ink);
   font-family:var(--sans); font-size:12.5px; font-weight:600;
   cursor:pointer;
 }
@@ -2391,7 +2599,7 @@ body::before{
   display:inline-flex; align-items:center; gap:7px;
   min-height:42px; padding:0 20px;
   border:0; border-radius:999px;
-  background:var(--ink); color:var(--stock-bg);
+  background:var(--stock-ink); color:var(--stock-bg);
   font-family:var(--sans); font-size:12.5px; font-weight:600;
   cursor:pointer;
 }
@@ -2407,7 +2615,7 @@ body::before{
   margin:0;
   font-family:var(--mono); font-size:10px; font-weight:500;
   letter-spacing:.09em; text-transform:uppercase;
-  font-variant-numeric:tabular-nums;
+  font-variant-numeric:lining-nums tabular-nums;
   color:var(--ink-soft);
 }
 .export-formats{ display:flex; flex-direction:column; gap:2px; }
@@ -2518,7 +2726,7 @@ body::before{
   letter-spacing:-.02em; color:var(--ink);
   /* the figures change as you read; proportional digits would shuffle the
      tile's width every time the minute ticks over */
-  font-variant-numeric:tabular-nums;
+  font-variant-numeric:lining-nums tabular-nums;
 }
 .stat-lbl{
   font-family:var(--sans); font-size:10.5px; font-weight:500; line-height:1.2;
@@ -2532,7 +2740,7 @@ body::before{
 }
 .stat-sec-sub{
   margin-top:5px; font-family:var(--sans); font-size:12.5px; line-height:1.5;
-  color:var(--ink-soft); font-variant-numeric:tabular-nums;
+  color:var(--ink-soft); font-variant-numeric:lining-nums tabular-nums;
 }
 .stat-sec .facts{ margin-top:12px; }
 
@@ -2667,7 +2875,7 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
 .top-t--gone{ color:var(--ink-soft); font-style:italic; }
 .top-n{
   font-family:var(--mono); font-size:11.5px; color:var(--ink-soft);
-  font-variant-numeric:tabular-nums; white-space:nowrap;
+  font-variant-numeric:lining-nums tabular-nums; white-space:nowrap;
 }
 .top-bar{
   grid-column:1 / -1; display:block; height:4px; border-radius:2px;
@@ -2705,7 +2913,7 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
 }
 .mix-n{
   font-family:var(--mono); font-size:11px; color:var(--ink);
-  font-variant-numeric:tabular-nums;
+  font-variant-numeric:lining-nums tabular-nums;
 }
 
 /* ── the way through to it ─────────────────────────────────────────────────
@@ -2721,7 +2929,7 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
 .strip-body{ display:flex; flex-direction:column; gap:3px; min-width:0; flex:1 1 auto; }
 .strip-t{
   font-family:var(--serif); font-size:14.5px; line-height:1.25; color:var(--ink);
-  font-variant-numeric:tabular-nums;
+  font-variant-numeric:lining-nums tabular-nums;
 }
 .strip-s{
   font-family:var(--sans); font-size:10.5px; font-weight:500; line-height:1;
@@ -2859,7 +3067,11 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
    ══════════════════════════════════════════════════════════════════════════ */
 
 .home-sec{ margin-top:30px; }
-.home-sec:first-of-type{ margin-top:0; }
+/* Zero the gap only when the section really does follow the header, whose
+   own margin-bottom already spaces it. :first-of-type was wrong: the stats
+   card is a link, not a section, so with nothing in progress the first
+   SECTION was the one under the card and it butted into it with 0px. */
+.app-head + .home-sec{ margin-top:0; }
 .home-sec-head{
   display:flex; align-items:baseline; justify-content:space-between; gap:12px;
   margin-bottom:14px;
@@ -2968,7 +3180,7 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
 .cont-foot .bar{ flex:1 1 auto; }
 .cont-pct{
   font-family:var(--mono); font-size:11px; line-height:1; color:var(--ink-soft);
-  font-variant-numeric:tabular-nums; flex:none;
+  font-variant-numeric:lining-nums tabular-nums; flex:none;
 }
 
 /* ── the stats card ────────────────────────────────────────────────────────
@@ -3002,7 +3214,7 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
 .statcard-n{
   font-family:var(--serif); font-weight:500; font-size:22px; line-height:1;
   letter-spacing:-.015em; color:var(--ink);
-  font-variant-numeric:tabular-nums;
+  font-variant-numeric:lining-nums tabular-nums;
 }
 .statcard-k{
   font-family:var(--sans); font-size:10.5px; font-weight:500; line-height:1.25;
@@ -3160,7 +3372,7 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
      weight on the whole tile, and it clears the 3:1 non-text floor everywhere. */
   border:1px solid var(--plate-edge);
   background:var(--card-w); color:var(--ink-soft);
-  font-family:var(--mono); font-size:11px; font-variant-numeric:tabular-nums;
+  font-family:var(--mono); font-size:11px; font-variant-numeric:lining-nums tabular-nums;
 }
 .coll-name{
   font-family:var(--sans); font-size:14.5px; font-weight:600; line-height:1.3;
@@ -3186,7 +3398,9 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
   width:100%; height:38px; padding:0 2px;
   background:transparent; color:var(--ink);
   border:0; border-bottom:1px solid var(--rule);
-  font-family:var(--sans); font-size:15px;
+  /* 16px: see the note on .find input. Under it, focusing this field zooms
+     the whole shelf on iOS. */
+  font-family:var(--sans); font-size:16px;
 }
 .coll--new input:focus{ outline:none; border-bottom-color:var(--ink); }
 .coll-new-do{ display:flex; gap:6px; }
@@ -3238,7 +3452,10 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
   height:38px; padding:0 12px;
   background:var(--paper); color:var(--ink);
   border:1px solid var(--rule); border-radius:var(--r-sm);
-  font-family:var(--sans); font-size:13.5px;
+  /* 16px: see the note on .find input. This was the worst of the three at
+     13.5, and both of these fields are auto-focused the moment they appear,
+     so the zoom arrived unprompted. */
+  font-family:var(--sans); font-size:16px;
 }
 
 /* Naming a shelf from a book's own page. The same field as .rename above —

@@ -132,7 +132,7 @@ export async function openPdf(blob: Blob): Promise<PdfDoc> {
         const name = (err as { name?: string } | null)?.name
         if (name === 'PasswordException') {
             throw new PdfRefused(
-                'This PDF is locked with a password. Flyleaf does not open protected files.')
+                'This PDF is locked with a password. Flyleaf eReader does not open protected files.')
         }
         if (name === 'InvalidPDFException') {
             throw new PdfRefused('This file is not a readable PDF.')

@@ -14,11 +14,23 @@
                    is DESIGN.md's: a low-alpha NORMAL wash plus a 2px bar in the
                    margin, with the text left at the stock's own ink.
 
-   Either way the reader ends up looking at two composited colours — ink-under-
-   the-mark against ground-under-the-mark — and that is the pair this file
-   measures. For the dark stocks it searches for the largest alpha that still
-   clears 4.5:1 and reports what the wash looks like against the bare page at
-   that alpha, because a wash nobody can see is not a highlight.
+   Either way the reader ends up looking at two composited colours, and there
+   are TWO pairs to measure, not one:
+
+     ink:gnd    the sentence read through the mark. Body text, so 4.5:1.
+     mark:page  the mark itself against the bare page beside it. This is the
+                one the first shipped set had no floor on at all, and it is
+                why the owner reported that the highlights "don't show well":
+                butter landed at 1.17:1 on Press, a cream mark on a cream
+                page. The floor is now 1.7:1 and it is enforced below.
+
+   1.7 is not a WCAG number and does not pretend to be. 1.4.11's 3:1 is for
+   the boundary of a CONTROL; a 3:1 fill sitting behind body text is a block,
+   not a highlight, and it costs the pastel its identity (the solver's 3:1
+   answers were #FF3B7B and a grey-green butter). 1.7 is where a band is
+   unmistakable at reading distance while the sentence still reads as text
+   with a mark on it. Ink-through-mark is unaffected: it measures 6.4–10.9 at
+   this floor, so the two requirements never come into tension.
 
    Run: node audit/tints.mjs
    ───────────────────────────────────────────────────────────── */
@@ -35,13 +47,24 @@ const STOCKS = {
     pitch:  { bg: '#000000', ink: '#BFBAB2', dark: true },
 }
 
-/* The four fills and the one underline, DESIGN.md → Highlighter tints. */
+/* The four fills and the one underline, DESIGN.md → Highlighter tints.
+
+   These are NOT Press's four card grounds any more. They were, and that was
+   the bug: a card ground has to be barely-off-white so type can sit on it,
+   which is the exact opposite of what a fill lying ON a page needs. Same hex
+   cannot do both jobs. Pink, blue and butter were re-solved in OKLCH — hue
+   held to Press's exactly, as little lightness given up as the 1.7:1 floor
+   allows, and the rest of the budget spent on chroma so what comes back is
+   still a pink rather than a taupe. Mustard is untouched: at 2.02:1 it was
+   already the one of the four that cleared the floor on its own. */
 const TINTS = {
     mustard: '#DCA94C',
-    pink:    '#F3D9DD',
-    blue:    '#DAE4EE',
-    butter:  '#F6EBD9',
+    pink:    '#F0B3BE',
+    blue:    '#AFC9E3',
+    butter:  '#D6C19F',
 }
+/* Floor on mark:page, light stocks. See the note at the top of the file. */
+const MARK_FLOOR = 1.7
 /* The underline highlighter's shipped values, read off index.css — :root and
    the dark-stock override. These were terracotta (#C2410C / #E8865A) until the
    owner's "no orange"; this driver went on measuring the orange after index.css
@@ -85,10 +108,11 @@ for (const [stockName, stock] of Object.entries(STOCKS)) {
         const tint = hex(tintHex)
         if (!stock.dark) {
             const cr = round2(ratio(multiply(tint, ink), multiply(tint, bg)))
+            const vs = round2(ratio(multiply(tint, bg), bg))
             note({
                 stock: stockName, tint: tintName, mode: 'multiply', alpha: 1,
-                cr, vs: round2(ratio(multiply(tint, bg), bg)),
-                pass: cr >= 4.5,
+                cr, vs,
+                pass: cr >= 4.5 && vs >= MARK_FLOOR,
             })
             continue
         }
@@ -107,10 +131,11 @@ for (const [stockName, stock] of Object.entries(STOCKS)) {
             if (ratio(over(tint, ink, a), over(tint, bg, a)) >= TARGET) { best = round2(a); break }
         }
         const cr = round2(ratio(over(tint, ink, best), over(tint, bg, best)))
+        const vs = round2(ratio(over(tint, bg, best), bg))
         note({
             stock: stockName, tint: tintName, mode: 'normal', alpha: best,
-            cr, vs: round2(ratio(over(tint, bg, best), bg)),
-            pass: best > 0 && cr >= 4.5,
+            cr, vs,
+            pass: best > 0 && cr >= 4.5 && vs >= MARK_FLOOR,
         })
     }
 }
@@ -126,8 +151,8 @@ const underlineRows = Object.entries(STOCKS).map(([name, s]) => {
 })
 
 const w = (s, n) => String(s).padEnd(n)
-console.log('FILLS — composited ink vs composited ground under the mark')
-console.log(w('stock', 8) + w('tint', 9) + w('mode', 10) + w('alpha', 7) + w('ink:gnd', 9) + w('wash:page', 11) + 'AA 4.5')
+console.log(`FILLS — ink:gnd needs 4.5, mark:page needs ${MARK_FLOOR}`)
+console.log(w('stock', 8) + w('tint', 9) + w('mode', 10) + w('alpha', 7) + w('ink:gnd', 9) + w('mark:page', 11) + 'verdict')
 for (const r of rows)
     console.log(w(r.stock, 8) + w(r.tint, 9) + w(r.mode, 10) + w(r.alpha, 7)
         + w(r.cr.toFixed(2), 9) + w(r.vs.toFixed(2), 11) + (r.pass ? 'pass' : 'FAIL'))
@@ -151,7 +176,7 @@ for (const [name, s] of Object.entries(STOCKS)) {
     for (const [tintName, tintHex] of Object.entries(TINTS)) {
         const r = rows.find(x => x.stock === name && x.tint === tintName)
         const [rr, gg, bb] = hex(tintHex)
-        console.log(`  --hl-${tintName}:rgba(${rr},${gg},${bb},${String(r.alpha).replace(/^0/, '')});`)
+        console.log(`  --hl-fill-${tintName}:rgba(${rr},${gg},${bb},${String(r.alpha).replace(/^0/, '')});`)
     }
     console.log(`  --hl-underline:${UNDERLINE_DARK};`)
     console.log('}')

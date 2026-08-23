@@ -11,9 +11,9 @@
 > tempted to add a sixth colour or a fourth face, that mark is the bar: name the role Press
 > has no token for, or use what is here.
 
-**Name: Flyleaf eReader** — a sibling to Flyleaf Press under Flyleaf. Same rosette mark
-(`assets/flyleaf-mark-source.svg`), rendered in `--ink` in chrome. Same neutral chrome rule:
-**mostly ink on paper**. Where Press's pastels are *card grounds*, here they are **page stocks
+**Name: Flyleaf eReader** — a sibling to Flyleaf Press under Flyleaf. **Its own mark**, not
+Press's rosette — see *The mark* below. Rendered in `--ink` in chrome, same as Press's is in
+Press's. Same neutral chrome rule: **mostly ink on paper**. Where Press's pastels are *card grounds*, here they are **page stocks
 and highlighter tints** — the same printed-paper logic applied to a different printed object.
 
 ## Direction
@@ -197,29 +197,64 @@ is why the measurement above is a guaranteed floor and not a best case.
 The veil is only ever on a fixed page. A reflowable book has real text on a real stock and needs
 nothing over it — a fill over live type is the banned paper texture by another name.
 
-### Highlighter tints **NEW (role, not values)**
+### Highlighter tints **NEW (role, and — for three of them — values)**
 
 Press's remaining grounds, used as the marks a reader makes. Four fills and one underline is
 the whole set — enough to mean something, few enough to stay nameable.
 
-| Name | Value | Rendering |
-|---|---|---|
-| Mustard | `#DCA94C` | Fill |
-| Pink | `#F3D9DD` | Fill |
-| Blue | `#DAE4EE` | Fill |
-| Butter | `#F6EBD9` | Fill |
-| Terracotta | `#C2410C` | **Underline, 2px** — never a fill |
+This began as *role, not values*: Press's four card grounds, reused unchanged. That was wrong,
+and the reader found it before the audit did — *"the highlight colors don't show well."* A card
+ground has to be barely-off-white so type can sit **on** it. A fill has to separate from the page
+it is lying **on**. One hex cannot do both jobs, and these had only ever been checked for the
+first: the ink read through the mark cleared 4.5:1 everywhere, while the mark itself against the
+bare page had **no floor at all**, and butter landed at 1.17:1 on Press — a cream mark on a cream
+page.
+
+So pink, blue and butter now carry their own values. Press's **hue is held exactly** (within half
+a degree), the new floor is met by giving up as little lightness as it takes, and what is left of
+the budget goes to chroma — because a near-white that only sheds lightness comes back grey, and a
+taupe is not butter. Mustard is Press's value, untouched: at 2.02:1 it was the one of the four
+that already cleared the floor.
+
+| Name | Value | Press's ground | Rendering |
+|---|---|---|---|
+| Mustard | `#DCA94C` | `#DCA94C` — unchanged | Fill |
+| Pink | `#F0B3BE` | `#F3D9DD` | Fill |
+| Blue | `#AFC9E3` | `#DAE4EE` | Fill |
+| Butter | `#D6C19F` | `#F6EBD9` | Fill |
+| Underline | `#1C5480` | — | **Underline, 2px** — never a fill |
+
+The underline was terracotta `#C2410C` until the owner's *"no orange"*, and this table went on
+naming the orange after the app had stopped drawing it. It is the ink blue now, `#7FB6EC` on a
+dark stock.
 
 **Rules**
 - A highlight is drawn **behind** the words, never over them; the letters keep their own colour
   and go on showing through. A fill that dims the text it marks is a bug.
-- Terracotta is the exception that keeps Press's rule intact: `--accent` is card-internal, and a
-  reading page is a printed surface, so it may appear here — but as a **rule under the text**,
-  which is a printed mark, not as a wash of the brand colour across a paragraph.
-- **On Coal, fills invert their job.** A `#F3D9DD` wash behind cream text on a `#221E1B` ground
-  destroys the text. On Coal a highlight is the same hue at low alpha *plus* a 2px bar in the
-  left margin, and the text stays `--cream`. Every tint's Coal treatment is **measured against
-  4.5:1 before it ships** — no tint is approved by eye.
+- **Two floors, both measured, both enforced.** `audit/tints.mjs` fails the run if either is
+  missed on any of the twenty-eight fills: **4.5:1** on the ink read through the mark, and
+  **1.7:1** on the mark against the bare page beside it. 1.7 is deliberately not a WCAG number —
+  1.4.11's 3:1 governs the boundary of a *control*, and a 3:1 fill behind body text is a block,
+  not a highlight. 1.7 is where a band is unmistakable at reading distance while the sentence
+  still reads as text with a mark on it. The two never conflict: at the 1.7 floor the ink measures
+  6.4–10.9.
+- The underline is the exception that keeps Press's rule intact: a strong colour may appear here,
+  but as a **rule under the text**, which is a printed mark, not as a wash of it across a
+  paragraph.
+- **On a dark stock, fills invert their job.** A pale wash behind cream text on a `#221E1B`
+  ground destroys the text, and multiply is no help either — a pastel times a near-black page is
+  mud. So on Coal, Dusk and Pitch a highlight is the same hue at low alpha *plus* a 2px bar in the
+  left margin, and the text stays at the stock's own ink. The twelve alphas are the largest that
+  hold **4.8:1** on that ink, not 4.5 — the headroom is there because the browser composites in
+  its own colour space, and maximising against 4.5 put every pair inside a rounding error of it.
+  No tint is approved by eye.
+- **The bar goes in the margin, and the margin is half the setting.** Upstream inverts the side
+  margin percentage to `g/(1−g)` so the outer padding and the inner column gap match, then pads
+  the column by half of that — so the text edge sits at `size·g / 2(1−g)`, about 4.35% a side at
+  the 8% default, not 8%. Deriving the bar's inset from the setting read literally put it 12px
+  *inside* the column on a 612px pane, drawing a rule straight through the first character of
+  every marked line. Measured: text starts at 26.59px on a 612px pane and 15.59px on a 358.8px
+  one, and the bar now sits 8px clear of it at both.
 - Highlighter tints never appear on chrome. In the annotations list they are 10px dots.
 
 ### The graph ramp **NEW (role, derived, no new hues)**
@@ -584,7 +619,7 @@ gesture rather than sampled per move.
 | **Library** | Press's card language: covers-or-list toggle (persisted), mono micro-labels, hairline groups. Groups by **Reading · Finished · All**, with a Continue row at the top carrying the last book and its progress bar. **Ships with two books on it** — labelled `INCLUDED` in mono, removable, restorable; `SPEC.md` § 1. The first screen leads with a book, never with a button. |
 | **Import** | File picker, drag-and-drop anywhere, and the installed app registered as a **file handler** so a `.epub` opens straight into it. Import is never a modal wizard — a dropped file lands in the library and starts opening. |
 | **Collections** | Two per row on a phone, each a **plate** — a 4:5 surface holding up to three covers fanned symmetrically around a centred front one, with the count as a corner badge. See *The collections plate* below. The word is **Collections**, never Shelves. |
-| **Launch screen** | The mark, the **name**, one line saying what this is, and five formats in mono. No spinner and no version. Waits on the web fonts up to 1s and holds a 1.2s floor from navigation, then paints regardless. The native iOS launch image is the same lockup in the same units — see *The launch lockup* below. |
+| **Launch screen** | The mark, the **name**, a hairline rule, and one line saying what this is. No spinner and no version. Waits on the web fonts up to 1s and holds a 1.2s floor from navigation, then paints regardless. The native iOS launch image is the same lockup in the same units — see *The launch lockup* below. |
 | **Marks on paper** | Highlights and notes export as Markdown, plain text, JSON — and **PDF**, hand-written, base-14, no embedded font. See *Marks on paper* below. |
 
 ### The nav
@@ -661,56 +696,140 @@ verdict: *"I don't understand shelves. what it is used for?"* A shelf is furnitu
 a book sits, which is exactly what the app already decides for you. A collection says what the
 reader grouped and why. Renamed throughout: the label, the empty state, the route and the record.
 
+### The mark
+
+A **printer's lozenge with a lozenge counter** — one closed diamond with a smaller diamond
+punched out of it, geometric, symmetric on both axes, no colour of its own.
+
+```
+M256 48 L396 256 L256 464 L116 256 Z  M256 164 L194 256 L256 348 L318 256 Z
+```
+
+**It is not Press's rosette.** The owner: *"update the logo so it doesn't look exactly like
+flyleaf press."* These are three distinct products under one name, and the eReader gets its own
+mark. What it keeps is the *world* — a plain geometric printer's ornament, ink on paper, no fill
+and no rule of its own — and what it deliberately does not keep is the flower. Beside Press's
+ornate five-petal form it reads as the quieter of two siblings, which is the right relationship
+for the app that gets out of the way.
+
+**One `d` string, three consumers.** `app/src/components/Mark.tsx` exports `MARK`;
+`app/scripts/make-icons.mjs` and `app/index.html`'s inline splash carry the same string. None of
+them sets `fill-rule`, and they must not have to: the counter is a **second subpath with reversed
+winding** (`256,164 → 194,256 → 256,348 → 318,256` runs anticlockwise where the outer runs
+clockwise), so the default nonzero rule makes it a hole. Reverse either subpath and the counter
+fills in solid.
+
+**Two facts about the geometry are load-bearing.** The bounding box is `116–396 × 48–464`, so the
+ink is **280 wide × 416 tall** and fills **0.8125** of the 512 box — that fraction is `MARK_FRAC`
+in the generator, and `k = span / (512 × MARK_FRAC)` is what turns a requested ink span into a
+scale. A stale fraction silently rescales every icon (at the rosette's old `0.7575` this mark
+would come out 7% large). And it is symmetric about **both** `x=256` and `y=256` — the rosette was
+not vertically symmetric — which is what lets the generator centre the 512 box rather than
+measuring the ink.
+
+**Because the ink is tall and narrow, every fraction that was tuned for the rosette had to move.**
+A fraction sets the ink's *height*, and a 280×416 form at the same height as a near-square one
+reads appreciably lighter in a square tile. Install icons went `0.48 → 0.60`, maskable
+`0.36 → 0.44`, and the splash box `88px → 96px`. Measured on the output: install icons land at
+`0.603–0.609` of the box, maskable at `0.443`, ink centred to within the half-pixel of the bbox
+convention, and the maskable pair's furthest ink pixel sits at radius **0.221** of the width
+against Android's **0.40** safe-circle allowance — clear of every mask shape.
+
+**Sixteen other candidates were drawn and rejected across five rounds, and they failed on
+meaning, not craft.** Recorded so none of them is re-attempted: any rearrangement of Press's
+near-circular petal (rx 74.67 / ry 59.73, a ratio of only 1.25) reads as blobs; a four- or
+eight-pointed radial form reads as the **AI-sparkle glyph**, which is actively wrong for an app
+whose brief bans AI; a five-leaf ring is Press with pointed petals; leaves from a common base
+read as a **lotus or a spa**; a leaf over a dot reads as an **exclamation mark**; a disc with a
+leaf cut out reads as a **coffee bean**; a page-hole reads as a **D**; two offset lozenges
+collapse to a **lightning bolt** at 28px; a bar with a lozenge on it collapses to a **`+`** at
+18px; a lozenge on a rule risks reading as a **download glyph**; the asterism ⁂ reads as a
+**braille cell**; a plain lozenge is a **bullet**. A five-pointed star would have read as a
+rating and a six-pointed one as a snowflake. Every candidate was rendered at 112/56/28/18/14px on
+both grounds and judged beside the rosette; the winner is the one that survives to 14px with its
+counter still open.
+
+**There is no separate source SVG.** `assets/flyleaf-mark-source.svg` used to hold one — a copy
+of Press's tile, on a blue gradient sky this project's guardrails ban, whose own comment pointed
+at four files that do not exist in this repo. It is gone. `make-icons.mjs` emits
+`app/public/icons/icon.svg` from the same constant, so anything outside the build that needs a
+standalone file takes it from there. A second hand-typed copy of the path is the drift this
+section exists to prevent.
+
 ### The launch lockup
 
 Two screens have to be indistinguishable: the native iOS launch image, which appears instantly and
 which the app cannot draw, and the in-page `#splash`, which paints over it. Anything that differs
 between them shows up as a jump at the handoff — which is the one failure a launch image has.
 
-So they are the **same layout in the same units**. `#splash` draws the mark in an **88px** box, and
-the path fills **0.7575** of that box, so `SPLASH_SPAN = 88 × 0.7575` is the *drawn* height the
-generator must use, multiplied by each device's DPR. Using the box height instead is the bug that
-was there: every line came out 24% small and every gap 24% tight, and the two screens visibly
-disagreed.
+So they are the **same layout in the same units** — and how that is guaranteed is the substantive
+part. The generator does not hold a table of numbers *derived from* the CSS; it holds **the CSS
+itself** and solves the layout from it. `make-icons.mjs` has a `CSS` object transcribing
+`#splash`'s literals — box `96`, then each line's `margin-top`, `font-size`, `line-height`,
+`letter-spacing` and opacity — and a baseline solver that walks the stack the way the browser does.
 
-Every measurement in the generator is expressed in **spans** — multiples of that drawn mark height
-— rather than in pixels, so it holds at any DPR:
+| Element | CSS | Baseline solved as |
+|---|---|---|
+| mark | `96px` box, ink `0.8125` of it | box top is the cursor origin |
+| `Flyleaf eReader` | Playfair 500, `30px/1.1`, `-.008em`, `margin-top:24` | `lineTop + ⌊(box − (asc+desc))/2⌋ + asc` |
+| the rule | `40 × 1px`, `currentColor` at `.18`, `margin-top:22` | drawn as a rect at the cursor |
+| `READ WHAT YOU OWN` | Archivo 500, `11px/1.6`, `.16em`, `.55`, `margin-top:20` | same solver |
 
-| Line | Size | Tracking | Baseline |
-|---|---|---|---|
-| `Flyleaf eReader` (Playfair) | 0.3750 | 0 | 0.6901 |
-| `READ WHAT YOU OWN` (Archivo) | 0.1800 | 0.0180 | 1.1176 |
-| `EPUB · MOBI · AZW3 · FB2 · PDF` (Plex Mono) | 0.1650 | 0.0099 | 1.6155 |
+**The solver reproduces Blink's arithmetic, which was measured rather than read off a spec.**
+Ideal-real arithmetic put the two baselines **0.97px and 0.47px low**. Blink actually (a) rounds
+each font metric to a whole CSS pixel, (b) **floors** the half-leading, and (c) quantises the line
+box to **1/64px** — `11 × 1.6` is `17.59375` on screen, not `17.6`. With hhea metrics (Playfair
+`1082/−251`, Archivo `878/−210` per 1000 upem) that reproduces the measured baselines exactly. Use
+hhea, not winAscent, which puts the name a further 1.6px low.
 
-The block is **3.00 spans** from box top to the last line's line-box bottom, which is what centres
-it in the generator the way flex centres it in the page. Re-derive by reading the baselines off the
-live overlay, never by eye.
+**Why it is structured that way, and not as a table of spans.** The old form expressed every
+measurement in *spans* — multiples of the drawn mark height — and the class of bug that produces
+has now bitten twice, in opposite directions. Once by feeding CSS-over-88 fractions into a
+span-scaled layout, which came out **24% small**. Once by pinning the whole layout to the mark's
+ink height, so **redrawing the mark silently resized the wordmark** — exactly what happened when
+the rosette became a lozenge 280 wide to 416 tall. The fraction now cancels where it should
+(`SPLASH_SPAN = CSS.box × MARK_FRAC` makes `k = box/512` and `u = dpr`) and applies where it should
+(icons, where `span = min(w,h) × frac`).
+
+**Verified by pixel comparison, not by eye.** `main.tsx` removes the `#splash` div but leaves its
+inline CSS in `<head>`, so the check loads the built app, waits on `document.fonts.ready`, removes
+any surviving `#splash`, re-appends a fresh one with the same markup — which gives the real cascade
+with the real faces — then measures and screenshots it. At 390×844 dpr 3: svg box `96px`, block
+height `213.59` against the generator's `213.6`, name baseline `148.0`, claim baseline `208.0`.
+Diffing the generated `launch-1170x2532.png` against that screenshot puts the ink extents at
+`973–1570` and `972–1569` — **one device pixel** over a 598px block, with the 0.42% differing
+pixels confined to the ink rows and columns, i.e. glyph rasterisation, not layout.
 
 **Why the words are there at all.** It read *"Flyleaf"* over a line about the device, which named
 the family and the privacy promise and never once said the thing you were waiting for was an
 ereader — a cold start looked like Press loading slowly. The owner: *"the splash screen also
-doesn't register that this is an ebook reader."* The name carries it now, and the format list
-settles the question before the app has painted a page.
+doesn't register that this is an ebook reader."* The name carries it now, and settles it
+before the app has painted a page.
 
 **The middle line is a claim, not an instruction.** It read *"OPEN A BOOK FILE AND READ IT"*, which
 is a description of the mechanic — and worse, a command issued to somebody who has already opened
 the app. The owner: *"the splash screen is painful, what do you mean open a book and read it as a
 tagline."* It is **`READ WHAT YOU OWN`** now: the same three words the product is actually built on
 — local files, no store, no account, and a DRM'd file refused rather than rented. The line above it
-says what this is and the line below says what it eats, so the middle line is free to say *why*.
-It measures **151.1px** against the 281.8px available inside the lockup at the 320px floor, against
-the old line's 28 characters, so the wrap risk that governs the format line does not arise here.
+says what this is, so this one is free to say *why*. It measures **151.1px** against the 281.8px
+available inside the lockup at the 320px floor, so it does not come near wrapping.
 
-**Five formats, not six, and not the nine the app reads.** Six measured **261px** against the
-256px available inside the 32px padding at **320px** — the narrowest phone supported, and the one
-the first note forgot, having checked 375 and called it the floor. Five measures 218px there. It
-reads as "these among others", which is what it is; the exhaustive list is in Settings, where
-there is width for it. The format line must never wrap: a list broken over two lines reads as
-prose that ran out of room.
+**The format list is gone, and a hairline rule took its place.** It read `EPUB · MOBI · AZW3 · FB2
+· PDF` in mono under the tagline, sized so that five extensions cleared the 320px floor where six
+measured 261px against 256px available. It is out. Three stacked text lines under a mark is a
+**manifest, not a welcome**, and the extension list was the weakest of the three: it answered a
+question nobody has got to yet, on the one screen where a reader is not choosing anything.
+Everything it was defending against — *"is this Press loading slowly?"* — the word **eReader** in
+the name already settles. Dropping it also retires a whole third typeface from the critical path
+(IBM Plex Mono) and the no-wrap constraint that pinned the lockup's width to what a list of
+extensions measured at 320px. What replaced it is **1px**: a 40px rule at `currentColor` `.18`. It
+separates the identity from the statement about it — the one hierarchy this screen has — and
+derives from the ground, so it needs no token of its own on either scheme. If the format list comes
+back it belongs on **Home**, beside the import control, where a reader is actually choosing a file.
 
-**The mono is a different voice on purpose.** The line above it is a sentence; this one is a list
-of file extensions. Setting them identically — as Press sets its two lines — reads as one wrapped
-paragraph.
+**And the mark's box grew, 88px → 96px.** Not a restyle: the lozenge is 280 wide to 416 tall where
+the rosette was near-square, so at equal box height it reads appreciably lighter. 96 puts its ink
+at 78 × 52px, which carries the weight on screen that the rosette's 67px did.
 
 **Local font stacks only.** The web fonts are still in flight at this point, and a swap mid-fade
 is worse than the fallback. The exit is **420ms**, under the 600ms hard removal in `main.tsx` that

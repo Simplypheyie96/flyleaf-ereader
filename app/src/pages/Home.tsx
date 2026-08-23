@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, localDay, readingSince } from '../db'
 import { percent, remember, shortDate, stored } from '../lib'
 import { Cover } from '../components/Cover'
+import { InstallStrip } from '../components/InstallStrip'
 import { GridIcon, HomeIcon, ListIcon, StatsIcon } from '../components/icons'
 import type { Book, Locator } from '../types'
 
@@ -110,9 +111,11 @@ export function Home() {
     <main className="page">
       <div className="page-inner">
         <header className="app-head">
-          <h1>Flyleaf</h1>
+          <h1>Flyleaf eReader</h1>
           <p className="app-sub">{greeting(feed)}</p>
         </header>
+
+        <InstallStrip />
 
         {reading.length === 0 && fresh.length === 0 ? (
           <div className="empty">
@@ -120,7 +123,7 @@ export function Home() {
             <h2>Nothing to read yet</h2>
             <p>
               Nothing here yet. Open a file from this device — EPUB, MOBI, AZW3, FB2, TXT,
-              Markdown, HTML or PDF — or put the two books Flyleaf ships with back in your library.
+              Markdown, HTML or PDF — or put the two books it ships with back in your library.
             </p>
             <div className="empty-do">
               <Link className="btn" to="/open">Open a book</Link>
@@ -295,7 +298,7 @@ function hm(ms: number): string {
     evening" is guessing at both the hour and the mood, and gets one of them
     wrong. What it says instead is the one thing the reader might not know. */
 function greeting(feed: Feed): string {
-  if (feed.reading.length === 0) return 'Your library, on this device, offline.'
+  if (feed.reading.length === 0) return 'Your library, on this device.'
   if (feed.week >= 60_000) return `${hm(feed.week)} read this week.`
   if (feed.reading.length === 1) return 'Pick up where you left off.'
   return `${feed.reading.length} books on the go.`

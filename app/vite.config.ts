@@ -102,7 +102,7 @@ export default defineConfig({
       manifest: {
         id: '/',
         name: 'Flyleaf eReader',
-        short_name: 'Flyleaf Read',
+        short_name: 'Flyleaf eReader',
         description: 'Read what you own. EPUB, MOBI, AZW3, FB2, PDF — paginated, offline, no account.',
         lang: 'en',
         dir: 'ltr',

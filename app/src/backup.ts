@@ -164,13 +164,13 @@ export async function exportBackup(now: number): Promise<{ blob: Blob; summary: 
    is a sentence a reader can act on, and a stack trace is not. */
 async function readHeader(file: Blob): Promise<{ header: Header; at: number }> {
     const head = new Uint8Array(await file.slice(0, MAGIC.length + 4).arrayBuffer())
-    if (head.byteLength < MAGIC.length + 4) throw new BackupRefused('That file is too small to be a Flyleaf backup.')
+    if (head.byteLength < MAGIC.length + 4) throw new BackupRefused('That file is too small to be a Flyleaf eReader backup.')
     const magic = new TextDecoder().decode(head.subarray(0, MAGIC.length))
     if (magic !== MAGIC) {
         throw new BackupRefused(
             magic.startsWith('FLYLEAF-BACKUP-')
-                ? 'That backup was written by a newer version of Flyleaf than this one. Update the app, then try again.'
-                : 'That is not a Flyleaf backup file.',
+                ? 'That backup was written by a newer version of Flyleaf eReader than this one. Update the app, then try again.'
+                : 'That is not a Flyleaf eReader backup file.',
         )
     }
     const len = new DataView(head.buffer, head.byteOffset + MAGIC.length, 4).getUint32(0, true)
@@ -184,7 +184,7 @@ async function readHeader(file: Blob): Promise<{ header: Header; at: number }> {
         throw new BackupRefused('That backup file is damaged — its index is unreadable.')
     }
     if (header?.format !== 'flyleaf-backup' || header.version !== 1)
-        throw new BackupRefused('That is not a Flyleaf backup file.')
+        throw new BackupRefused('That is not a Flyleaf eReader backup file.')
     return { header, at: at + len }
 }
 

@@ -18,11 +18,25 @@ export type ImportOptions = {
   /** a fixed id, for the included books. Everything else gets a UUID. */
   id?: string
   seeded?: boolean
+  /** How many zips we have already opened to get here. See the unwrap below. */
+  depth?: number
 }
 
 export async function importFile(file: File, options: ImportOptions = {}): Promise<ImportResult> {
   const sniffed = await sniff(file)
   if (!sniffed.ok) {
+    /* A zip with one book in it. The sniff has already pulled the book out, so
+       import that instead of telling somebody about the bag it came in --
+       archived downloads are the normal case, not a mistake to be corrected.
+
+       Once, and once only. A zip inside a zip inside a zip is either a mistake
+       or somebody testing us, and either way one level is the whole of the
+       helpful behaviour; past that the honest answer is that this is a zip. */
+    if (sniffed.reason === 'wrapped') {
+      return (options.depth ?? 0) === 0
+        ? await importFile(sniffed.inner, { ...options, depth: 1 })
+        : { ok: false, reason: 'unsupported', name: file.name, what: 'a zip inside a zip' }
+    }
     return sniffed.reason === 'drm'
       ? { ok: false, reason: 'drm', name: file.name }
       : { ok: false, reason: 'unsupported', name: file.name, what: sniffed.what }

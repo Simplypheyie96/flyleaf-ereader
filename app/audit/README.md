@@ -1,6 +1,6 @@
 # The measured audit
 
-Twenty-one drivers over one probe. Run them against a **production preview**, not the dev
+Twenty-five drivers over one probe. Run them against a **production preview**, not the dev
 server — the service worker, the split parser chunks and the real font files only
 exist in a build, and several of the checks are about exactly those.
 
@@ -30,13 +30,30 @@ node audit/ramp.mjs        # the graph ramp: type on a wash, marks on their trac
 node audit/marks.mjs       # selection, highlights, notes, bookmarks, search
 ```
 
-One driver per format that does not go through the EPUB path:
+Formats. `formats.mjs` is the breadth check — one of every declared format imported
+through the real file input and opened in the real reader, plus the four archive shapes
+that must stay refused. The other three go deep on a format that takes its own path
+through the engine:
 
 ```
+node audit/formats.mjs     # the matrix: 11 files, 9 formats, 4 refusals, one pass
 node audit/text.mjs        # TXT, Markdown and a lone HTML file, end to end
 node audit/mobi.mjs        # MOBI 6, incl. the script sandbox — needs the fixture below
 node audit/pdf.mjs         # the pdfjs view against a fixture whose answers are known
 ```
+
+`formats.mjs` exists because a valid EPUB was refused in the reader's hands with
+"Flyleaf does not read a zip file" — `sniffZip` looked for the plain string
+`application/epub+zip` in the first 200 bytes, which any re-zipped EPUB fails, while the
+engine behind it opens an EPUB by reading `META-INF/container.xml` and never looks at the
+mimetype entry at all. One format's sniff can be wrong for months without a driver that
+opens one of each and says so.
+
+**AZW3/KF8 is declared and untested.** There is no fixture for it, because no MOBI/KF8
+writer exists on this machine — `ebook-convert`, `kindlegen` and `calibre` are all
+absent. `formats.mjs` prints it under `UNCOVERED` on every run rather than leaving the
+gap silent. It is the one format whose "it works" rests on the vendored parser's history
+instead of a measurement taken here.
 
 The gate:
 
@@ -44,7 +61,53 @@ The gate:
 node audit/a11y.mjs        # the half of accessibility that has no geometry
 node audit/panels.mjs      # every panel Settings ships is on screen, the Drive gate included
 node audit/backup.mjs      # the backup round trip, across two browser contexts
+node audit/install.mjs     # the install ask on Home, in all four of its branches
+node audit/tip.mjs         # the tip jar, up to but never through a charge
+node audit/phone.mjs       # the phone test, emulated: 4x CPU, touch, the 4MB EPUB
 ```
+
+`install.mjs`, `tip.mjs` and `phone.mjs` are the three drivers that cannot test the
+whole path, and all three say so rather than implying they did.
+
+`install.mjs` dispatches a **synthetic** `beforeinstallprompt`, because Chromium never
+fires a real one headlessly — there is no flag for it and the engagement heuristics do
+not run. Our branch, our button and our `prompt()` call are genuinely exercised;
+Chrome's decision to offer the install is faked. Its negatives are the valuable half:
+nothing shown before a prompt is held, nothing when `display-mode: standalone`, nothing
+after a dismissal survives a reload, and no button at all on iOS, where there is nothing
+a button could do.
+
+`tip.mjs` stops at "the sheet would open". The Paystack key is live, so the driver
+proves the SDK loaded and a popup handler exists and goes no further; a charge is not a
+test result.
+
+`phone.mjs` is not the phone test. CLAUDE.md asks for a real device, throttled, with a
+4MB EPUB; this machine has no simulator (`xcrun simctl` is absent — the toolchain is
+CommandLineTools, not full Xcode) and the simulator MCP cannot drive a physical phone at
+all. So the driver does the emulated half honestly: a 390x844 viewport at 3x with touch,
+a 4x CPU throttle, and `big.epub`. It reports cold open, the launch screen, warm reopen,
+the per-frame cost of three real touch drags, and whether a book opens with the network
+cut — and every budget in it is labelled an emulation budget, because a Chromium number
+on a laptop is evidence and not a certificate. The owner's real-device checklist is
+`SPEC.md` § 11.1.
+
+Its most useful measurement is the cheapest: warm-versus-cold. A reopen that costs most
+of a cold open means the 4MB file is being re-parsed, which is the one failure the
+throttle makes unmissable and an unthrottled run hides completely.
+
+**Read it before you believe it.** Four of this driver's first findings were the driver
+and not the app, and the shape of it is now baked into the file's comments so nobody
+"corrects" them back:
+
+- the finger comes from the pointer events the *page* receives, and from `screenX` —
+  `clientX` is frozen inside a paginated section iframe (measured: 1711.59 for every move
+  of a 224px drag), which is exactly why `turn.ts:147-155` is screen-measured;
+- drift is anchored at the claim, because `turn.ts`'s hysteresis is required behaviour and
+  reads as a tracking failure when measured from touchstart;
+- `dragSlow` is a permanent control that separates sampling latency from a trailing layer;
+- and the open has four clocks — import, cold open, boot, launch screen, warm open —
+  because one clock charged a deliberate 1.2s launch screen to the book and called it a
+  re-parse. `SPEC.md` § 11.2 has that one in full, including the tap it used to eat.
 
 `audit/fixtures/` holds the files the format drivers open. Four are checked in
 (`fixture.txt`, `fixture.md`, `fixture.html`, `measured-page.pdf`); two are generated,
@@ -53,7 +116,26 @@ because no MOBI writer and no EPUB writer exist on this machine:
 ```
 node audit/fixtures/make-mobi.mjs        # fixture.mobi — PalmDB + PalmDOC + MOBI 6 + EXTH
 node audit/fixtures/make-inked-book.mjs  # inked.epub — an EPUB that fights the stock
+node audit/fixtures/make-fb2.mjs         # fixture.fb2 + fixture.fbz — FictionBook 2
+node audit/fixtures/make-zip-shapes.mjs  # the six awkward archives formats.mjs opens
+node audit/fixtures/make-big.mjs         # big.epub — the 4MB book, grown from the seed
 ```
+
+`make-big.mjs` is why there is no 4MB binary in git. It duplicates the seed book's
+chapters into extra spine sections until the zip clears 4MB — many ordinary sections
+rather than one huge file, because the paginator's cost is per section and a single 4MB
+chapter would measure the wrong thing.
+
+`make-zip-shapes.mjs` is the regression suite for `src/import/sniff.ts`, and it is built
+from the shipped Time Machine so the expected title needs no second source of truth:
+`rezipped.epub` (deflated mimetype, not first — the shape that was refused),
+`wrapped.zip` (one book in a bag), `twobooks.zip`, `comic.zip`, `junk.zip`, and
+`truncated.epub` — a conforming 40KB head with no central directory, which is what a
+cancelled download leaves behind and which used to import as a book titled "truncated".
+
+`make-fb2.mjs` writes the `.fbz` with its `.fb2` deflated and second in the directory,
+deliberately: that is the entry order that broke EPUB, and FBZ is sniffed by the same
+function.
 
 `inked.epub` is what `darkstock.mjs` measures, and it exists because TXT, Markdown and
 HTML all have their `style` and `class` attributes stripped by `reader/textBook.ts` —
