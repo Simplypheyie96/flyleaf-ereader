@@ -431,9 +431,10 @@ export async function forgetDrive(interactive = false): Promise<number> {
   pauseAutoSync()
   try {
     if (!tokenHeld() && interactive) await signIn()
-    /* `ours` and not everything in the folder — Flyleaf Press's backup lives
-       in the same hidden folder and is not this app's to delete. See the note
-       on `dropAll`. */
+    /* `ours` and not everything in the folder. The folder is this app's alone
+       now, so the two agree — but they did not when the client was shared with
+       Flyleaf Press, and a sibling's backup is never this app's to delete. See
+       the note on `dropAll`. */
     const count = await dropAll(await silentToken(), ours)
     /* The marks described files that no longer exist. Left behind, a later
        reconnection could match one and skip the transfer that would have put

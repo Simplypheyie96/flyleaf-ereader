@@ -76,29 +76,6 @@
   --ease:cubic-bezier(.2,0,0,1);
   --gutter:32px;
 
-  /* ── NEW: the chrome measure ───────────────────────────────────────────
-     Press has no token for this because Press's prose lives on printed
-     cards of a fixed width; here the same paragraph is set in a 634px
-     settings panel, a 680px page column and a 320px reader sheet, and every
-     one of those had its own hand-picked cap — 34ch, 46ch, 52ch, 56ch, 62ch
-     — none of them related to the box it ended up in.
-
-     Measured, on the built app, at 1280 and 1024: .fine dd stopped at 452px
-     inside a 634px panel (29% of the box empty), .tip-head .ui-p at 340px
-     inside 582px (46% empty) and .app-sub at 383px inside 680px (44%
-     empty). All three read as a bug rather than as a measure — which is the
-     complaint, in the owner's words, that this "is such a reoccuring
-     problem".
-
-     74ch is the top of the comfortable 60–75 range, so it is still a
-     measure and not "fill the box": at 13px it lands at ~551px, which is
-     87% of the settings panel and 81% of the page column. Wide contexts get
-     this token; the genuinely narrow ones — a centred refusal, an empty
-     state, the PDF sheet's lede — keep their own tighter caps, because a
-     34ch block in a 320px box was never the bug and widening it would be a
-     change nothing measured. audit/measure.mjs is the check. */
-  --measure:74ch;
-
   /* ── NEW: the page turn ────────────────────────────────────────────────
      The only easing in either app that is not --ease. A turn is a thrown
      object coming to rest, not a UI transition: --ease decelerates from a
@@ -528,6 +505,28 @@ body::before{
   display:flex; flex-direction:column; align-items:center;
   overflow-x:clip;
 }
+ /* The measure lives HERE, on the container, and nowhere else.
+
+    Two rounds of this went the other way — a per-paragraph cap, tuned from
+    34ch up to 74ch — and both were wrong for the same reason. A cap inside a
+    box that is already capped either does nothing or stops the text short of
+    an edge every neighbouring block reaches, and it was the second case the
+    owner kept seeing: measured on the built app at 1280 and 1024, eight
+    uncapped .ui-p in a 636px settings panel filled to 613–624px while the
+    five capped .fine dd beside them stopped at 528–549px. A 90px step-in on
+    five paragraphs out of thirteen is what reads as broken. A single measure
+    that every paragraph shares does not, at either width.
+
+    So: this column is 680px (620px on a detail page, 720px in the reader
+    sheet), which at 13px is ~78ch of prose after panel padding — the top of
+    the comfortable band — and prose fills the box it is given. Do not add
+    max-width to a paragraph inside .page-inner or .sheet-body; narrow the
+    container instead if a narrower measure is wanted. audit/measure.mjs
+    fails the build on any block leaving more than 5% of its host empty.
+
+    The two deliberate exceptions are centred: .drop-lead on /open and the
+    empty states, where a narrower column inside a centred card is the point
+    and the space sits evenly on both sides rather than piling on one. */
 .page-inner{ width:100%; max-width:680px; }
 /* Only when the page is showing an empty state: scoped with :has so the fill
    follows the content rather than the page having to remember to ask for it. */
@@ -879,10 +878,6 @@ body::before{
   background:var(--wash); color:var(--ink);
 }
 .tip-mark > svg{ width:20px; height:20px; }
-/* 46ch on the paragraph beside a 38px mark: the text column is already inset,
-   and left uncapped it ran to the full panel width on a tablet. */
-.tip-head .ui-p{ max-width:var(--measure); }
-
 /* Three amounts in a row that wraps rather than shrinks — a ₦10,000 pill
    squeezed to fit beside two others is unreadable at exactly the moment
    somebody is choosing a number. */
@@ -944,10 +939,10 @@ body::before{
 
 /* Three notes, three jobs, and they are deliberately not one class: the floor
    is a fact about Paystack, the failure is a thing that just happened, and the
-   fine print is a standing reassurance. Same 52ch cap as .ctl-note. */
-.tip-note{ margin:14px 0 0; max-width:var(--measure); }
-.tip-why{ margin:14px 0 0; max-width:var(--measure); color:var(--danger); }
-.tip-fine{ margin:14px 0 0; max-width:var(--measure); font-size:12.5px; }
+   fine print is a standing reassurance. */
+.tip-note{ margin:14px 0 0; }
+.tip-why{ margin:14px 0 0; color:var(--danger); }
+.tip-fine{ margin:14px 0 0; font-size:12.5px; }
 
 /* ── the small print ───────────────────────────────────────────────────────
    A definition list, because that is what it is: five things, each named and
@@ -963,12 +958,10 @@ body::before{
 .fine dt:first-of-type{ margin-top:0; }
 .fine dd{
   margin:5px 0 0; font-size:13px; line-height:1.55; color:var(--ink-soft);
-  /* Capped in the panel as well as on the page: these are the longest
-     paragraphs in Settings, and at 1280px the panel is wide enough to run them
-     past a comfortable measure. The cap is the shared one — at 62ch these
-     stopped 182px short of the panel's edge, which read as a broken column
-     rather than as a measure. */
-  max-width:var(--measure);
+  /* Uncapped on purpose: these are the longest paragraphs in Settings and they
+     sit beside eight uncapped .ui-p in the same 636px panel. Any cap here is
+     the step-in the owner reported twice. The panel is the measure. */
+  text-wrap:pretty;
 }
 .fine-name{ font-family:var(--mono); font-size:12px; }
 
@@ -2045,7 +2038,7 @@ body::before{
 }
 .ctl-opts{ display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
 .ctl-note{
-  margin:8px 0 0; max-width:var(--measure);
+  margin:8px 0 0;
   font-family:var(--sans); font-size:12px; line-height:1.45; color:var(--ink-soft);
 }
 
@@ -2797,7 +2790,7 @@ body::before{
 
 .app-sub{
   font-size:13px; line-height:1.5; color:var(--ink-soft);
-  flex:1 1 100%; margin-top:2px; max-width:var(--measure);
+  flex:1 1 100%; margin-top:2px;
 }
 
 /* Four figures, two up on a phone. minmax(0,1fr) rather than 1fr so a long
@@ -3560,14 +3553,13 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
   margin-top:18px; padding-top:16px;
   border-top:1px solid var(--rule);
 }
-/* The shared measure, matching .ctl-note: a one-line explanation set to the
-   full panel width is a line the eye has to track back across for no reason —
-   but 52ch in a 634px panel was leaving a third of the box empty. */
-.collect-note{ margin:16px 0 0; max-width:var(--measure); }
+/* No cap: a one-line explanation under a control row belongs on the same left
+   and right edges as the row it explains. */
+.collect-note{ margin:16px 0 0; }
 /* Between the label and the chips: this says what a collection IS, so it sits
    above the controls rather than under them, and .seg's own 18px top margin
    supplies the gap below it. */
-.collect-intro{ margin:8px 0 0; max-width:var(--measure); }
+.collect-intro{ margin:8px 0 0; }
 
 /* A radio row in the shared menu. The tick column is always there whether or
    not the tick is drawn — see the note in Menu.tsx. */

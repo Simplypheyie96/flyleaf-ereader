@@ -1093,78 +1093,89 @@ real, and Chrome's own decision to offer the install is the part no driver here 
 
 ---
 
-## 15. Google Drive sync (built, and dormant until one env var is set)
+## 15. Google Drive sync (built, visible, and never yet run against a real Drive)
 
 The one networked feature in the app, and it is built so that the sentence *"no feature that needs
 a network to work"* stays true: the reader who never connects is not an unsynced reader, they are
 a reader we have no record of at all. Nothing signs in on their behalf, nothing nags, and there is
 no wall. Connecting changes **where the library is copied to**. It does not change what the app is.
 
-### 15.1 Visible now, and the one step left
+### 15.1 Its own client, in its own project
 
 `SYNC_AVAILABLE` in `src/sync/google.ts` is `CLIENT_ID.length > 0`, and `SyncPanel` returns `null`
 when it is false. For a long while it was false everywhere: the ID was commented out in
 `app/.env.example`, unset locally and unset on the deploy, so the panel hid itself and the owner
 asked *"where is google sync?"* three times running. Hiding a shipped feature is not an answer to
-that question, so the ID is now set in `app/.env.local` and in the Vercel project across all three
+that question, so the ID is set in `app/.env.local` and in the Vercel project across all three
 environments, and the panel renders — measured on the live site at `read.flyleaf.cc/settings`.
+
+**And it is now this app's own ID, on this app's own client, in this app's own Google Cloud
+project.** It used to be Flyleaf Press's, shared. That was a defensible call, it was wrong for two
+specific reasons, and both are recorded below rather than summarised away, because the reasoning is
+the only thing that stops it being re-shared later.
+
+```
+project            Flyleaf eReader        (id: flyleaf-ereader, no organisation)
+client             Flyleaf eReader web    (type: Web application)
+client id          1093925806507-geheiusfcb8belpi6bdpl6p8afi74g99.apps.googleusercontent.com
+created            23 Aug 2026 16:30 GMT+1 · status Enabled
+consent screen     "Flyleaf eReader" · External · Testing · 1 test user (cap 100)
+scopes             .../auth/drive.appdata · .../auth/userinfo.email — both non-sensitive
+```
 
 The ID is **public by design** and safe in a repo, a bundle and an env var; there is nothing in it
 to rotate or leak. Google's browser token flow has no client secret, so the only thing standing
 between that ID and any other site is the OAuth client's **Authorized JavaScript origins** list.
+Google did display a client secret when the client was created; the app has no use for it, it was
+not recorded anywhere, and it must not be.
 
-**That list is now set.** All four are registered on the client:
-
-```
-http://localhost:5173      http://localhost:4173
-https://read.flyleaf.cc    https://flyleaf-ereader.vercel.app
-```
-
-It was written here for a long time as *"the one step left, and the owner's alone — it cannot be
-reached from here"*, and that was wrong in a way worth recording, because the reasoning behind it
-looked sound. The checks that produced it were real — there is no `gcloud` on this machine, and
-Google exposes no API for a client's authorised origins — but they answered the wrong question.
-Signing in to the Console is something this tooling neither does nor should do; **using a session
-the owner had already signed in to, in their own browser, at their explicit and repeated request,
-is a different act.** The list was added that way on 23 Aug 2026 and verified by reloading the
-client page and reading the six rows back:
+**All four origins were registered when the client was created**, so this app has never had the
+missing-origin failure on its own credentials:
 
 | # | Origin | For |
 |---|---|---|
-| 1 | `https://press.flyleaf.cc` | Press — **pre-existing, untouched** |
-| 2 | `http://localhost:5210` | Press's dev server — **pre-existing, untouched** |
-| 3 | `https://read.flyleaf.cc` | this app, production |
-| 4 | `https://flyleaf-ereader.vercel.app` | this app, the Vercel origin |
-| 5 | `http://localhost:4173` | `vite preview`, which is what the audit drivers run against |
-| 6 | `http://localhost:5173` | `vite dev` |
+| 1 | `https://read.flyleaf.cc` | production |
+| 2 | `https://flyleaf-ereader.vercel.app` | the Vercel origin |
+| 3 | `http://localhost:4173` | `vite preview`, which is what the audit drivers run against |
+| 4 | `http://localhost:5173` | `vite dev` |
 
-**Authorised redirect URIs was left empty**, deliberately and per step 5 below: the token flow is
-origin-checked, so a redirect URI there would do nothing and could only break Press.
+**Authorised redirect URIs is empty**, deliberately: the token flow is origin-checked, not
+redirect-checked, so a redirect URI there would do nothing.
 
-Until they are added, pressing Connect fails. **Measured**, not assumed: driving the real button at
-`localhost:4173` opens Google's own error page at
-`accounts.google.com/signin/oauth/error?authError=…`, which decodes to `origin_mismatch` —
-*"You can't sign in to this app because it doesn't comply with Google's OAuth 2.0 policy. If you're
-the app developer, register the…"*.
+Google classified **both scopes as non-sensitive** — read off the consent screen's own tables, with
+the sensitive and restricted tables empty. An earlier version of this document assumed
+`drive.appdata` was sensitive and that a published app would therefore need Google's verification
+review. It is not, and the assumption is corrected here rather than quietly deleted.
 
-**And that failure used to lie.** `origin_mismatch` reaches the SDK as `popup_closed`, because
-Google paints its error page in the popup and all the SDK sees is the window going away. So the
-panel said *"Sign-in was closed before it finished"* — blaming the reader for a console setting.
-The two are now told apart by the clock: a person deciding to close a window takes at least a
-second or two, while the error page is reported back almost immediately, so under **1200ms** the
-message instead names the cause and the exact origin — *"Google turned this away:
-https://read.flyleaf.cc is not an authorised origin on the sync app's Google credentials."*
+The consent screen is in **Testing**, audience **External**, with `ajayifey@gmail.com` as its one
+test user. Testing is not a limitation to fix: it means the owner's own account, and any address
+listed as a test user, signs in without going near a review. Publishing is a Google review, not a
+switch, and it is a question for the day this is offered to other people.
 
-The ID itself is **public by design** and safe in a repo, a bundle and an env var; there is nothing
-in it to rotate or leak. It is the same client Flyleaf Press already uses, so both apps share one
-consent screen. The scopes are `drive.appdata` — a hidden folder, *not* the reader's Drive, which we
-cannot see outside of — and `userinfo.email`, only so the panel can name the account.
+**One thing is still open at Google.** The audience page reports *"Your app's OAuth configuration is
+incomplete… Please visit the Branding page to finish configuring your app."* The Branding page never
+loaded to be read — the browser tab wedged on `chrome-error://chromewebdata/` three times, while
+`curl` reached `console.cloud.google.com` fine from the same machine, so it is the bridge and not the
+network. It does not block anything measured here: the client is Enabled, the scopes are registered
+and the origins are live. It is written down because an unread warning is not a cleared one.
 
-#### What sharing the client actually shares
+#### How the failure used to lie
 
-Called a "per-app folder" everywhere including, until now, this document. It is not. **`appDataFolder`
-is scoped to the OAuth client**, and sharing the client therefore shares the folder. One client, one
-hidden folder, and both products' documents sitting in it:
+Before the origins existed, pressing Connect failed, and the failure **lied about why**.
+`origin_mismatch` reaches the SDK as `popup_closed`, because Google paints its error page in the
+popup and all the SDK sees is the window going away. So the panel said *"Sign-in was closed before
+it finished"* — blaming the reader for a console setting. The two are now told apart by the clock: a
+person deciding to close a window takes at least a second or two, while the error page is reported
+back almost immediately, so under **1200ms** the message instead names the cause and the exact
+origin — *"Google turned this away: https://read.flyleaf.cc is not an authorised origin on the sync
+app's Google credentials."* Kept, because it is the message that makes a mistyped origin a one-pass
+fix instead of a four-pass guess.
+
+#### What sharing a client actually shared
+
+Called a "per-app folder" everywhere including, until this was understood, this document. It is not.
+**`appDataFolder` is scoped to the OAuth client**, and sharing the client therefore shares the
+folder. One client, one hidden folder, and both products' documents sitting in it:
 
 | File | Written by |
 |---|---|
@@ -1181,20 +1192,19 @@ be parsed, overwritten, or counted as the other's.
 
 **Deleting was.** `dropAll` took *every file in the folder*, and the comment above it argued for
 exactly that — an old name or a half-written upload cannot be left behind claiming to be a backup if
-nothing is left behind at all. Sound reasoning about a folder you own alone, and this is not one. The
-consequence was that **"remove the copy from my Drive" in the reading app deleted Flyleaf Press's
+nothing is left behind at all. Sound reasoning about a folder you own alone, and that was not one.
+The consequence was that **"remove the copy from my Drive" in the reading app deleted Flyleaf Press's
 entire cloud backup**, in one press, with no warning, and the sentence shown afterwards — *"The copy
 was removed from your Drive. Your library here is untouched."* — was true of this app and false of
-the other one. Press's own equivalent, `dropLibraries`, is the exact mirror of it and does the same
-thing in the other direction.
+the other one.
 
 Nothing about it looked wrong in the source, which is the part worth keeping. Both functions read
 correctly, both were well argued, and the bug lived entirely in an assumption about Google's
 scoping that neither file stated. It was found by the owner asking whether sharing one client could
 let two products touch each other's contents.
 
-**The fix is ownership, and it needs two halves.** `ours` in `record.ts` decides, and `dropAll` now
-takes it as an argument rather than deleting on its own authority:
+**The fix is ownership.** `ours` in `record.ts` decides, and `dropAll` takes it as an argument
+rather than deleting on its own authority:
 
 - **The tag.** Every file written from this app carries `appProperties.app = 'ereader'`. A file
   tagged as another app's is never ours to delete *whatever it is called*, so renaming a document in
@@ -1220,11 +1230,93 @@ with only Dexie stubbed, so a rename in `drive.ts` fails the driver instead of q
 There is no browser in it and no click to make: signing in to a real Drive is the one thing an audit
 run must not do, so the folder is synthetic and the predicate is real.
 
-**The other half of this is Press's, and it is not fixed by this repo.** `dropLibraries` in
-`../Review app/app/src/sync/drive.ts` still deletes everything in the folder, so Press's "remove the
-copy" still takes this app's shelf, marks, position and every backed-up book with it. It needs the
-mirror of the change above — its own `APP = 'press'` tag and a `name = 'library.json'` bridge — and
-it is a different product with its own deploy, so it is not changed here on this app's say-so.
+**With a client of its own, none of that is load-bearing any more, and all of it stays.** A separate
+client means a separate folder, so `ours` now matches everything in it and the tag is insurance
+against ever sharing again. The undeduped-listing fix was a real bug regardless of who else was in
+the folder.
+
+**Press's half is now hygiene rather than urgency.** `dropLibraries` in
+`../Review app/app/src/sync/drive.ts` still deletes everything in *its* folder, and that folder no
+longer contains anything of this app's, so it can no longer take this app's shelf, marks, position
+or books with it. It still wants the mirror of the change above — its own `APP = 'press'` tag and a
+`name = 'library.json'` bridge — because the Flyleaf journal is a third product that could one day
+share a client. It is a different product with its own deploy, so it is not shipped here on this
+app's say-so.
+
+#### Why its own client, and why now rather than later
+
+What sharing bought was real: one consent screen, so a reader who has already granted Drive access
+in Press gets a token here with no second prompt; one origins list; and one review, if a review is
+ever needed.
+
+What it cost is more:
+
+- **One hidden folder for two products, permanently.** The delete bug is the shape of that, and
+  every further app that joins the client inherits the hazard rather than being protected from it.
+- **Revocation is joint.** A reader who disconnects Press in their Google account settings
+  disconnects this app in the same act. There is no way to keep one and drop the other.
+- **The consent screen carries one name.** Branding is configured **per project**, not per client,
+  which is why a distinct name needed a whole new project and not just a new client. Three distinct
+  products, one name, on the one surface where a reader decides whether to trust this app.
+- **No per-app usage figure, ever** — see the note on `quota()`.
+
+**Against that, separating had exactly one cost, and it is the whole reason it was done now rather
+than in six months.** `appDataFolder` is per-client, so a new client sees a new, *empty* folder.
+Anything already backed up under the shared client does not merely disappear from view: it becomes
+unreachable **even to delete**, because only the client that wrote it can see it. Those bytes would
+sit in the reader's quota permanently with no interface anywhere able to remove them.
+
+**That cost was zero here, established rather than assumed.** The set of documents this app had ever
+put in the shared folder was empty: the Drive panel was invisible until `VITE_GOOGLE_CLIENT_ID` was
+set on 22–23 Aug 2026, and Connect could not have written anything even then, because it was still
+meeting `origin_mismatch` until origins went on the client. The owner confirms the same from the
+other direction — nothing was ever synced, because it never worked. Two independent lines agreeing.
+**Separating now cost nothing; separating later would have been silent data loss.**
+
+#### The order it was done in, and the only order it can be done in
+
+1. **Sign in to the Drive panel under the *old* client and press "remove the copy from my Drive".**
+   That is the only moment those files are reachable. Skip it and they are orphaned in the reader's
+   quota forever. **Not applicable this time — there was nothing to clear**, for the reason above.
+   Kept, because it applies to any future change of client.
+2. Create the new project, consent screen and client. Done — the block at the top of this section.
+3. Swap `VITE_GOOGLE_CLIENT_ID` locally and in all three Vercel environments, **then redeploy** — it
+   is a build-time `import.meta.env` value, so an env change alone does nothing. Done: the old value
+   was removed from production, preview and development, the new one set in each, and the result
+   confirmed by reading it back with `vercel env pull` (the pulled file was then deleted).
+4. Reconnect in the panel. The folder is new and empty; the first sync repopulates it from local,
+   which is the direction that cannot lose anything. **This one is the owner's** — it needs a real
+   Google sign-in, which is the one thing this tooling does not do.
+
+#### What can be automated, corrected
+
+This section used to say the Console could not be reached from here at all, and gave two reasons.
+One of them still holds and the other does not, so both are set down straight:
+
+- **Still true.** There is no `gcloud` on this machine, and installing it would not help:
+  `gcloud auth login` is an authentication flow, which this tooling does not perform. The Resource
+  Manager REST API needs a `cloud-platform` token, obtainable only the same way. And Playwright
+  cannot drive the owner's real Chrome profile: Chrome 136+ refuses automation against the default
+  user-data-dir — *"DevTools remote debugging requires a non-default data directory"* — and
+  Playwright always passes `--use-mock-keychain`, so sign-in tokens fail to decrypt even when it
+  does launch. The only way round both is copying somebody's whole Google session store to a scratch
+  profile, which is not a thing to do to an account.
+- **No longer true.** *"So the Console clicks are the owner's."* They were not. The **Playwright MCP
+  extension** drives the already-signed-in session in the owner's own browser, and the whole of step
+  2 — project, consent screen, audience, test user, scopes, client, four origins — was done that
+  way on 23 Aug 2026 at the owner's explicit and repeated request. **Signing in** is still not
+  something this tooling does; **using a session the owner has already signed in to** is a different
+  act, and the earlier text conflated them.
+
+Two working notes for whoever drives that Console again, because both cost time to find:
+
+- `browser_click` never resolves on Console pages — Angular Material animates continuously, so
+  Playwright's "visible, enabled and stable" check never settles. Click through `browser_evaluate`
+  with a direct DOM `.click()`, matching buttons on their normalised `innerText`.
+- `browser_type` is unreliable in Console fields. Set values with the native
+  `HTMLInputElement.prototype.value` setter and dispatch `input` and `change`; chip fields need a
+  synthetic `keydown`/`keyup` with `key: 'Enter'` on top. And the Application-type control is
+  Google's own `<cfc-select>`, not a `mat-select` — find it by `[role=combobox]`.
 
 #### Billing: no card, and none needed
 
@@ -1233,10 +1325,10 @@ upgrade. That turns out not to matter, and the reasoning is worth keeping so nob
 later out of vague anxiety.
 
 Nothing any Flyleaf app uses is billable. Projects, OAuth consent screens, OAuth clients and the
-Drive API for `drive.appdata` are free, and none of them require a billing account to be *attached*
+Drive API for `drive.appdata` are free, and none of them requires a billing account to be *attached*
 in the first place. The exposure is therefore not a bill; it is that a project tied to a billing
-account which lapses can be carried into a suspended state along with it — and that project holds the
-client the apps authenticate against.
+account which lapses can be carried into a suspended state along with it — and those projects hold
+the clients the apps authenticate against.
 
 **So the posture is detached billing, not an upgrade.** A project with no billing account attached is
 the permanently-free state: no card, no trial clock, nothing to expire. Google's "free tier" is not
@@ -1244,133 +1336,44 @@ an account type that can be chosen — it is a set of always-free limits on a no
 reaching a normal account means attaching a payment method. Detaching billing gets the same outcome
 here without one.
 
-Which means, concretely: detach billing from `flyleaf-press` and `flyleaf-505004`, and create the new
-`flyleaf-ereader` project **without** billing attached — new projects sometimes auto-attach to an
-existing trial account, so it wants checking after creation rather than assuming. Verify first that
+Concretely, and **the owner's, not this tooling's**, because billing sits behind a payment method:
+detach billing from `flyleaf-press` and `flyleaf-505004`, and check that the new `flyleaf-ereader`
+project did not auto-attach to the trial account — new projects sometimes do. Verify first that
 nothing else in those projects uses a paid API; for Flyleaf it is OAuth and Drive only.
-
-Not done from here: billing is account configuration behind a payment method, which is the owner's
-alone.
-
-#### Decided: this app gets its own OAuth client
-
-Sharing was a defensible call and it is being undone, on the owner's decision of 23 Aug 2026, for
-reasons that only got clearer once the delete bug was understood. What sharing bought was real: one
-consent screen, so a reader who has already granted Drive access in Press gets a token here with no
-second prompt; one origins list; and one verification review, which matters because `drive.appdata`
-is a **sensitive** scope and a published app needs Google to review it.
-
-What it costs is more:
-
-- **One hidden folder for two products, permanently.** The bug above is the shape of that, and every
-  further app that joins the client inherits the hazard rather than being protected from it.
-- **Revocation is joint.** A reader who disconnects Press in their Google account settings
-  disconnects this app in the same act. There is no way to keep one and drop the other.
-- **The consent screen carries one name.** Branding is configured **per project**, not per client,
-  so a reader deciding whether to trust the reading app is shown Press's identity on the screen where
-  they decide it. Three distinct products, one name, on the one surface where the distinction counts.
-- **No per-app usage figure, ever** — see the note on `quota()`.
-
-**Against that, separating has exactly one cost, and it is the whole reason this is being done now.**
-`appDataFolder` is per-client, so a new client sees a new, *empty* folder. Anything already backed up
-under the shared client does not merely disappear from view: it becomes unreachable **even to
-delete**, because only the client that wrote it can see it. Those bytes would sit in the reader's
-quota permanently with no interface anywhere able to remove them.
-
-That is a serious migration in six months and free today — established, not assumed. The Drive panel
-was invisible until `VITE_GOOGLE_CLIENT_ID` was set on 22–23 Aug 2026, and Connect could not have
-written anything even then, because it was still meeting `origin_mismatch` until the origins went on
-the client. The set of documents this app has ever put in the shared folder is **empty**; see step 1
-below. **Separate now and it costs nothing; separate later and it is silent data loss.**
-
-Nothing shipped above is wasted by the split. With its own folder, `ours` matches everything this app
-wrote, so behaviour is unchanged and the tag becomes insurance against ever sharing again. The
-undeduped-listing fix was a real bug regardless. And the fix makes the migration itself safe: the
-"remove the copy from my Drive" press that has to happen *before* the switch now clears only this
-app's files and leaves Press's `library.json` alone, which is precisely what it would not have done
-the day before.
-
-It also downgrades Press's half. Once this app is on its own client, `dropLibraries` can no longer
-reach this app's documents, so the mirror fix in Press stops being an urgent data-loss fix and
-becomes hygiene — still correct, still worth shipping, no longer racing anything. The Flyleaf journal
-is a third product that could one day share a client, which is the reason to ship it at all.
-
-**The order matters and there is only one order.**
-
-1. Sign in to the Drive panel on this app under the *current* shared client and press **remove the
-   copy from my Drive**. This is the only moment those files are reachable. Skip it and they are
-   orphaned in the reader's quota forever.
-
-   **Not applicable this time — there is nothing to clear.** Kept because it applies to any future
-   change of client, and because the reasoning is the reason the split is free. No eReader document
-   has ever reached the shared folder: Connect met `origin_mismatch` at Google until the origins were
-   registered on 23 Aug 2026, so it never held a token to write with, and the run that proved the
-   registration worked stops at Google's sign-in page by design and grants no consent. The owner
-   confirms the same from the other direction — nothing was ever synced, because it never worked. Two
-   independent lines agreeing, so the migration cost of separating is not "approximately zero", it is
-   zero.
-2. Create the new project, consent screen and client (below).
-3. Swap `VITE_GOOGLE_CLIENT_ID` locally and in all three Vercel environments, then redeploy — it is
-   a build-time `import.meta.env` value, so an env change alone does nothing.
-4. Reconnect in the panel. The folder is new and empty; the first sync repopulates it from local,
-   which is the direction that cannot lose anything.
-
-**What cannot be automated, and why — checked, not assumed.** There is no `gcloud` on this machine,
-and installing it does not help: `gcloud auth login` is an authentication flow, which this tooling
-does not perform. The Resource Manager REST API needs a `cloud-platform` token, obtainable only the
-same way. So the project and client have to be made in the Console UI, in a session that is already
-signed in — and on 23 Aug 2026 both routes to one were shut:
-
-- The Claude in Chrome extension reported itself **not connected**.
-- Playwright cannot drive the real profile at all. Chrome 136+ refuses automation against the default
-  user-data-dir outright — *"DevTools remote debugging requires a non-default data directory"* — and
-  independently of that, Playwright always passes `--use-mock-keychain`, so the sign-in tokens fail
-  to decrypt even when it does launch. The only way round both is copying the owner's whole Google
-  session store to a scratch profile, which is not a thing to do to somebody's account.
-
-So steps 2's Console clicks are the owner's or the extension's. Everything else — the env vars, the
-deploy, the code, this document — is not.
 
 #### The steps, kept because a client can be recreated or an origin can move
 
-Done once already, and written out so it needs no rediscovering. Note that step 1 is still the
-owner's: **signing in** is not something this tooling does. Everything after it can be driven
-through a session that is already signed in.
+Done once already, and written out so it needs no rediscovering.
 
-1. Open **console.cloud.google.com/apis/credentials** and sign in as the account that owns the
-   client — the screenshot of the failure was taken under `ajayifey@gmail.com`.
-2. Select the project that holds the Flyleaf client. It is the **same OAuth client Flyleaf Press
-   uses**, so the project is whichever one Press was set up under; the client is identifiable by
-   its ID:
-
-   ```
-   997776608568-vfq90f4v1b1v82p2enm0li1f4sj72vrk.apps.googleusercontent.com
-   ```
-
-3. Under **OAuth 2.0 Client IDs**, click that client. It is of type *Web application*.
-4. In **Authorized JavaScript origins**, add all four entries from the block above — one per row,
-   scheme included, **no trailing slash**, and `http` (not `https`) for the two localhosts.
-5. Leave **Authorized redirect URIs** alone. Google Identity Services' token flow is
-   origin-checked, not redirect-checked; adding a redirect URI here changes nothing and removing
-   one could break Press.
-6. Save. Google's own note says changes can take five minutes to take effect, and in practice they
-   sometimes take longer.
-7. Then check it, rather than assuming — and check it **twice over**. First reload the client page
+1. Open **console.cloud.google.com** signed in as the account that owns the project —
+   `ajayifey@gmail.com`.
+2. Create a project. The name is what a reader sees on the consent screen, so it is
+   **Flyleaf eReader**, not a slug.
+3. **APIs & Services → OAuth consent screen.** App name *Flyleaf eReader*, support email and
+   developer contact `ajayifey@gmail.com`, audience **External**. This step agrees to Google's API
+   Services User Data Policy; it is an inherent part of registering, and it was declared before it
+   was ticked.
+4. **Audience → Test users → Add users.** Add the owner's address. External + Testing means only
+   listed test users can connect, cap 100.
+5. **Data access → Add or remove scopes.** `.../auth/drive.appdata` — a hidden folder, *not* the
+   reader's Drive, which we cannot see outside of — and `.../auth/userinfo.email`, only so the panel
+   can name the account. Nothing else.
+6. **Clients → Create client**, type *Web application*. Add all four **Authorized JavaScript
+   origins** from the table above — one per row, scheme included, **no trailing slash**, and `http`
+   (not `https`) for the two localhosts. Leave **Authorized redirect URIs** empty. Save.
+7. Copy the client ID into `app/.env.local` and into all three Vercel environments, then **deploy**.
+   Google's own note says an origins change can take five minutes, and in practice sometimes longer.
+8. Then check it, rather than assuming — and check it **twice over**. First reload the client page
    and read the rows back: a form that navigated away on Save is not proof it saved, and this one
    did navigate away. Then open `https://read.flyleaf.cc/settings`, press **Connect**, and expect
    Google's account chooser. If the panel says *"Google turned this away"* with an origin in it,
    that origin is the row that is still missing or mistyped — the message names it deliberately so
-   this loop needs one pass, not four. Google's own note allows five minutes to a few hours for
-   the change to reach their edge, so an `origin_mismatch` in the first few minutes means *wait*,
+   this loop needs one pass, not four. An `origin_mismatch` in the first few minutes means *wait*,
    not *retype*.
 
-Two things worth knowing before touching that screen. The consent screen is **shared with Press**,
-so any edit to the app name, logo or scopes there changes Press too; adding origins does not.
-And nothing needs publishing to make this work: a client left in **Testing** mode signs in the
-owner's own account (and any address listed as a test user) without going near Google's
-verification review. Whether `drive.appdata` counts as sensitive for a *published* app is a
-question for the day this is offered to other people — it is not in the way of the owner using it,
-and it is not worth guessing at here.
+One thing worth knowing before touching any of those screens: **the consent screen belongs to this
+project alone now**, so editing the app name, logo or scopes here cannot touch Press. That is the
+whole point of the split.
 
 ### 15.2 Three documents, not one
 

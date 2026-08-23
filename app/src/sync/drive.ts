@@ -35,22 +35,23 @@ const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files'
 /* WHOSE FILE IS THIS. Written onto every file this app creates, and the reason
    it has to exist:
 
-   `appDataFolder` is per-OAuth-client, not per-app, and this app deliberately
-   SHARES its client with Flyleaf Press so the two need one consent screen
-   between them (SPEC.md § 15.1). One client means ONE hidden folder, and both
-   apps are in it — Press's `library.json` beside this app's `shelf.json`,
-   `marks.json`, `place.json` and one `book-<fp>` per backed-up book.
+   `appDataFolder` is per-OAuth-client, not per-app. This app USED TO share its
+   client with Flyleaf Press, which meant ONE hidden folder with both apps in
+   it — Press's `library.json` beside this app's `shelf.json`, `marks.json`,
+   `place.json` and one `book-<fp>` per backed-up book. It has its own client
+   in its own project as of 23 Aug 2026 (SPEC.md § 15.1), so the folder is this
+   app's alone and `ours` now matches everything in it.
 
-   Reading and writing were always safe: every name is distinct and every
-   access is an exact-name lookup, so neither app can parse or overwrite the
-   other's documents. DELETING was not. `dropAll` used to take everything in
-   the folder — see the note on it — which meant this app's "remove the copy
-   from my Drive" quietly took Press's backup with it.
-
-   The tag is the durable half of the fix: a file carrying another app's tag is
-   never ours to delete, whatever it is called, so renaming a document later
-   cannot reintroduce the bug. The name list in `record.ts` is the bridge for
-   files written before the tag existed. */
+   The tag stays, and it is not dead weight. Reading and writing were always
+   safe even shared: every name is distinct and every access is an exact-name
+   lookup, so neither app could parse or overwrite the other's documents.
+   DELETING was not. `dropAll` used to take everything in the folder — see the
+   note on it — which meant this app's "remove the copy from my Drive" quietly
+   took Press's backup with it. A file carrying another app's tag is never ours
+   to delete, whatever it is called, so this cannot come back if a client is
+   ever shared again, and renaming a document later cannot reintroduce it. The
+   name list in `record.ts` is the bridge for files written before the tag
+   existed. */
 export const APP = 'ereader'
 
 export interface DriveFile {
@@ -255,12 +256,14 @@ export async function remove(token: string, id: string): Promise<void> {
     IT USED TO TAKE EVERYTHING IN THE FOLDER, and the comment here argued for
     that: a stray name cannot be left behind if nothing is left behind. Sound
     reasoning about a folder of our own, and wrong about this one. The folder is
-    per-OAuth-client, this app shares its client with Flyleaf Press on purpose
-    (`APP` above, SPEC.md § 15.1), and Press's `library.json` is in there beside
-    ours. So "remove the copy from my Drive" in a reading app silently deleted
-    the cloud backup of a different product — one press, no warning, and the
-    reassurance printed afterwards ("Your library here is untouched") was true
-    of this app and false of the other one.
+    per-OAuth-client, this app shared its client with Flyleaf Press at the time
+    (`APP` above, SPEC.md § 15.1), and Press's `library.json` was in there
+    beside ours. So "remove the copy from my Drive" in a reading app silently
+    deleted the cloud backup of a different product — one press, no warning, and
+    the reassurance printed afterwards ("Your library here is untouched") was
+    true of this app and false of the other one. The client is separate now, so
+    the folder holds only our files; `mine` stays, because a shared folder is
+    one decision away and this must not be rediscovered.
 
     `mine` decides ownership, and it is passed in rather than written here
     because `record.ts` owns the names. It answers yes on our tag, and on the
@@ -286,11 +289,11 @@ export async function dropAll(
     is null on an account with none.
 
     This is WHOLE-ACCOUNT usage, not this app's share of it — every document,
-    photograph and mail attachment is in it, and so is Flyleaf Press's backup,
-    since the two apps share one hidden folder (see the note on `APP`). There
-    is no per-app figure to be had, and subtracting one from the other would be
-    guesswork. So the panel says "used in your Drive", which is what the number
-    is, and never "used by your books", which it is not.
+    photograph and mail attachment is in it, and so is every other app's hidden
+    folder, Flyleaf Press's among them. Drive reports no per-folder figure and
+    no per-app one, so subtracting one from the other would be guesswork. The
+    panel therefore says "used in your Drive", which is what the number is, and
+    never "used by your books", which it is not.
 
     Worth a call of its own because the book files are opt-in and this is the
     number that decision turns on. "Books take space in your Drive" is an

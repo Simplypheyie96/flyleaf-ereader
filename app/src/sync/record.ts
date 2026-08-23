@@ -499,10 +499,12 @@ export function bookFileName(fp: string): string {
 
 /** Is this file ours to delete?
 
-    The hidden Drive folder is shared with Flyleaf Press — one OAuth client, one
-    consent screen, one `appDataFolder` (SPEC.md § 15.1) — so "remove my backup"
-    has to be able to tell our files from a sibling's. Two ways, and it needs
-    both:
+    The folder is this app's alone since it got its own OAuth client on 23 Aug
+    2026 (SPEC.md § 15.1), so today this answers yes to everything in it. It
+    stays because it did not used to: the folder is per-CLIENT, the client was
+    shared with Flyleaf Press, and "remove my backup" had to tell our files
+    from a sibling's. Sharing a client is one decision away — the Flyleaf
+    journal is a third product — so the two tests stay, and both are needed:
 
       · THE TAG is the durable one. Every file written from this app now carries
         `appProperties.app = 'ereader'`, so a document renamed in some later
@@ -513,7 +515,7 @@ export function bookFileName(fp: string): string {
         no tag at all, and it is still ours and should still go. Our four shapes
         are the three record documents and one `book-<fingerprint>` per book.
 
-    Anything that is neither — Press's `library.json`, or a name from an app
+    Anything that is neither — a sibling's `library.json`, or a name from an app
     that does not exist yet — is left where it is. Stranding a stranger's file
     costs a few kilobytes of somebody's Drive quota. Deleting it costs them
     their backup. */
