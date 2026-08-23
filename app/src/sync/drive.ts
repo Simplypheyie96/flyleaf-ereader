@@ -93,26 +93,42 @@ function unpack(file: RawFile): DriveFile {
 }
 
 /** Turn Drive's refusal into a sentence somebody can act on. Google puts a
-    machine-readable `reason` in the body of every error it returns; this reads
-    it and says the corresponding human thing, falling back to the status only
-    when the body is something unexpected. */
+    machine-readable reason in the body of every error it returns — but in three
+    different shapes, depending on which generation of the API surface answered:
+    the classic `error.errors[0].reason`, the newer `error.status`, and the
+    `error.details[].reason` that carries `SERVICE_DISABLED`. Reading only the
+    first one is how a disabled API came out as a permissions problem, which
+    sent the reader to sign in again over and over for a fault that was never
+    theirs. So collect all three and match against the set. */
 async function explain(response: Response): Promise<string> {
-  let reason = ''
+  const reasons = new Set<string>()
   try {
     const body = (await response.json()) as {
-      error?: { errors?: { reason?: string }[]; message?: string }
+      error?: {
+        errors?: { reason?: string }[]
+        details?: { reason?: string }[]
+        status?: string
+        message?: string
+      }
     }
-    reason = body.error?.errors?.[0]?.reason ?? ''
+    for (const entry of body.error?.errors ?? []) if (entry.reason) reasons.add(entry.reason)
+    for (const entry of body.error?.details ?? []) if (entry.reason) reasons.add(entry.reason)
+    if (body.error?.status) reasons.add(body.error.status)
   } catch {
     /* An error page rather than an error object. The status still says
        something, and that is what the last line falls back to. */
   }
+  const reason = (name: string) => reasons.has(name)
 
-  if (reason === 'insufficientPermissions' || reason === 'insufficientFilePermissions')
+  /* The API is switched off for this app's Google Cloud project. Nothing the
+     reader does fixes it, so do not send them back to the sign-in screen. */
+  if (reason('accessNotConfigured') || reason('SERVICE_DISABLED'))
+    return 'Flyleaf eReader is not switched on for Drive yet. That is ours to fix, not yours — your library here is unaffected.'
+  if (reason('insufficientPermissions') || reason('insufficientFilePermissions'))
     return 'Flyleaf eReader was not given permission to use your Drive. Sign in again and leave the box ticked on Google’s screen.'
-  if (reason === 'storageQuotaExceeded')
+  if (reason('storageQuotaExceeded'))
     return 'Your Google Drive is full, so nothing could be saved to it.'
-  if (reason === 'rateLimitExceeded' || reason === 'userRateLimitExceeded')
+  if (reason('rateLimitExceeded') || reason('userRateLimitExceeded'))
     return 'Google asked us to slow down. Sync will try again shortly.'
   if (response.status === 403)
     return 'Google would not let Flyleaf eReader into your Drive. Sign in again and leave the box ticked.'

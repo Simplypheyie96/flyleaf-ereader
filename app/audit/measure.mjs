@@ -112,7 +112,7 @@ const PROBE = `((slack) => {
   return { out, skipped }
 })(${SLACK})`
 
-const ROUTES = ['/', '/library', '/open', '/stats', '/collections', '/settings']
+const ROUTES = ['/', '/library', '/open', '/stats', '/collections', '/settings', '/privacy', '/terms']
 
 const browser = await chromium.launch()
 for (const [w, h, name] of [[390, 844, 'phone'], [1280, 900, 'desktop'], [1024, 1366, 'ipad']]) {

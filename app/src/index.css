@@ -976,6 +976,30 @@ body::before{
 }
 .fine-name{ font-family:var(--mono); font-size:12px; }
 
+/* ── /privacy and /terms ───────────────────────────────────────────────────
+   No new type and no new panel: both pages are built out of .panel, .ui-lbl,
+   .ui-p and the .fine definition list the small print already uses, and the
+   measure is the panel, as everywhere else.
+
+   The one thing they needed that did not exist was an inline prose link. Every
+   other link in this app is a row, a button or a chip, so an <a> inside a
+   sentence fell straight through to the browser's blue — off-palette, and the
+   only saturated thing on the page. Same hairline idiom as .shelf-foot: ink
+   for the word, the rule colour for the underline, ink on hover. The underline
+   is the non-colour cue, so the link is still identifiable without it.
+
+   Inline links inside a paragraph take WCAG 2.5.8's inline exception, so these
+   are deliberately not padded out to 24px — padding a word inside a sentence
+   would push the line box around it. */
+.page-inner--legal .ui-p a,
+.page-inner--legal .fine dd a{
+  color:var(--ink);
+  text-decoration:underline; text-decoration-color:var(--rule);
+  text-decoration-thickness:1px; text-underline-offset:3px;
+}
+.page-inner--legal .ui-p a:hover,
+.page-inner--legal .fine dd a:hover{ text-decoration-color:var(--ink); }
+
 /* ── the shelf ─────────────────────────────────────────────────────────────
    Press's card language, doing a library: covers as objects, mono micro-labels,
    hairline groups, no shadow anywhere. Radii per DESIGN.md — 2px on a printed

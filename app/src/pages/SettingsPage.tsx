@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { DEFAULT_SETTINGS, clearDismissedSeeds, db, saveSettings, useSettings } from '../db'
 import { checkForUpdate, isIOS, promptInstall, requestPersistence, useInstall } from '../pwa'
@@ -482,6 +483,14 @@ export function SettingsPage() {
               own risk.
             </dd>
           </dl>
+          {/* The two long documents live on their own routes rather than in
+              this panel: the five clauses above are what a reader actually
+              needs at a glance, and burying a privacy policy inside them would
+              make both harder to read. */}
+          <div className="set-acts">
+            <Link className="btn btn--ghost btn--sm" to="/privacy">Privacy</Link>
+            <Link className="btn btn--ghost btn--sm" to="/terms">Terms of use</Link>
+          </div>
         </section>
 
         <Erase />
