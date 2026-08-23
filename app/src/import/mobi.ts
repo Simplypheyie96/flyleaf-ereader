@@ -1,3 +1,7 @@
+// @ts-ignore
+import { unzlibSync } from '../vendor/foliate-js/vendor/fflate.js'
+// @ts-ignore
+import { MOBI } from '../vendor/foliate-js/mobi.js'
 import type { Meta } from './meta'
 
 /* MOBI and AZW3 metadata, from the PalmDB record 0.
@@ -89,5 +93,15 @@ export async function readMobi(file: File): Promise<Meta> {
      their file actually carries. */
   if (authors.length) meta.author = authors.join(' and ')
   if (subjects.length) meta.subjects = subjects
+
+  try {
+    const mobi = new MOBI({ unzlib: unzlibSync })
+    await mobi.open(file)
+    const cover = await mobi.getCover()
+    if (cover) meta.cover = cover
+  } catch (err) {
+    // cover extraction failed, which is fine
+  }
+
   return meta
 }

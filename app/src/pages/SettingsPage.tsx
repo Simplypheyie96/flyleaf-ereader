@@ -11,6 +11,7 @@ import type { Settings } from '../types'
 import { LeaveIcon } from '../components/icons'
 import { SyncPanel } from '../components/SyncPanel'
 import { Tip } from '../components/Tip'
+import { Erase } from '../components/Erase'
 
 /* Everywhere this app points outside itself, in one place.
 
@@ -483,6 +484,7 @@ export function SettingsPage() {
           </dl>
         </section>
 
+        <Erase />
         <section className="panel">
           <p className="ui-lbl">Version</p>
           <p className="ui-p" style={{ marginTop: 8, fontFamily: 'var(--mono)', fontSize: 12.5 }}>
