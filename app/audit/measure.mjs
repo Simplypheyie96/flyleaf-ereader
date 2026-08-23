@@ -14,18 +14,21 @@
    says nothing about where the words actually stop.
 
    A block is reported when it WRAPS (more than one line) and its widest line
-   still leaves a большой share of its container's content width unused. A
+   still leaves a large share of its container's content width unused. A
    single-line block that is short is just a short sentence. A wrapped block
    that stops well short of the edge is a cap fighting its container, which is
    the bug. */
 import { chromium } from '/Users/simplypheyie/.npm/_npx/e41f203b7505f1fb/node_modules/playwright/index.mjs'
 
 const BASE = process.env.BASE || 'http://localhost:4173'
-/* Under a fifth of the box left empty is measure discipline; over a third is
-   the bug the owner is pointing at. */
-const SLACK = Number(process.env.SLACK || 0.28)
+/* Of the box the words were ALLOWED (see `host` in the probe). A tenth is
+   already more than ragged-right accounts for — measured, the widest line of
+   ordinary prose lands within 4–7% of its own content box on every page here,
+   phone included. */
+const SLACK = Number(process.env.SLACK || 0.10)
 const findings = []
 const rows = []
+let centred = 0, layout = 0
 
 const PROBE = `((slack) => {
   const out = []
@@ -50,11 +53,17 @@ const PROBE = `((slack) => {
     return { count: ls.length, widest: Math.max(...ls.map(l => l.right - l.left)), left: Math.min(...ls.map(l => l.left)) }
   }
 
+  const skipped = { centred: 0, layout: 0 }
   const SEL = 'p, dd, li, .ui-p, .lede, blockquote, figcaption'
   for (const el of document.querySelectorAll(SEL)) {
     const cs = getComputedStyle(el)
     if (cs.display === 'none' || cs.visibility === 'hidden') continue
     if (cs.whiteSpace === 'nowrap' || cs.textOverflow === 'ellipsis') continue
+    /* Centred prose is exempt, and it is the one honest exemption here: a
+       narrower column inside a centred card puts its slack evenly on both
+       sides, which is a composition, not the ragged one-sided step-in the
+       owner reported. Counted and printed rather than dropped quietly. */
+    if (cs.textAlign === 'center') { skipped.centred++; continue }
     const txt = el.textContent.replace(/\\s+/g, ' ').trim()
     if (txt.length < 60) continue                      // too short to wrap meaningfully
     const l = lines(el)
@@ -72,8 +81,22 @@ const PROBE = `((slack) => {
       host = host.parentElement
     }
     if (!hostBox) continue
+    /* The block's OWN content box, and it is what separates the two failures
+       that look identical in a screenshot.
+
+       A max-width shrinks the element itself, so the words still fill their
+       own box — which is why the denominator for a cap has to be the host and
+       not ownW. But an element narrower than its host with NO cap on it is a
+       layout fact, not a text fact: a flex sibling beside a 38px mark, a grid
+       track, an anchor with an icon column. Those filled 93–100% of their own
+       box on every page here and reporting them as "text wrapping early" is
+       how this driver cried wolf eight times. */
+    const ob = el.getBoundingClientRect()
+    const ownW = ob.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
     const unused = 1 - l.widest / hostBox.w
     if (unused <= slack) continue
+    const fillsOwn = l.widest / ownW >= 0.90
+    if (cs.maxWidth === 'none' && fillsOwn) { skipped.layout++; continue }
     out.push({
       sel: el.tagName.toLowerCase() + (el.className?.toString?.() ? '.' + el.className.toString().trim().split(/\\s+/).join('.') : ''),
       lines: l.count,
@@ -81,11 +104,12 @@ const PROBE = `((slack) => {
       host: hostBox.tag + (hostBox.cls ? '.' + hostBox.cls.trim().split(/\\s+/).join('.') : ''),
       hostW: +hostBox.w.toFixed(1),
       unusedPct: Math.round(unused * 100),
+      ownW: +ownW.toFixed(1),
       cap: cs.maxWidth,
       text: txt.slice(0, 70),
     })
   }
-  return out
+  return { out, skipped }
 })(${SLACK})`
 
 const ROUTES = ['/', '/library', '/open', '/stats', '/collections', '/settings']
@@ -99,10 +123,12 @@ for (const [w, h, name] of [[390, 844, 'phone'], [1280, 900, 'desktop'], [1024, 
     for (const route of ROUTES) {
         await page.goto(BASE + route, { waitUntil: 'networkidle' })
         await page.waitForTimeout(700)
-        const seen = await page.evaluate(PROBE)
+        const { out: seen, skipped } = await page.evaluate(PROBE)
+        centred += skipped.centred
+        layout += skipped.layout
         for (const s of seen) {
             rows.push({ view: name, route, ...s })
-            findings.push(`${name} ${route}  ${s.sel} wraps to ${s.lines} lines but its widest is ${s.widest}px in a ${s.hostW}px ${s.host} — ${s.unusedPct}% of the box unused (max-width: ${s.cap}) — "${s.text}"`)
+            findings.push(`${name} ${route}  ${s.sel} wraps to ${s.lines} lines but its widest is ${s.widest}px in a ${s.hostW}px ${s.host} (own box ${s.ownW}px) — ${s.unusedPct}% of the box unused (max-width: ${s.cap}) — "${s.text}"`)
         }
     }
     await ctx.close()
@@ -110,5 +136,6 @@ for (const [w, h, name] of [[390, 844, 'phone'], [1280, 900, 'desktop'], [1024, 
 await browser.close()
 
 console.log(JSON.stringify({ slack: SLACK, rows }, null, 2))
+console.log(`\nexempt: ${centred} centred (slack sits evenly on both sides), ${layout} uncapped and filling ≥90% of their own box (the element is narrow, not the text)`)
 console.log(`\n=== FINDINGS: ${findings.length}`)
 for (const f of findings) console.log('  · ' + f)
