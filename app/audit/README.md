@@ -1,6 +1,6 @@
 # The measured audit
 
-Twenty-five drivers over one probe. Run them against a **production preview**, not the dev
+Twenty-eight drivers over one probe, and one runner. Run them against a **production preview**, not the dev
 server — the service worker, the split parser chunks and the real font files only
 exist in a build, and several of the checks are about exactly those.
 
@@ -8,6 +8,24 @@ exist in a build, and several of the checks are about exactly those.
 npm run build
 npx vite preview --port 4173 --strictPort
 ```
+
+Then either run one driver, or run the sweep:
+
+```
+node audit/sweep.mjs              # the gate: chrome, reader, formats, a11y
+node audit/sweep.mjs reader ghost # only these
+node audit/sweep.mjs --all        # every driver, phone and formats included
+```
+
+`sweep.mjs` exists because a one-liner lied. The sweep used to be a `for` loop piping each
+driver into `grep -oE "FINDINGS: [0-9]+"`, and it printed a clean column of zeroes for ten
+drivers and **nothing** for four — `routes`, `states`, `sheet` and `reader`, which end in a
+JSON object carrying a `findings` array and never print that line. A blank cell read as
+clean; it meant unmeasured. The `|| echo NO-OUTPUT` that was supposed to catch it could
+never fire, because `grep | tail` exits through `tail`, which always succeeds. So the
+runner gives every driver exactly three outcomes — a count, a list, or `UNREADABLE` — and
+silence is not one of them. It also fails a driver that prints a count *and* an array that
+disagree with it, because then one of the two is stale.
 
 The chrome, at every width and in both themes:
 
@@ -49,11 +67,14 @@ engine behind it opens an EPUB by reading `META-INF/container.xml` and never loo
 mimetype entry at all. One format's sniff can be wrong for months without a driver that
 opens one of each and says so.
 
-**AZW3/KF8 is declared and untested.** There is no fixture for it, because no MOBI/KF8
-writer exists on this machine — `ebook-convert`, `kindlegen` and `calibre` are all
-absent. `formats.mjs` prints it under `UNCOVERED` on every run rather than leaving the
-gap silent. It is the one format whose "it works" rests on the vendored parser's history
-instead of a measurement taken here.
+**Nothing is uncovered.** AZW3/KF8 was, and it was printed under `UNCOVERED` on every
+run rather than left silent — a declared format with no fixture, because no MOBI/KF8
+writer exists on this machine (`ebook-convert`, `kindlegen`, `calibre` and Kindle
+Previewer are all absent). Advertising a format whose "it works" rests on the vendored
+parser's history is not good enough, so `fixtures/make-azw3.mjs` now builds one by hand:
+real FDST, SKEL and FRAG indices, and four sections a reader has to reassemble by
+splicing a fragment into a skeleton at a byte offset. `UNCOVERED` prints empty now, and
+the day it does not is the day a format went on the shelf without a file behind it.
 
 The gate:
 

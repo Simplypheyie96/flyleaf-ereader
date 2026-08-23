@@ -1267,6 +1267,12 @@ body::before{
 .icon-btn{
   display:inline-flex; align-items:center; justify-content:center;
   width:34px; height:34px; padding:0; cursor:pointer;
+  /* font-size: inherit, not a chosen size. There is no text in here today, so
+     this paints nothing — but `button{ font-family }` at the top of this file
+     sets the family and NOT the size, so without this the box sits at
+     Chromium's 13.3333px UA default and the first text child anyone adds
+     inherits a size nobody picked. Same reason on .reader-btn and .disclose. */
+  font-size:inherit;
   background:var(--card-w); color:var(--ink);
   border:1px solid var(--rule); border-radius:999px;
   transition:background 160ms var(--ease), color 160ms var(--ease);
@@ -1498,7 +1504,7 @@ body::before{
   display:flex; align-items:center; justify-content:space-between; gap:12px;
   width:100%; min-height:22px; border:0; background:none; cursor:pointer;
   padding:8px 0; margin:-8px 0;
-  color:inherit; text-align:start;
+  color:inherit; font-size:inherit; text-align:start;
 }
 
 .disclose .ui-lbl{ pointer-events:none; }
@@ -1745,6 +1751,7 @@ body::before{
   flex:none;
   display:inline-flex; align-items:center; justify-content:center;
   width:44px; height:44px; padding:0;
+  font-size:inherit;
   border:1px solid var(--rule); border-radius:999px;
   background:var(--lift); color:var(--ink);
   cursor:pointer;
