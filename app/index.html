@@ -100,11 +100,16 @@
          Local font stacks only: the web fonts are still in flight at this
          point and a swap mid-fade is worse than the fallback. */
       #splash-in{ display:flex; flex-direction:column; align-items:center; text-align:center; padding:0 32px; }
-      /* 96, not 88: the lozenge is 280 wide to 416 tall where the rosette it
-         replaced was near-square, so at equal box height it reads
-         appreciably lighter. 96 puts its ink at 78px tall by 52px wide, which
-         carries the same weight on the screen as the rosette's 67px did. */
-      #splash svg{ width:96px; height:96px; }
+      /* 80, down from the 88 the bare rosette used: the mark is now a SOLID
+         block with the rosette knocked out of it, and a filled block carries
+         far more weight than an open form of the same size — so it goes
+         smaller, not larger. 80 puts the rosette itself at 52px wide inside
+         the block, and the block fills its box exactly, so this number is also
+         the drawn size. 72 was rendered beside it and read as a chip under a
+         big name rather than the anchor of the lockup; 88 is heavier than the
+         30px wordmark can hold. scripts/make-icons.mjs transcribes this as
+         CSS.box and the launch images are generated from it, so change both. */
+      #splash svg{ width:80px; height:80px; }
       #splash b{
         display:block; margin-top:24px; font:500 30px/1.1 "Playfair Display",Georgia,serif;
         /* Negative at this size, where 25px wanted a hair positive: display
@@ -132,7 +137,7 @@
     </style>
     <div id="splash" aria-hidden="true">
       <div id="splash-in">
-        <svg viewBox="0 0 512 512"><path fill="currentColor" d="M256 48 L396 256 L256 464 L116 256 Z M256 164 L194 256 L256 348 L318 256 Z"/></svg>
+        <svg viewBox="-35 -49 582 582"><path fill="currentColor" fill-rule="evenodd" d="M97 -49 H415 A132 132 0 0 1 547 83 V401 A132 132 0 0 1 415 533 H97 A132 132 0 0 1 -35 401 V83 A132 132 0 0 1 97 -49 Z M256 57.6 A74.67 59.73 -90 1 1 256 206.93 A74.67 59.73 -90 1 1 256 57.6 Z M444.69 194.69 A74.67 59.73 -18 1 1 302.66 240.85 A74.67 59.73 -18 1 1 444.69 194.69 Z M372.61 416.51 A74.67 59.73 54 1 1 284.84 295.68 A74.67 59.73 54 1 1 372.61 416.51 Z M139.39 416.51 A74.67 59.73 126 1 1 227.16 295.68 A74.67 59.73 126 1 1 139.39 416.51 Z M67.31 194.69 A74.67 59.73 198 1 1 209.34 240.85 A74.67 59.73 198 1 1 67.31 194.69 Z M217.6 256 A38.4 38.4 0 1 1 294.4 256 A38.4 38.4 0 1 1 217.6 256 Z"/></svg>
         <b>Flyleaf eReader</b>
         <i></i>
         <small>Read what you own</small>

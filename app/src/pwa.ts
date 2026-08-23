@@ -113,12 +113,40 @@ export function useInstall(): InstallState {
 let swReg: ServiceWorkerRegistration | undefined
 let swSettled = false
 
+/* An installed PWA can go a long time without a navigation — iOS in
+   particular keeps the window alive and warm, so the browser's own
+   check-on-navigate may not fire for days and the reader sits on a shell that
+   is weeks old. That is not hypothetical: it is how an installed copy came to
+   be showing an app name that had already been changed in two deploys. So the
+   registration is nudged as well as held — once an hour, and whenever the app
+   comes back to the foreground, throttled to the same hour so a reader
+   switching apps does not fire a request per switch. Both are no-ops when the
+   deploy has not changed (the worker script 304s), and neither can touch
+   IndexedDB. Offline they fail silently, which is correct: this is the one
+   thing in the app that is allowed to need the network, because it is the
+   thing that asks whether there is anything new. */
+const UPDATE_EVERY = 60 * 60 * 1000
+let lastCheck = 0
+
+function nudge(reg: ServiceWorkerRegistration): void {
+  const now = Date.now()
+  if (now - lastCheck < UPDATE_EVERY) return
+  lastCheck = now
+  reg.update().catch(() => {})
+}
+
 export function initServiceWorker(): void {
   registerSW({
     immediate: true,
     onRegisteredSW(_url, reg) {
       swReg = reg
       swSettled = true
+      if (!reg) return
+      lastCheck = Date.now()
+      setInterval(() => nudge(reg), UPDATE_EVERY)
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') nudge(reg)
+      })
     },
     onRegisterError() {
       swSettled = true

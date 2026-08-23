@@ -11,8 +11,8 @@
 > tempted to add a sixth colour or a fourth face, that mark is the bar: name the role Press
 > has no token for, or use what is here.
 
-**Name: Flyleaf eReader** — a sibling to Flyleaf Press under Flyleaf. **Its own mark**, not
-Press's rosette — see *The mark* below. Rendered in `--ink` in chrome, same as Press's is in
+**Name: Flyleaf eReader** — a sibling to Flyleaf Press under Flyleaf. **Press's rosette, the same
+mark**, presented differently — see *The mark* below. Rendered in `--ink` in chrome, same as Press's is in
 Press's. Same neutral chrome rule: **mostly ink on paper**. Where Press's pastels are *card grounds*, here they are **page stocks
 and highlighter tints** — the same printed-paper logic applied to a different printed object.
 
@@ -698,63 +698,77 @@ reader grouped and why. Renamed throughout: the label, the empty state, the rout
 
 ### The mark
 
-A **printer's lozenge with a lozenge counter** — one closed diamond with a smaller diamond
-punched out of it, geometric, symmetric on both axes, no colour of its own.
+**It is Press's rosette — the same mark, character for character.** Five petals and a centre
+disc, `MARK` in `app/src/components/Mark.tsx` byte-identical to `MARK` in
+`../Review app/app/src/cards/assets.ts`:
 
 ```
-M256 48 L396 256 L256 464 L116 256 Z  M256 164 L194 256 L256 348 L318 256 Z
+M256 57.6 A74.67 59.73 -90 1 1 256 206.93 A74.67 59.73 -90 1 1 256 57.6 Z  …five petals and a disc
 ```
 
-**It is not Press's rosette.** The owner: *"update the logo so it doesn't look exactly like
-flyleaf press."* These are three distinct products under one name, and the eReader gets its own
-mark. What it keeps is the *world* — a plain geometric printer's ornament, ink on paper, no fill
-and no rule of its own — and what it deliberately does not keep is the flower. Beside Press's
-ornate five-petal form it reads as the quieter of two siblings, which is the right relationship
-for the app that gets out of the way.
+The owner's instruction was *"find a way to present it differently from the Flyleaf Press"* — and
+that is a **presentation** brief, not a redraw. One family, one mark; three products, three
+presentations. An earlier pass here read it as a redraw and drew a new glyph. It was wrong, it is
+reverted, and the sixteen rejected candidates that pass produced are not recorded because none of
+them should ever be revisited: the question they were answering was not the question.
 
-**One `d` string, three consumers.** `app/src/components/Mark.tsx` exports `MARK`;
-`app/scripts/make-icons.mjs` and `app/index.html`'s inline splash carry the same string. None of
-them sets `fill-rule`, and they must not have to: the counter is a **second subpath with reversed
-winding** (`256,164 → 194,256 → 256,348 → 318,256` runs anticlockwise where the outer runs
-clockwise), so the default nonzero rule makes it a hole. Reverse either subpath and the counter
-fills in solid.
+**What differs is the polarity.** Press sets the rosette bare — ink on paper, one
+`fill="currentColor"`, nothing around it. Here it is **knocked out of a solid ink block**, so the
+ground shows through the petals. A printer's block, which is the right object for an app whose
+whole world is printed paper, and the one treatment that still separates the two at the 48px a
+home screen shrinks an icon to: same silhouette, opposite ink. A hairline frame or a ruled circle
+was the obvious quieter alternative and was rejected for exactly that reason — both read fine in
+the nav and vanish in the icon, and the icon is the surface where being mistaken for Press
+actually costs something.
 
-**Two facts about the geometry are load-bearing.** The bounding box is `116–396 × 48–464`, so the
-ink is **280 wide × 416 tall** and fills **0.8125** of the 512 box — that fraction is `MARK_FRAC`
-in the generator, and `k = span / (512 × MARK_FRAC)` is what turns a requested ink span into a
-scale. A stale fraction silently rescales every icon (at the rosette's old `0.7575` this mark
-would come out 7% large). And it is symmetric about **both** `x=256` and `y=256` — the rosette was
-not vertically symmetric — which is what lets the generator centre the 512 box rather than
-measuring the ink.
+**Three constants, three consumers.** `Mark.tsx` exports `MARK`, `TILE` and `VIEWBOX`;
+`app/scripts/make-icons.mjs` and `app/index.html`'s inline splash carry the same strings, because
+both run outside the bundle. `Mark.tsx` is the source.
 
-**Because the ink is tall and narrow, every fraction that was tuned for the rosette had to move.**
-A fraction sets the ink's *height*, and a 280×416 form at the same height as a near-square one
-reads appreciably lighter in a square tile. Install icons went `0.48 → 0.60`, maskable
-`0.36 → 0.44`, and the splash box `88px → 96px`. Measured on the output: install icons land at
-`0.603–0.609` of the box, maskable at `0.443`, ink centred to within the half-pixel of the bbox
-convention, and the maskable pair's furthest ink pixel sits at radius **0.221** of the width
-against Android's **0.40** safe-circle allowance — clear of every mask shape.
+**`fill-rule="evenodd"` is what makes the hole, and it is only safe because the rosette's six
+subpaths are mutually disjoint.** Each petal is a whole ellipse — the two arcs share the major
+axis as their chord — `149.33` long by `119.46` wide, centred `123.735` out from the middle. Its
+greatest angular half-width is **31.2°** against the **36°** that 72° spacing allows, so no two
+petals meet; its inner vertex stops at **r=49.07** against the centre disc's **38.4**, so no petal
+meets the disc. Nothing is crossed twice by the rosette alone, so evenodd cancels exactly once —
+against the tile. **Grow a petal and that sum has to be redone before the hole can be trusted.**
+This also replaces the reversed-winding trick a previous mark depended on: with evenodd nothing
+cares which way a subpath runs, so the shared path can stay byte-identical to Press's.
 
-**Sixteen other candidates were drawn and rejected across five rounds, and they failed on
-meaning, not craft.** Recorded so none of them is re-attempted: any rearrangement of Press's
-near-circular petal (rx 74.67 / ry 59.73, a ratio of only 1.25) reads as blobs; a four- or
-eight-pointed radial form reads as the **AI-sparkle glyph**, which is actively wrong for an app
-whose brief bans AI; a five-leaf ring is Press with pointed petals; leaves from a common base
-read as a **lotus or a spa**; a leaf over a dot reads as an **exclamation mark**; a disc with a
-leaf cut out reads as a **coffee bean**; a page-hole reads as a **D**; two offset lozenges
-collapse to a **lightning bolt** at 28px; a bar with a lozenge on it collapses to a **`+`** at
-18px; a lozenge on a rule risks reading as a **download glyph**; the asterism ⁂ reads as a
-**braille cell**; a plain lozenge is a **bullet**. A five-pointed star would have read as a
-rating and a six-pointed one as a snowflake. Every candidate was rendered at 112/56/28/18/14px on
-both grounds and judged beside the rosette; the winner is the one that survives to 14px with its
-counter still open.
+**The block is centred on the rosette's ink, not on the 512 box.** The ink spans `64.94–447.06`
+horizontally, centred on `256`, but `57.60–425.97` vertically, centred on **`241.78`** — the
+rosette has a point up and two feet down, so it is not vertically symmetric. Hence
+`viewBox="-35 -49 582 582"`: a `582` square with `132` corners (`0.227` of the side, the ratio the
+home-screen tile has always used) whose centre is `(256, 242)`. That is the whole reason the
+viewBox is stated rather than left at `0 0 512 512`, and it is why the generator's `ty` is not
+symmetric with its `tx`. `100` of clear ink either side of the rosette and `106.8` above and
+below: a knockout needs more surround than a positive mark does, or the petal tips read as nicks
+in the edge rather than as a flower.
 
-**There is no separate source SVG.** `assets/flyleaf-mark-source.svg` used to hold one — a copy
-of Press's tile, on a blue gradient sky this project's guardrails ban, whose own comment pointed
-at four files that do not exist in this repo. It is gone. `make-icons.mjs` emits
-`app/public/icons/icon.svg` from the same constant, so anything outside the build that needs a
-standalone file takes it from there. A second hand-typed copy of the path is the drift this
-section exists to prevent.
+**Because the block fills its viewBox exactly, there is no ink fraction left to convert.** A
+requested span *is* the drawn span, and `MARK_FRAC` — which existed only to bridge an open form
+and its padded box — is gone from the generator. The fractions that remain, and the measurements
+that confirm them on the output:
+
+| Surface | Fraction | Measured |
+|---|---|---|
+| install icons | `0.76` — deliberately not full-bleed, so iOS's own corner rounding never fights the block's `0.227` radius and only clips paper | `391/512 = 0.764`, centred to within a pixel |
+| maskable | `0.62` — a rounded square of side `s` with `0.227s` corners reaches `√2(s/2 − 0.227s) + 0.227s = 0.613s` from its centre | `319/512 = 0.623`, furthest ink at radius **`0.382`** against Android's **`0.40`** |
+| splash / launch | `80px`, down from the bare rosette's `88` | knockout verified pixel-wise: centre disc and petals read `#F4F2ED`, the inter-petal slivers and the tile read `#1B1917` |
+
+**A filled block goes smaller than an open mark, not larger** — that is the one thing this
+presentation gets wrong if it is scaled by habit. `72` and `80` were rendered side by side in the
+launch lockup: `72` read as a chip under a big name, `88` is heavier than the `30px` wordmark can
+hold, `80` is the anchor. The ramp was checked at `112/72/56/28/22/18/14px` on both grounds beside
+Press's bare rosette; the petals stay separate down to `22px` and the flower still reads at `14`.
+
+**The standalone source SVG is generated.** `assets/flyleaf-mark-source.svg` is written by
+`make-icons.mjs` from the same three constants — full-bleed, transparent, ink stated because
+`currentColor` means nothing in a file opened outside a stylesheet. It is what anything outside
+the build takes the mark from. The file it replaces was a hand-typed second copy of the path, on
+a blue gradient sky this project's guardrails ban, whose own comment pointed at four files that do
+not exist in this repo. A second hand-typed copy of a path is the drift this section exists to
+prevent.
 
 ### The launch lockup
 
@@ -765,12 +779,12 @@ between them shows up as a jump at the handoff — which is the one failure a la
 So they are the **same layout in the same units** — and how that is guaranteed is the substantive
 part. The generator does not hold a table of numbers *derived from* the CSS; it holds **the CSS
 itself** and solves the layout from it. `make-icons.mjs` has a `CSS` object transcribing
-`#splash`'s literals — box `96`, then each line's `margin-top`, `font-size`, `line-height`,
+`#splash`'s literals — box `80`, then each line's `margin-top`, `font-size`, `line-height`,
 `letter-spacing` and opacity — and a baseline solver that walks the stack the way the browser does.
 
 | Element | CSS | Baseline solved as |
 |---|---|---|
-| mark | `96px` box, ink `0.8125` of it | box top is the cursor origin |
+| mark | `80px` box, filled edge to edge by the block | box top is the cursor origin |
 | `Flyleaf eReader` | Playfair 500, `30px/1.1`, `-.008em`, `margin-top:24` | `lineTop + ⌊(box − (asc+desc))/2⌋ + asc` |
 | the rule | `40 × 1px`, `currentColor` at `.18`, `margin-top:22` | drawn as a rect at the cursor |
 | `READ WHAT YOU OWN` | Archivo 500, `11px/1.6`, `.16em`, `.55`, `margin-top:20` | same solver |
@@ -786,19 +800,27 @@ hhea, not winAscent, which puts the name a further 1.6px low.
 measurement in *spans* — multiples of the drawn mark height — and the class of bug that produces
 has now bitten twice, in opposite directions. Once by feeding CSS-over-88 fractions into a
 span-scaled layout, which came out **24% small**. Once by pinning the whole layout to the mark's
-ink height, so **redrawing the mark silently resized the wordmark** — exactly what happened when
-the rosette became a lozenge 280 wide to 416 tall. The fraction now cancels where it should
-(`SPLASH_SPAN = CSS.box × MARK_FRAC` makes `k = box/512` and `u = dpr`) and applies where it should
-(icons, where `span = min(w,h) × frac`).
+ink height, so **redrawing the mark silently resized the wordmark**. Neither is reachable now:
+`SPLASH_SPAN = CSS.box` — no fraction, because the block fills its box — so `k = box/582` and
+`u = dpr` exactly, and an ink fraction survives only where it is a real design choice (icons,
+where `span = min(w,h) × frac`).
 
 **Verified by pixel comparison, not by eye.** `main.tsx` removes the `#splash` div but leaves its
 inline CSS in `<head>`, so the check loads the built app, waits on `document.fonts.ready`, removes
 any surviving `#splash`, re-appends a fresh one with the same markup — which gives the real cascade
-with the real faces — then measures and screenshots it. At 390×844 dpr 3: svg box `96px`, block
-height `213.59` against the generator's `213.6`, name baseline `148.0`, claim baseline `208.0`.
-Diffing the generated `launch-1170x2532.png` against that screenshot puts the ink extents at
-`973–1570` and `972–1569` — **one device pixel** over a 598px block, with the 0.42% differing
-pixels confined to the ink rows and columns, i.e. glyph rasterisation, not layout.
+with the real faces — then measures and screenshots it. At 390×844 dpr 3: svg box `80 × 80`, block
+height `197.59` against the generator's `197.59375`, name box at `423.2`, rule at `482.2`, claim at
+`505.2`. Diffing the generated `launch-1170x2532.png` against that screenshot puts the ink extents
+at `969–1546` and `969–1547` — **one device pixel** over a 578px block, with the **0.25%**
+differing pixels confined to the ink rows and columns, i.e. glyph rasterisation, not layout.
+
+**That diff is also what caught the third instance of the span bug**, and it is worth naming because
+it is the one the two earlier fixes did not cover. The knockout's `viewBox` starts at `(-35, -49)`,
+not at `0 0`, so a `translate(tx, ty)` that centres correctly in *x* — because `tx` subtracts
+`VB.x·k` — silently drew the block `VB.y·k` high in *y*: **20 device pixels at dpr 3**, which is
+precisely the `949` against `969` the first run measured. Both components subtract the origin now,
+and `top` (the box top, shared with the text cursor) is a separate name from `ty` (the transform),
+so the two cannot drift again.
 
 **Why the words are there at all.** It read *"Flyleaf"* over a line about the device, which named
 the family and the privacy promise and never once said the thing you were waiting for was an
@@ -827,9 +849,10 @@ separates the identity from the statement about it — the one hierarchy this sc
 derives from the ground, so it needs no token of its own on either scheme. If the format list comes
 back it belongs on **Home**, beside the import control, where a reader is actually choosing a file.
 
-**And the mark's box grew, 88px → 96px.** Not a restyle: the lozenge is 280 wide to 416 tall where
-the rosette was near-square, so at equal box height it reads appreciably lighter. 96 puts its ink
-at 78 × 52px, which carries the weight on screen that the rosette's 67px did.
+**And the mark's box shrank, 88px → 80px.** Not a restyle: the block is filled where the bare
+rosette was open, so at equal box height it reads appreciably heavier. `72` and `80` were rendered
+side by side — `72` read as a chip under a `30px` name rather than the anchor of the lockup, and
+`88` outweighed it — so `80` is the box, and it is `CSS.box` in the generator as well.
 
 **Local font stacks only.** The web fonts are still in flight at this point, and a swap mid-fade
 is worse than the fallback. The exit is **420ms**, under the 600ms hard removal in `main.tsx` that

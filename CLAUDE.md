@@ -16,9 +16,9 @@ app under the Flyleaf name, and they are three distinct products, not one app wi
 Never describe them as "two apps, one name", never give one the other's description, and never
 put the owner's personal name in app copy. It inherits Press's *aesthetic* by instruction —
 same neutral chrome, same printed-paper world, same restraint — which is a design lineage, not a
-claim that the two are the same product. **The mark is its own**, though: a printer's lozenge, not
-Press's rosette, because the owner asked for one that does not read as the same app
-(`DESIGN.md` → *The mark*).
+claim that the two are the same product. **The mark is Press's rosette** — the same mark, the same
+path — *presented* differently, because the owner asked for one that does not read as the same app
+and that is a presentation brief, not a redraw (`DESIGN.md` → *The mark*).
 
 Success is: hand it a file, and reading is as fluid as Apple Books — instant open, a page turn
 that follows your thumb, a position that survives every change of font size, and all of it
@@ -42,10 +42,13 @@ Locked. Do not re-litigate.
 
 - **The aesthetic is Flyleaf Press's**, inherited by instruction. Additions are allowed only for
   roles Press has no token for, and each one is marked **NEW** in `DESIGN.md` with its reason.
-- **The mark is not Press's.** A printer's lozenge with a lozenge counter, chosen over sixteen
-  other candidates across five rounds. One `d` string in `Mark.tsx`, read by the icon generator
-  and the inline splash; the counter is a reversed-winding subpath, so no consumer needs
-  `fill-rule`. `DESIGN.md` → *The mark* records why the sixteen failed, so they are not redrawn.
+- **The mark IS Press's rosette, differentiated by presentation only.** `MARK` in `Mark.tsx` is
+  byte-identical to `MARK` in `../Review app/app/src/cards/assets.ts` and must stay that way: one
+  family, one mark. What differs is the polarity — Press sets the rosette bare, this app knocks it
+  **out of a solid ink block**, which is the one treatment that still separates the two at the 48px
+  a home screen shrinks an icon to. **Do not draw a new glyph.** A previous pass read the
+  instruction as a redraw, produced a printer's lozenge over five rounds, and it was reverted;
+  `DESIGN.md` → *The mark* has the geometry that makes the knockout safe.
 - **Reading face: Literata**, default. EB Garamond, Source Serif 4, Newsreader and Atkinson
   Hyperlegible are the alternates, loaded on selection.
 - **Formats: reflowable + PDF.** EPUB 2/3, MOBI, AZW3/KF8, FB2, FBZ, TXT, Markdown, HTML, and
