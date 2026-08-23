@@ -403,6 +403,35 @@ never a feature that needs a network.
 - **Remove** confirms by naming exactly what goes — *"the file, your place in it, and 14
   highlights"* — and for an included book adds that it can be brought back from Settings.
 
+### 7.1 Who owns a cover's object URL
+
+The rule, because getting it wrong produced the one bug a reader actually reported — *"some book
+covers are glitching, they will show cover one minute and not show it another minute"*:
+
+- **The URL is minted by a module-level cache in `Cover.tsx`, keyed on `id:size:type`, and derived
+  during render.** Not in an effect, and not owned by the mount. Every place a book appears —
+  Home's continue rail and its recent shelf at the same time, the shelf, the sheet — shares one
+  decode of one Blob.
+- **No revoke on unmount.** The old code created the URL in an effect and revoked it on cleanup,
+  which put a revoke one render ahead of the `<img>`'s `src`: `setUrl` is a state update, so the
+  element still pointed at the revoked URL for a render, and with `decoding="async"` and a cover
+  still in flight — the normal case on a phone — the aborted load fired `error`.
+- **The memory that revoke protected is not at stake.** `Library.tsx` reads the shelf with
+  `toArray()`, so every cover Blob is already retained for as long as that query is live; an object
+  URL is a handle onto a Blob being held anyway, not a second copy. Covers are bounded near 120KB
+  by `shrinkCover`. The cache's `LIMIT` of 512 is a runaway guard, not a memory strategy, and it
+  must not be tightened: a cap small enough to bite evicts URLs whose `<img>` is still on screen,
+  which reproduces the reported glitch inside the cache meant to fix it.
+- **One error is not evidence.** A spurious error and a genuine decode failure are the same event
+  with the same fields, so the first failure is retried — the URL is dropped and minted again.
+  Corrupt bytes fail twice and get the designed "No cover" ghost; an interrupted load simply
+  succeeds. Nothing ever latches on a single event: the old `dead` flag cleared only when the
+  cover's shape changed, and a book's shape never changes, so one aborted load ghosted a good
+  cover for the rest of the session and came back only on a remount.
+
+`audit/covers.mjs` is the gate, and its third question is the direct regression guard: a single
+`error` dispatched at a loaded, valid cover must recover to an image, not to the ghost.
+
 ---
 
 ## 8. Where the controls live
