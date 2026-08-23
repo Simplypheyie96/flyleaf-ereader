@@ -970,6 +970,37 @@ text-underline-offset: 3px;
 - **Scoped, not global.** `.page-inner--legal` is the guard. A bare `a` rule would have quietly
   restyled every row, chip and button in the app that happens to be an anchor.
 
+### The settings row, and the panel that folds — both **inherited from Press, not new**
+
+Two Settings shapes arrived on 23 Aug 2026, and neither is an addition: both already existed in
+Press and were copied across with their comments intact.
+
+**`.set-row` / `.set-row--stack` / `.set-row-txt`** — a label, its paragraph, and a small button,
+on no plate at all. Copied verbatim from `../Review app/app/src/index.css`. It replaced the one
+place this app outlined a destructive control in `--danger` *before* anybody had pressed anything:
+Drive sync's "Remove the copy from Drive", which sat directly beneath a status line reading
+*Connected. Synced.* and made a working sync look like a failure report. The rule that came out of
+it:
+
+- **`--danger` on the resting surface says "something is wrong". On a button it says "this
+  deletes".** Only the second is ever true before a press, so only the button is ever red.
+- **The sentence about what cannot be undone waits for the press.** It lives in the confirm step,
+  never in the resting row.
+- `panel--danger` is therefore **only legal after a press** — `BookDetail`'s confirm block is the
+  one remaining use, and it is only on screen because somebody asked for it.
+- `--stack` puts the button *under* a paragraph rather than beside it, for the reason Press's own
+  comment gives: level with a four-line block, a button is level with nothing.
+
+**`.fold-hd`** — a panel whose label row is the press that puts it away. Structurally Press's
+`.disclose` (a `<button aria-expanded>` carrying a `.ui-lbl` and a chevron, wrapped around the
+tallest thing on the page), drawn with **this app's** chevron rather than Press's `▲`/`▼` text
+glyph, because `ChevronIcon` + `picker-caret` is already the disclosure mark here and two
+disclosure marks in one app is one too many. Four of the eight Settings panels fold: **Backup**
+opens by default because it carries live state, and **Included books**, **The Flyleaf apps** and
+**The small print** are closed because all three are reference rather than daily. The button
+contributes the press and nothing else — no colour, no size, no weight of its own — so the label
+is byte-for-byte the label it was, and the global `:focus-visible` ring covers it for free.
+
 ---
 
 ## Banned
