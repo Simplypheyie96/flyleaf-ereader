@@ -81,8 +81,9 @@ Static deploy on Vercel as `flyleaf-ereader`, project root `app/`, live at
 **`https://read.flyleaf.cc`** — DNS in, certificate issued (`SPEC.md` § 16.1). Source at
 `github.com/Simplypheyie96/flyleaf-ereader`, private, like both siblings. No server, no database to
 provision, and one optional env var: `VITE_GOOGLE_CLIENT_ID`, now **set** locally and in all three
-Vercel environments, so the Drive panel is visible. The one step left is the owner's: adding this
-app's origins to the OAuth client in Google Cloud Console, without which Connect fails with
+Vercel environments, so the Drive panel is visible. This app's four origins are **registered** on
+the shared OAuth client as of 23 Aug 2026 — verified by reloading the client page and reading the
+six rows back, Press's two among them and untouched — so Connect no longer meets
 `origin_mismatch` (`SPEC.md` § 15.1).
 Same shape as Press deliberately — one less thing to hold in your head when moving between them.
 

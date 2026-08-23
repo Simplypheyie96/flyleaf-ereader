@@ -170,7 +170,11 @@ const shelfLine = () => pa.evaluate(() => {
     return p?.textContent.replace(/\s+/g, ' ').trim() ?? null
 })
 m.beforeRefusal = await shelfLine()
-await pa.locator('input[accept=".flyleaf"]').setInputFiles(NOT_A_BACKUP)
+/* Located by its place, not by an accept attribute: the accept list was
+   removed because `.flyleaf` resolves to no Uniform Type Identifier and iOS
+   greyed out the reader's own backup file. .set-acts is the restore panel's
+   own action row. */
+await pa.locator('.set-acts input[type=file]').setInputFiles(NOT_A_BACKUP)
 await pa.waitForTimeout(1200)
 m.refusal = await pa.evaluate(() => ({
     alert: document.querySelector('[role=alert]')?.textContent?.trim() ?? null,
@@ -228,7 +232,7 @@ say(`device B before the restore: ${JSON.stringify(m.deviceB.before)}`)
 
 await pb.goto(BASE + '/settings', { waitUntil: 'networkidle' })
 await pb.waitForTimeout(700)
-await pb.locator('input[accept=".flyleaf"]').setInputFiles(OUT)
+await pb.locator('.set-acts input[type=file]').setInputFiles(OUT)
 await pb.waitForTimeout(2500)
 m.deviceB.confirm = await pb.evaluate(() => {
     const c = document.querySelector('.set-confirm')

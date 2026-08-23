@@ -31,7 +31,11 @@ export type Sniffed =
      in it is a refusal dressed up as a diagnosis. */
   | { ok: false; reason: 'wrapped'; what: string; inner: File }
 
-const MIME: Record<Format, string> = {
+/* One media type per format, exported because the file dialog needs the same
+   pairing this sniff does — see ACCEPT in ./index.ts. Two hand-kept copies of
+   this map is how the picker came to offer a narrower set of formats than the
+   parser could read. */
+export const MIME: Record<Format, string> = {
   epub: 'application/epub+zip',
   mobi: 'application/x-mobipocket-ebook',
   azw3: 'application/vnd.amazon.ebook',

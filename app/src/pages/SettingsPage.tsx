@@ -193,6 +193,18 @@ export function SettingsPage() {
           </div>
         </section>
 
+        {/* SECOND of nine panels, and it has been moved twice. It started at the
+            bottom, went to sixth, and was still "too far below" — so it stops
+            being ranked by decorum and gets ranked by whether it can be seen.
+            Second is the highest it can go without Settings opening on a
+            donation ask: Theme is what somebody came here to change, and this
+            sits directly under it, on screen at 390x844 without a scroll.
+
+            Above the apps panel rather than inside it, still: a jar is not a
+            destination, and the one place it must not be is a row in a list of
+            other places to go. */}
+        <Tip />
+
         <section className="panel">
           <p className="ui-lbl">This device</p>
           <p className="ui-p" style={{ marginTop: 8 }}>
@@ -256,7 +268,15 @@ export function SettingsPage() {
             <input
               ref={picker}
               type="file"
-              accept=".flyleaf"
+              /* No accept list, for the same reason as the book picker in
+                 OpenBook.tsx: iOS resolves each entry to a Uniform Type
+                 Identifier and greys out everything that does not conform, and
+                 `.flyleaf` is an extension this app invented, so it is
+                 registered by nothing anywhere. The filter would have made a
+                 reader's own backup unpickable on the one platform they are
+                 most likely to restore onto. inspectBackup() reads the file and
+                 refuses a non-backup by name before anything is written, so the
+                 content is the authority here too. */
               className="sr-only"
               /* Not a tab stop, and not in the accessibility tree: the button
                  beside it is the control, and it already says so. */
@@ -381,12 +401,6 @@ export function SettingsPage() {
                 : `${shelf.missing} of ${SEEDS.length} ${shelf.missing === 1 ? 'is' : 'are'} not in your library right now.`}
           </p>
         </section>
-
-        {/* Above the apps panel, not inside it: a jar is not a destination, and
-            the one place it must not be is a row in a list of other places.
-            Sixth of nine panels — past the settings somebody came here to
-            change, and well clear of the small print they never scroll to. */}
-        <Tip />
 
         <section className="panel">
           <p className="ui-lbl">The Flyleaf apps</p>

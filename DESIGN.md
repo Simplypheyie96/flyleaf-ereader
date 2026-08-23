@@ -488,6 +488,43 @@ Press's scale, unchanged. Base **4px**; every gap is a multiple.
 
 Generous and balanced is the default. Cramped or edge-to-edge is a bug.
 
+### The chrome measure — `--measure: 74ch` **NEW (role, one value)**
+
+Press has no token for this, and the reason is structural rather than an oversight: Press's
+prose lives on printed cards of a **fixed** width, so the card *is* the measure and a cap would
+be redundant — `../Review app/DESIGN.md` says as much when it bans a measure cap on the card
+body. Here the same paragraph is set in a 634px settings panel, a 680px page column and a 320px
+reader sheet, so the cap and the box are two independent numbers and nothing was keeping them in
+a sensible relationship.
+
+Fourteen hand-picked caps had accumulated — 34ch, 46ch, 52ch, 56ch, 62ch — each defensible in
+its own rule and none of them related to the box it ended up inside. Measured on the built app
+at 1280 and 1024:
+
+| Where | Cap | Widest line | Box | Unused |
+|---|---|---|---|---|
+| `.fine dd` | 62ch | 452.3px | 634px | **29%** |
+| `.tip-head .ui-p` | 46ch | 340.1px | 582px | **46%** |
+| `.app-sub` | 52ch | 383.4px | 680px | **44%** |
+
+At that much slack a measure stops reading as a measure and starts reading as a bug — which is
+exactly how it was reported: *"the words wrapping before they fill the container."*
+
+**74ch** is the top of the comfortable 60–75 range, so this is still a measure and not "fill the
+box": at 13px it lands near 551px, which is 87% of the settings panel and 81% of the page column.
+
+- **Wide chrome takes the token.** Settings panels, the tip card, page subtitles, collection
+  notes, the reader's control notes.
+- **Genuinely narrow contexts keep their own tighter caps** and are not a regression to fix: a
+  centred refusal (34ch), an empty-state line (34ch), the PDF sheet's lede (46ch), and the drop
+  zone's centred lede (34em) are narrow *by design*, and widening them would be a change nothing
+  measured asked for.
+- **`audit/measure.mjs` is the check**, on every route at 390 / 1024 / 1280. It walks each block
+  of prose with a `Range`, merges its client rects by line box, finds the nearest ancestor wider
+  than the widest line, and fails on more than 28% slack. The relationship between a cap and its
+  box is invisible in the source — every rule reads fine alone — so it has to be measured or it
+  silently comes back.
+
 ---
 
 ## Surface & depth
