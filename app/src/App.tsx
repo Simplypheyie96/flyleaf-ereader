@@ -9,6 +9,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { OpenBook } from './pages/OpenBook'
 import { BookDetail } from './pages/BookDetail'
 import { ReadRoute } from './pages/ReadRoute'
+import { PrivacyPage, TermsPage } from './pages/Legal'
 import { useSettings } from './db'
 import type { Settings } from './types'
 
@@ -66,6 +67,11 @@ function Shell() {
         <Route path="/open" element={<OpenBook />} />
         <Route path="/book/:id" element={<BookDetail />} />
         <Route path="/read/:id" element={<ReadRoute />} />
+        {/* The two documents Google requires of an app that asks for a Drive
+            scope, and that a reader is owed regardless. They are routes rather
+            than a separate site because read.flyleaf.cc is the app. */}
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
         {/* /reading was a tab until Home took its job. It is redirected rather
             than deleted because it is the one route a reader could have
             installed to their home screen or bookmarked, and a 404 there would
