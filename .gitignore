@@ -13,7 +13,25 @@ dist
 # Scratch output from the Playwright MCP server, not part of the app.
 .playwright-mcp
 
-# The 4MB test book. Generated, not authored — `node audit/fixtures/make-big.mjs`
-# grows it from the seed EPUB that IS in the repo, so a clone can rebuild it and
-# git never carries 4.2MB of undiffable zip.
+# Generated fixtures, not authored ones. Both generators grow these from the
+# seed EPUBs that ARE in the repo, so a fresh clone rebuilds them with one
+# command and git never carries megabytes of undiffable zip. The drivers name
+# the command when a fixture is missing, so an absent file is an instruction
+# rather than a failure.
+#
+#   node audit/fixtures/make-big.mjs          -> big.epub
+#   node audit/fixtures/make-zip-shapes.mjs   -> the three below, and three
+#                                                small ones that DO travel
+#
+# Only the big ones are ignored. comic.zip, junk.zip and truncated.epub are a
+# few kilobytes each and worth having present out of the box. rezipped.epub is
+# here for a second reason: the `zip` CLI stamps mtimes into it, so it is not
+# even reproducible byte-for-byte and would show a diff on every rebuild.
 app/audit/fixtures/big.epub
+app/audit/fixtures/twobooks.zip
+app/audit/fixtures/wrapped.zip
+app/audit/fixtures/rezipped.epub
+
+# tsc's incremental cache. Rewritten by every build, useful to nobody but the
+# machine that wrote it.
+app/tsconfig.tsbuildinfo
