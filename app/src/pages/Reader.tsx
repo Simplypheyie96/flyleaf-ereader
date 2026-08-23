@@ -589,23 +589,37 @@ export function Reader() {
         const root = stageRef.current?.closest('.reader')
         if (!r || !root) return
 
-        /* `gap` is the setting's own number, and upstream turns it into a
-           per-side inset of roughly HALF that. It computes the column gap as
-           f⁻¹(g) = g/(1−g) of the pane so the outer padding and the inner
-           column gap come out equal (paginator.js:704–722), then lays the
-           column out with `padding: 0 gap/2` on the book's own document
-           (paginator.js:329). So the text edge lands at size·g / 2(1−g).
+        /* `gap` is not a margin, and upstream spends it differently in the two
+           flows — which is why the same slider used to put the text edge in
+           two different places depending on Flow.
 
-           Measured, not assumed: at 8% the text starts 26.59px in on a 612px
-           pane and 15.59px in on a 358.8px one — 4.35% a side, not 8%. An
-           earlier note here claimed the inset was `gap`% "symmetric to the
-           pixel"; it was reading the column gap, which is indeed g/(1−g), and
-           calling it the padding. Left as is on purpose: the slider range is a
-           look decision, not a bug, and doubling it would restyle every page.
+           Upstream computes gap = f⁻¹(g)·size = g/(1−g)·size (paginator.js:
+           704–722). In PAGINATED flow that buys the inset twice: `columnize`
+           lays the document out with `padding: 0 gap/2` (paginator.js:329) and
+           the #top grid adds another half through its `--_half-gap` columns
+           (paginator.js:475–491). The two halves sum to the whole, so the text
+           edge lands at the percentage the slider says — measured at 390px:
+           4% → 4.10%, 8% → 7.95%, 12% → 12.05%, and at 1280px: 4.14 / 7.97 /
+           12.03. Symmetric to 1px, and exactly what SPEC.md § 2 asks for.
+
+           (An earlier note here claimed 4.35% a side and called the range a
+           look decision. It had measured only the document padding — one of
+           the two halves — and missed the grid's. The numbers above come from
+           both edges of a laid-out paragraph in HOST coordinates.)
+
+           In SCROLLED flow there is no grid inset and no column, so `scrolled`
+           applies the FULL gap as padding (paginator.js:304) and the delivered
+           inset is g/(1−g) — over the asking price: 8% rendered 8.72% and 12%
+           rendered 13.59%, so switching Flow moved the text edge 3px. Solving
+           g/(1−g) = m for g gives m/(100+m), which is what goes on the wire
+           there. Both flows now land on the same edge for the same setting.
+
            `margin` is a different thing entirely: the head and foot strip
            inside the pane. */
         marginRef.current = s.margin
-        r.setAttribute('gap', `${s.margin}%`)
+        r.setAttribute('gap', s.flow === 'scrolled'
+            ? `${(100 * s.margin) / (100 + s.margin)}%`
+            : `${s.margin}%`)
         r.setAttribute('margin', `${CHROME_INSET}px`)
         r.setAttribute('flow', s.flow)
         r.setAttribute('max-inline-size', `${Math.round(s.measure * s.size)}px`)
