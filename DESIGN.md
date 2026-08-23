@@ -941,6 +941,35 @@ All five clear the **3:1** WCAG 1.4.11 asks of a non-text graphic. `underline` i
 screen either, so on paper it is not a bar: it is a rule under the words, which is what the reader
 actually saw.
 
+### The inline prose link **NEW (role, derived, no new values)**
+
+Press has no token for this because Press has no inline link. Every link in Press, and every link
+in this app up to now, is a **row, a button or a chip** — a whole box you press. `/privacy` and
+`/terms` are the first pages here with a link *inside a sentence*, and an unstyled `<a>` in prose
+falls straight through to the browser's own blue: off-palette, and the only saturated thing on
+either page.
+
+No new value was needed. The idiom already existed on `.shelf-foot` — **ink for the word, `--rule`
+for the underline, ink on hover** — so it is lifted verbatim and scoped to `.page-inner--legal`,
+which is the only place prose links exist:
+
+```css
+color: var(--ink);
+text-decoration: underline;
+text-decoration-color: var(--rule);
+text-decoration-thickness: 1px;
+text-underline-offset: 3px;
+```
+
+- **The underline is the non-colour cue.** Ink-on-paper against ink-on-paper carries no hue
+  difference at all, so the underline is not decoration here — it is the entire affordance, and it
+  is why the link is still findable for a reader who cannot separate the two colours.
+- **Deliberately not padded to 24px.** WCAG 2.5.8 exempts a link inline in a sentence, and padding
+  a word inside a line of prose pushes the line box around it. The row-shaped links in the same
+  page's `Elsewhere` panel are buttons and do take the full target size.
+- **Scoped, not global.** `.page-inner--legal` is the guard. A bare `a` rule would have quietly
+  restyled every row, chip and button in the app that happens to be an anchor.
+
 ---
 
 ## Banned
