@@ -1152,12 +1152,28 @@ test user. Testing is not a limitation to fix: it means the owner's own account,
 listed as a test user, signs in without going near a review. Publishing is a Google review, not a
 switch, and it is a question for the day this is offered to other people.
 
-**One thing is still open at Google.** The audience page reports *"Your app's OAuth configuration is
-incomplete… Please visit the Branding page to finish configuring your app."* The Branding page never
-loaded to be read — the browser tab wedged on `chrome-error://chromewebdata/` three times, while
-`curl` reached `console.cloud.google.com` fine from the same machine, so it is the bridge and not the
-network. It does not block anything measured here: the client is Enabled, the scopes are registered
-and the origins are live. It is written down because an unread warning is not a cleared one.
+**The Console shows one warning, and it is about publishing, not about this working.** The Audience
+page reports *"Your app's OAuth configuration is incomplete. You must enter the missing information
+to proceed. Please visit the Branding page to finish configuring your app."* The Branding page was
+read field by field after a hard reload, and **nothing on it is required and empty**: app name
+*Flyleaf eReader*, user support email and developer contact `ajayifey@gmail.com`, authorised domains
+`flyleaf.cc` and `flyleaf-ereader.vercel.app`, all saved. What is empty is the **application home
+page, privacy policy and Terms of Service links**, which Google marks optional on that form and
+wants before an External app can be **published** — and the same page states plainly *"Verification
+is not required since your app is in testing status."* Pressing Save did not clear the warning,
+which is consistent with that reading: it is a publishing prerequisite, not a broken client.
+
+So it is left, deliberately. Clearing it means writing a public privacy policy and a Terms of
+Service and hosting both, which is a decision about offering this app to other people, not a
+configuration step. Nothing measured is blocked by it: the client is Enabled, both scopes are
+registered, all four origins are live, and the app is in Testing with the owner as its test user,
+which is the state that works today.
+
+**Flyleaf Press, for the record, is a different case.** Its own project reads **In production**,
+audience External, 0 users of a 100 cap — so Press is published and any Google account can grant it
+access, while this app is in Testing and only listed test users can. Worth knowing before assuming
+the two behave alike. Press's own home page and privacy policy fields are empty too; it was
+published before Google asked for them, and nothing in this repo touches Press's project.
 
 #### How the failure used to lie
 
@@ -1283,7 +1299,10 @@ other direction — nothing was ever synced, because it never worked. Two indepe
 3. Swap `VITE_GOOGLE_CLIENT_ID` locally and in all three Vercel environments, **then redeploy** — it
    is a build-time `import.meta.env` value, so an env change alone does nothing. Done: the old value
    was removed from production, preview and development, the new one set in each, and the result
-   confirmed by reading it back with `vercel env pull` (the pulled file was then deleted).
+   confirmed by reading it back with `vercel env pull` (the pulled file was then deleted). The deploy
+   is verified from the outside, not assumed: `read.flyleaf.cc` now serves `index-Bw-_-Zio.js`, which
+   contains commit `458c380` and the new client ID, and **does not contain** the old
+   `997776608568-…` one anywhere.
 4. Reconnect in the panel. The folder is new and empty; the first sync repopulates it from local,
    which is the direction that cannot lose anything. **This one is the owner's** — it needs a real
    Google sign-in, which is the one thing this tooling does not do.
