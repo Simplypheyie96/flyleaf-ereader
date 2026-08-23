@@ -38,6 +38,7 @@ import { SelectionMenu } from '../reader/SelectionMenu'
 import type { SelAnchor } from '../reader/SelectionMenu'
 import { NoteEditor } from '../reader/NoteEditor'
 import { ExportSheet } from '../reader/ExportSheet'
+import { Overlayer } from '../vendor/foliate-js/overlayer.js'
 import {
     addBookmark, addHighlight, drawFor, flatten, readPaint, removeAnnotation,
     removeBookmark, setNote, setTint, sortByPosition, withinPage,
