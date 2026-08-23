@@ -886,7 +886,29 @@ skeleton and fragment indices, which is a different job from the MOBI 6 generato
 covers it by the same code path and the same hook, but that is reasoning, not a measurement, and
 this sentence is here instead of a green tick.
 
-### 14.8 The empty contents list was one unquoted attribute
+### 14.8 Measuring nothing measures fine
+
+Twenty drivers were green while a finished feature shipped as nothing at all. The Drive panel is
+gated on a build-time ID, the ID was unset, `SyncPanel` returned `null`, and the whole section was
+absent from every build for weeks. Not one driver noticed, and each was right not to: `sync.mjs`
+tests the merge fold in `record.ts` directly and touches neither the UI nor Google, while
+`a11y.mjs`, `states.mjs` and `swatches.mjs` all measure what is on screen — and **an absent section
+has no contrast to fail, no state to be wrong in and no swatch to drift.** A component that returns
+`null` is invisible to every check that measures rendered output, because measuring nothing measures
+fine.
+
+`panels.mjs` closes it by asserting the one thing all the others assume: presence. It is
+deliberately dumb — no geometry, no colour, no behaviour, just that each panel the page is built to
+render is in the document, visible, and taller than 24px.
+
+**Its own first draft repeated the bug.** It read the client ID off the served bundle and then
+required the panel present if the ID was there and absent if it was not — calling the two agreeing a
+pass. Which scores an ID-less build at zero findings with the panel gone: the original bug, reported
+as health. *Consistency was never the property worth testing.* The property is that Drive sync
+**ships**, so a build with no client ID is itself a finding, named as such. Verified by rebuilding
+without the ID: two findings, both accurate, and both naming the fix.
+
+### 14.9 The empty contents list was one unquoted attribute
 
 The first MOBI fixture opened, rendered and hardened correctly, and its contents list was empty —
 where its `<guide>` pointed at two chapters. The finding named the app; the cause was the fixture,
