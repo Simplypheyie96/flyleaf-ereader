@@ -42,7 +42,7 @@ export async function readFb2(file: File, format: Format): Promise<Meta> {
   /* <coverpage><image l:href="#id"/></coverpage> → <binary id="id">base64 */
   const href = info.getElementsByTagName('coverpage')[0]
     ?.getElementsByTagName('image')[0]
-    ?.getAttributeNS('http://www.w3.org/1999/xlink', 'href')
+    ?.getAttributeNS('http://www.w3.org/1999/xlink', 'href') ?? info.getElementsByTagName('coverpage')[0]?.getElementsByTagName('image')[0]?.getAttribute('href') ?? info.getElementsByTagName('coverpage')[0]?.getElementsByTagName('image')[0]?.getAttribute('l:href')
   const id = href?.replace(/^#/, '')
   if (id) {
     const binary = Array.from(doc.getElementsByTagName('binary')).find((b) => b.getAttribute('id') === id)
