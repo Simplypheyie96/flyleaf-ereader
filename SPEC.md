@@ -1197,8 +1197,12 @@ sentence. What it did not have was anybody reading it. So Home carries an ask to
 under the header, above Continue, and it is the only place in the app that asks the reader for
 anything.
 
-Its rule is that it never appears where the ask cannot be acted on. Four branches, and three of
-them are silence:
+Its rule is that it never appears where the ask cannot be acted on — but "acted on" once meant
+"a button can be offered", and that made the ask **invisible** on desktop Safari, on Firefox, and
+on any Chrome that has already seen this app installed and so stops firing the event. A reader
+who never gets the browser's own bar was simply never asked. So the last branch is no longer
+silence: it names the route through the browser's own menu, per engine, and still carries no
+button, because there is still nothing to click.
 
 | state | strip | button |
 | --- | --- | --- |
@@ -1206,7 +1210,8 @@ them are silence:
 | iOS/iPadOS (`manualOnly`) | `Add to home screen`, naming Share → Add to Home Screen exactly as iOS names them | **none** — there is no programmatic install to offer |
 | a real `beforeinstallprompt` is held, coarse pointer | `Add to home screen`, on opening back to the page you were on | Install |
 | the same, fine pointer | `Open books here`, on book files opening into the reader | Install |
-| no prompt held and not iOS | none | — |
+| no prompt held, not iOS, coarse pointer | `Add to home screen`, naming the browser menu item — `Add to Home screen` on Chromium, `Add to Home Screen` elsewhere | **none** |
+| no prompt held, not iOS, fine pointer | `Open books here`, pointing at the address-bar install icon on Chromium, the browser menu otherwise | **none** |
 
 Two copies for the same capability, split on `pointer: coarse`, because "home screen" is not a
 thing on a laptop; and the desktop line leads on **file handling**, not on working offline —
