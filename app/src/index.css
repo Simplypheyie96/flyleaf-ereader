@@ -1862,6 +1862,12 @@ body::before{
    figure changes on every turn and a shifting readout draws the eye off the
    page. */
 .reader-readout{
+  /* A button, not a line of text: pressing it opens the jump. It keeps every
+     capsule rule below unchanged, and adds only the three things a button
+     needs that a <p> did not — a pointer, a press, and the same inversion the
+     other reader controls use to say they are open. */
+  cursor:pointer;
+  transition:transform 160ms var(--ease), background-color 160ms var(--ease);
   /* Same capsule as the title, and the same flex:0 1 auto for the same reason:
      the pill is the width of the readout, centred by auto margins, and the
      chapter is the part that gives when there is not enough room. */
@@ -1889,6 +1895,11 @@ body::before{
 /* The dots are punctuation between three values, not content. They keep the
    soft tone the figures gave up, and at 55% they are the one thing here that
    is allowed to be faint. */
+.reader-readout:active{ transform:scale(.96); }
+.reader-readout[aria-expanded="true"]{
+  background:var(--ink); color:var(--stock-bg); border-color:var(--ink);
+}
+.reader-readout[aria-expanded="true"] .reader-readout-sep{ color:var(--stock-bg); }
 .reader-readout-sep{ flex:none; color:var(--ink-soft); opacity:.55; }
 .reader-readout > span{ flex:none; }
 .reader-chapter{
@@ -2005,6 +2016,41 @@ body::before{
 .reader-goto{ padding:22px; }
 .reader-goto > .ui-p{ margin:0 0 4px; }
 .reader-goto-acts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+
+/* In the sheet row the block is the whole sheet, so it owns the scroll the
+   .sheet-body owns for the settings sheet. min-height:0 or the flex child
+   refuses to shrink below its content and the 40dvh cap does nothing. */
+.sheet > .reader-goto{ min-height:0; overflow-y:auto; padding-bottom:calc(22px + env(safe-area-inset-bottom)); }
+
+/* The percentage is typed as well as dragged, so the value in the head is a
+   field, not a label. It keeps the .ctl-val figures — same mono, same tabular
+   figures — and adds only what a field needs to read as one: a ground, a rule
+   and a caret. The unit sits outside the input so the number never has to be
+   parsed around it. */
+.reader-goto-num{
+  display:inline-flex; align-items:baseline; gap:2px;
+  /* 32px tall, not the 22 the figures alone came to: it is a field a finger
+     has to land in to place a caret, and .ctl-val next to it was never a
+     target at all. */
+  min-height:32px; padding:6px 10px;
+  border:1px solid var(--rule); border-radius:8px;
+  background:var(--lift);
+  font-family:var(--mono); font-size:12px; font-weight:500;
+  font-variant-numeric:lining-nums tabular-nums;
+  color:var(--ink);
+}
+.reader-goto-num:focus-within{ border-color:var(--ink); }
+.reader-goto-field{
+  width:3ch;
+  margin:0; padding:0;
+  border:0; background:none;
+  font:inherit; color:inherit;
+  text-align:end;
+  -moz-appearance:textfield;
+}
+.reader-goto-field::-webkit-outer-spin-button,
+.reader-goto-field::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.reader-goto-field:focus{ outline:none; }
 
 /* ── a book that would not open ───────────────────────────────────────────
    A refusal, not a spinner that never stops. DRM is caught at import and never

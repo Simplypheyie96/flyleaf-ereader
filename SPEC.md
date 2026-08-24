@@ -388,18 +388,27 @@ Beneath it, when and only when `navigator.onLine`, one labelled row that opens *
 a new tab. Labelled as leaving the app, absent when offline. It is an enhancement that degrades,
 never a feature that needs a network.
 
-### 6.6 A book that carries no contents list
+### 6.6 Going to a place in the book
 
-Plenty of files have no navigation document: a plain `.txt`, a Markdown export, a hand-made
-EPUB. The Contents tab used to say so — *"This book carries no contents list"* — and stop, which
-left the end of the book reachable only by turning every page to it.
+**The readout is the control.** `PAGE 4 OF 14 · XLIII · 63%` is the thing on screen that says
+where you are, so it is the thing you press to be somewhere else — a jump reached from a line of
+text sitting *beside* the readout is a jump nobody finds. It is a button, it inverts to ink while
+open like every other reader control, and it opens the **Go to** block in the sheet row, so the
+page shrinks and reflows once and the reader can see the book behind the control they are setting.
+It closes the settings sheet and the panel, and they close it.
 
-Where the list would be, that book gets **one control and three buttons**:
+The same block also stands in for the contents list on a book that has none — a plain `.txt`, a
+Markdown export, a hand-made EPUB — where the Contents tab used to say *"This book carries no
+contents list"* and stop. There it keeps that sentence as a lead-in; from the readout it needs no
+explanation and carries none.
+
+**One control, one field and three buttons:**
 
 | | |
 |---|---|
 | **Position** | A slider, 0–100, step 1, seeded from where the reader currently is. |
-| **Go to N%** | Commits the slider. Filled — the one filled control in the block. |
+| the % field | The same number, typed. Its own string while being edited, so an empty or half-typed field is allowed to exist; every keystroke that parses moves the slider. **It does not wait for Enter** — measured on a real keypress, Return never reaches the field, and a field that only commits on a key the page eats is a field that does nothing. |
+| **Go to N%** | Commits. Filled — the one filled control in the block. |
 | **Beginning** | `goToFraction(0)`. |
 | **End** | `goToFraction(1)`. |
 
@@ -413,13 +422,15 @@ Rules it is built to, all three of which it would be easy to break:
 - **It is proportion, not pagination.** No page number is invented for a reflowable book; the
   slider says how far through, which is the only true thing available.
 
-The slider seeds once, when the panel mounts, and then stops following the reader's own
-movement — a control that jumps under a thumb that is dragging it is worse than one that is
-briefly stale. Re-opening the panel re-seeds it.
+**It follows the book until it is touched.** The block can be left open while pages turn, and a
+slider showing where you *were* under a readout showing where you *are* is worse than no slider.
+So it re-seeds on every relocate — until the reader moves the slider or types in the field, after
+which it is theirs and the book stops overwriting it.
 
-**Done means:** a book with a contents list is unchanged; a book without one shows the block;
-Beginning and End land at 0% and 100%; the readout agrees; and the position that survives a
-reload is a CFI.
+**Done means:** pressing the readout opens the block and inverts the capsule; typing a number
+moves the slider without Enter; **Go to** lands there and closes the block; Beginning and End land
+at 0% and 100%; the readout agrees; a book with a contents list still shows its chapters, and one
+without shows this block with its lead-in; and the position that survives a reload is a CFI.
 
 ---
 
