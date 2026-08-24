@@ -556,15 +556,24 @@ export class TurnController {
         const l = this.#layer()
         if (l) l.style.transform = `translate3d(${offset}px,0,0)`
         const seam = this.#hooks.seam()
-        if (seam) seam.style.transform = `translate3d(${this.#seamAt(offset)}px,0,0)`
+        if (seam) seam.style.transform = `translate3d(${this.#seamAt(offset, offset < 0)}px,0,0)`
     }
 
     /** Where the rule sits: the boundary between the outgoing page and the
-        incoming one. Turning forward that boundary starts at the pane's
-        trailing edge and travels in with the content; turning back it starts
-        at the leading edge. */
-    #seamAt(offset: number): number {
-        return this.#paneX + offset + (offset < 0 ? this.#size : 0)
+        incoming one. Turning forward that boundary is the outgoing page's
+        TRAILING edge — it starts at the pane's trailing edge and travels in
+        with the content; turning back it is the leading edge and starts at
+        the pane's leading edge.
+
+        The direction is PASSED, never inferred from the offset's sign. A tap
+        or a key turn commits from an offset of exactly 0, and `0 < 0` is
+        false, so inferring put the start keyframe at the leading edge while
+        the end keyframe — paneX − size + size — landed on the leading edge
+        too. Both keyframes computed to the same x, so instead of an edge
+        travelling across the pane the turn drew a stationary hairline down
+        the leading margin: the straight line at the edge, on every tap. */
+    #seamAt(offset: number, fwd: boolean): number {
+        return this.#paneX + offset + (fwd ? this.#size : 0)
     }
 
     #liveOffset(): number {
@@ -615,10 +624,14 @@ export class TurnController {
         this.#anim = anim
         /* The seam rides the same clock, the same easing and the same
            property, so it cannot drift a frame away from the edge it draws. */
+        /* Which way this turn goes: the destination says it on a commit,
+           and on a spring back — where the destination is 0 — the offset
+           being abandoned says it instead. */
+        const fwd = to !== 0 ? to < 0 : this.#offset < 0
         this.#hooks.seam()?.animate(
             [
-                { transform: `translate3d(${this.#seamAt(this.#offset)}px,0,0)` },
-                { transform: `translate3d(${this.#seamAt(to)}px,0,0)` },
+                { transform: `translate3d(${this.#seamAt(this.#offset, fwd)}px,0,0)` },
+                { transform: `translate3d(${this.#seamAt(to, fwd)}px,0,0)` },
             ],
             { duration, easing, fill: 'forwards' })
         return anim.finished.then(() => true, () => false)
