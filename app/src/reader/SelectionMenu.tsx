@@ -81,19 +81,28 @@ export function SelectionMenu(p: SelectionMenuProps) {
 
     const w = box?.w ?? 0
     const h = box?.h ?? 0
-    /* Above by preference: a menu below the selection covers the next line,
-       which is the line you are about to read. Below only when there is no
-       room above. */
-    const isTouch = window.matchMedia('(pointer: coarse)').matches
-    const preferBelow = isTouch
-    const above = preferBelow 
-        ? !(p.anchor.bottom + GAP + h <= p.bounds.height - EDGE) 
-        : (p.anchor.top - GAP - h >= EDGE)
+    
+    let top: number
+    let left: number
 
-    const top = above
-        ? Math.max(EDGE, p.anchor.top - GAP - h)
-        : Math.min(p.bounds.height - h - EDGE, p.anchor.bottom + GAP)
-    const left = clamp(p.anchor.x - w / 2, EDGE, Math.max(EDGE, p.bounds.width - w - EDGE))
+    const isTouch = window.matchMedia('(pointer: coarse)').matches
+    if (isTouch) {
+        // To completely avoid the unpredictable OS native selection menu on touch screens,
+        // we place our menu on the opposite half of the screen from the text selection.
+        const center = p.bounds.height / 2
+        if (p.anchor.top < center) {
+            top = Math.max(EDGE, p.bounds.height - h - 32)
+        } else {
+            top = 32
+        }
+        left = clamp((p.bounds.width - w) / 2, EDGE, Math.max(EDGE, p.bounds.width - w - EDGE))
+    } else {
+        const canGoAbove = p.anchor.top - GAP - h >= EDGE
+        top = canGoAbove
+            ? Math.max(EDGE, p.anchor.top - GAP - h)
+            : Math.min(p.bounds.height - h - EDGE, p.anchor.bottom + GAP)
+        left = clamp(p.anchor.x - w / 2, EDGE, Math.max(EDGE, p.bounds.width - w - EDGE))
+    }
 
     return (
         <div
