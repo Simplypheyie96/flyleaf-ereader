@@ -31,6 +31,7 @@ import { readingCss } from '../reader/readingCss'
 import { hardenBook } from '../reader/harden'
 import { Sheet } from '../reader/Sheet'
 import { TurnController } from '../reader/turn'
+import { ScrollCross } from '../reader/scrollCross'
 import { ReadingClock } from '../reader/clock'
 import { Panel } from '../reader/Panel'
 import type { PanelRequest, SearchYield } from '../reader/Panel'
@@ -105,6 +106,7 @@ export function Reader() {
     const seamRef = useRef<HTMLDivElement | null>(null)
     const viewRef = useRef<FoliateViewElement | null>(null)
     const turnRef = useRef<TurnController | null>(null)
+    const crossRef = useRef<ScrollCross | null>(null)
     /* Chrome state is read inside event handlers that are registered once, so
        it is mirrored into a ref. Re-registering listeners on every toggle
        would tear the gesture layer down and rebuild it mid-read. */
@@ -155,6 +157,8 @@ export function Reader() {
        handle on a section's document is the one its own load event hands over,
        so it is kept. */
     const liveDoc = useRef<Document | null>(null)
+    /* The spine index of the section on screen, for ScrollCross. */
+    const sectionIndex = useRef(0)
     const selRange = useRef<Range | null>(null)
     const selIndex = useRef(0)
     const selTimer = useRef<number | null>(null)
@@ -275,6 +279,16 @@ export function Reader() {
                 turnRef.current = turn
                 turn.attach(document)
 
+                /* Scrolled flow only: foliate never leaves a section on its own
+                   scroll, so without this a phone dead-ends at the bottom of
+                   every chapter. Inert while paginated. */
+                const cross = new ScrollCross({
+                    renderer: () => viewRef.current?.renderer ?? null,
+                    index: () => sectionIndex.current,
+                })
+                crossRef.current = cross
+                cross.attach(document)
+
                 await view.init({ lastLocation: locator?.cfi ?? null, showTextStart: true })
                 if (!live) return
                 setReady(true)
@@ -289,6 +303,8 @@ export function Reader() {
             live = false
             turnRef.current?.destroy()
             turnRef.current = null
+            crossRef.current?.destroy()
+            crossRef.current = null
             const v = viewRef.current
             viewRef.current = null
             if (v) {
@@ -316,7 +332,9 @@ export function Reader() {
         const doc = e.detail?.doc
         if (!doc) return
         turnRef.current?.attach(doc)
+        crossRef.current?.attach(doc)
         docIndex.current.set(doc, e.detail.index ?? 0)
+        sectionIndex.current = e.detail.index ?? 0
         liveDoc.current = doc
         doc.addEventListener('selectionchange', onSelectionChange)
         doc.addEventListener('keydown', onDocKey)
