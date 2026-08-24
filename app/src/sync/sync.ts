@@ -70,7 +70,7 @@ const FILES_KEY = 'flyleaf-ereader-sync-files'
     mobile data, and the first thing they would know about it is the bill. Three
     a pass with a sync every ninety seconds clears forty books in about twenty
     minutes of the app being open, and stops the moment it is closed. */
-const FILES_PER_PASS = 3
+const FILES_PER_PASS = 10
 
 export interface SyncResult {
   /** rows that came down from another device */
