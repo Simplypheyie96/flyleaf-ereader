@@ -15,9 +15,13 @@ import { CloseIcon } from './icons'
                  and carries NO button, because there is nothing to click.
      canPrompt   a real beforeinstallprompt is held, so an Install button can
                  do the thing the sentence promises.
-     neither     nothing. A browser that has not offered an install cannot be
-                 made to, and a strip that only apologises is noise. Settings
-                 keeps the permanent, honest version of this ("This device").
+     neither     the browser's own route, in words. A browser that has not
+                 offered a prompt cannot be made to — but silence there meant
+                 the ask was invisible on desktop Safari and Firefox, and on
+                 any Chrome that has already seen this app installed and so
+                 stops firing the event. So this branch names the menu item
+                 instead of apologising, and carries no button, because there
+                 is still nothing to click.
 
    Two copies for canPrompt, split on pointer, because "home screen" is not a
    thing on a laptop. The desktop line leads on file handling rather than on
@@ -52,7 +56,25 @@ function copyFor(canPrompt: boolean, manualOnly: boolean): Copy | null {
       button: false,
     }
   }
-  if (!canPrompt) return null
+  if (!canPrompt) {
+    /* No programmatic prompt and not iOS, so the only honest thing left is the
+       route through the browser's own menu. Named per engine, because a reader
+       hunting for "Install" in a menu that says "Add to Home screen" gives up. */
+    const ua = navigator.userAgent
+    const chromium = /Chrome|Chromium|Edg\//.test(ua) && !/Firefox/.test(ua)
+    const where = coarse()
+      ? chromium
+        ? 'Open the browser menu and choose Add to Home screen.'
+        : 'Open the browser menu and choose Add to Home Screen.'
+      : chromium
+        ? 'Look for the install icon at the end of the address bar, or open the browser menu and choose Install.'
+        : 'Open the browser menu and look for Install, or Add to Dock.'
+    return {
+      label: coarse() ? 'Add to home screen' : 'Open books here',
+      body: `${where} It opens in its own window and keeps your place.`,
+      button: false,
+    }
+  }
   return coarse()
     ? {
         label: 'Add to home screen',
