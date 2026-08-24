@@ -109,6 +109,7 @@ export function Reader() {
     const [toc, setToc] = useState<FoliateTOCItem[]>([])
     const [sheetOpen, setSheetOpen] = useState(false)
     const [readout, setReadout] = useState<Readout | null>(null)
+    const [gotoOpen, setGotoOpen] = useState(false)
     const [failed, setFailed] = useState<string | null>(null)
     const [ready, setReady] = useState(false)
 
@@ -850,6 +851,7 @@ export function Reader() {
                 case 'Escape':
                     if (panelOpen) setPanelOpen(false)
                     else if (sheetOpen) setSheetOpen(false)
+                    else if (gotoOpen) setGotoOpen(false)
                     else return
                     break
                 default: return
@@ -862,7 +864,7 @@ export function Reader() {
             window.removeEventListener('keydown', onKey)
             keyRef.current = null
         }
-    }, [ready, rtl, settings?.size, panelOpen, sheetOpen, toggleTick, openPanel, findText])
+    }, [ready, rtl, settings?.size, panelOpen, sheetOpen, gotoOpen, toggleTick, openPanel, findText])
 
     /* One alias for the whole render. `settings` is undefined for the first
        frame of a cold start, and a reader who reaches the sheet in that frame
@@ -972,6 +974,18 @@ export function Reader() {
                 />
             )}
 
+            {chrome && gotoOpen && (
+                <section className="sheet" aria-label="Go to a place in the book">
+                    <GoTo
+                        at={readout?.fraction ?? 0}
+                        onGo={f => {
+                            setGotoOpen(false)
+                            void viewRef.current?.goToFraction(f)
+                        }}
+                    />
+                </section>
+            )}
+
             {chrome && (
                 <footer className="reader-bar reader-bar--bottom">
                     {/* The readout is centred on the window, so the button on
@@ -984,13 +998,28 @@ export function Reader() {
                         aria-label="Contents, marks and search"
                         aria-expanded={panelOpen}
                         onClick={() => {
+                            setGotoOpen(false)
                             if (panelOpen) { setPanelOpen(false); return }
                             openPanel(panelTab)
                         }}
                     >
                         <ContentsIcon />
                     </button>
-                    <p className="reader-readout">
+                    {/* The readout is the obvious place to reach for when you
+                        want to be somewhere else in the book — it is the thing
+                        that tells you where you are — so it is the control that
+                        opens the jump, not a line of text beside one. */}
+                    <button
+                        type="button"
+                        className="reader-readout"
+                        aria-label="Where you are — press to go somewhere else in the book"
+                        aria-expanded={gotoOpen}
+                        onClick={() => {
+                            setGotoOpen(o => !o)
+                            setSheetOpen(false)
+                            setPanelOpen(false)
+                        }}
+                    >
                         {readout ? (
                             <>
                                 <span>Page {readout.page} of {readout.pages}</span>
@@ -1000,13 +1029,13 @@ export function Reader() {
                                 <span>{percent(readout.fraction)}%</span>
                             </>
                         ) : <span>&nbsp;</span>}
-                    </p>
+                    </button>
                     <button
                         type="button"
                         className="reader-btn"
                         aria-label="Text and page settings"
                         aria-expanded={sheetOpen}
-                        onClick={() => { setSheetOpen(o => !o); setPanelOpen(false) }}
+                        onClick={() => { setSheetOpen(o => !o); setPanelOpen(false); setGotoOpen(false) }}
                     >
                         <TypeIcon />
                     </button>
@@ -1019,6 +1048,7 @@ export function Reader() {
                         toc.length === 0 ? (
                             <GoTo
                                 at={readout?.fraction ?? 0}
+                                note="This book carries no contents list, so there are no chapters to jump between. Move through it by proportion instead."
                                 onGo={f => {
                                     setPanelOpen(false)
                                     void viewRef.current?.goToFraction(f)
@@ -1103,19 +1133,72 @@ export function Reader() {
    reader's own arrival — and a control that jumps under a thumb that is
    dragging it is worse than one that is briefly stale. It is mounted with the
    panel, so opening the panel again re-seeds it. */
-function GoTo({ at, onGo }: { at: number; onGo: (fraction: number) => void }) {
+function GoTo({ at, onGo, note }: {
+    at: number
+    onGo: (fraction: number) => void
+    note?: string
+}) {
     const [pc, setPc] = useState(() => Math.round(clamp01(at) * 100))
+    /* Until the reader touches the control it follows the book: the sheet can
+       be left open while pages turn, and a slider showing where you WERE while
+       the readout above it shows where you ARE is worse than no slider. Once
+       they have moved it, it is theirs, and the book no longer overwrites it. */
+    const touched = useRef(false)
+    const seeded = Math.round(clamp01(at) * 100)
+    useEffect(() => {
+        if (touched.current) return
+        setPc(seeded)
+    }, [seeded])
+    /* The typed field keeps its own string so a half-typed or empty value is
+       allowed to exist — bound straight to the number, clearing the field would
+       rewrite it as "0" under the caret. The NUMBER still updates on every
+       keystroke that parses, so the control never waits for Enter to agree with
+       what is on screen: measured on a real keypress, Return never reached this
+       component, and a field that only commits on a key the page eats is a
+       field that does nothing. */
+    const [typed, setTyped] = useState<string | null>(null)
+
+    function onType(raw: string) {
+        setTyped(raw)
+        const n = Number(raw)
+        if (raw.trim() === '' || !Number.isFinite(n)) return
+        touched.current = true
+        setPc(Math.min(100, Math.max(0, Math.round(n))))
+    }
+
+    function commitTyped(raw: string) {
+        touched.current = true
+        const n = Math.round(Number(raw))
+        setTyped(null)
+        if (!Number.isFinite(n)) return
+        setPc(Math.min(100, Math.max(0, n)))
+    }
 
     return (
         <div className="reader-goto">
-            <p className="ui-p ui-p--soft">
-                This book carries no contents list, so there are no chapters to jump between.
-                Move through it by proportion instead.
-            </p>
+            {note && <p className="ui-p ui-p--soft">{note}</p>}
             <div className="ctl">
                 <p className="ctl-head">
-                    <span className="ctl-lbl">Position</span>
-                    <span className="ctl-val">{pc}%</span>
+                    <label className="ctl-lbl" htmlFor="goto-pc">Position</label>
+                    <span className="reader-goto-num">
+                        <input
+                            id="goto-pc"
+                            className="reader-goto-field"
+                            type="number"
+                            inputMode="numeric"
+                            min={0} max={100} step={1}
+                            value={typed ?? String(pc)}
+                            aria-label="Position in the book, in percent"
+                            onChange={e => onType(e.currentTarget.value)}
+                            onBlur={e => commitTyped(e.currentTarget.value)}
+                            onKeyDown={e => {
+                                if (e.key !== 'Enter') return
+                                e.preventDefault()
+                                commitTyped(e.currentTarget.value)
+                            }}
+                        />
+                        <span aria-hidden="true">%</span>
+                    </span>
                 </p>
                 <div className="rng-wrap">
                     <input
@@ -1125,7 +1208,11 @@ function GoTo({ at, onGo }: { at: number; onGo: (fraction: number) => void }) {
                         aria-label="Position in the book"
                         aria-valuetext={`${pc} percent`}
                         style={{ ['--p' as string]: String(pc / 100) }}
-                        onChange={e => setPc(Number(e.currentTarget.value))}
+                        onChange={e => {
+                            touched.current = true
+                            setTyped(null)
+                            setPc(Number(e.currentTarget.value))
+                        }}
                     />
                 </div>
                 {/* Commit on a press, never on the drag. Every intermediate
@@ -1133,7 +1220,7 @@ function GoTo({ at, onGo }: { at: number; onGo: (fraction: number) => void }) {
                     place in it, and the reader did not ask to go to any of
                     them. */}
                 <div className="reader-goto-acts">
-                    <button type="button" className="btn" onClick={() => onGo(pc / 100)}>
+                    <button type="button" className="btn" onClick={() => onGo(clamp01(pc / 100))}>
                         Go to {pc}%
                     </button>
                     <button type="button" className="btn btn--ghost" onClick={() => onGo(0)}>
@@ -1147,7 +1234,6 @@ function GoTo({ at, onGo }: { at: number; onGo: (fraction: number) => void }) {
         </div>
     )
 }
-
 function clamp01(n: number): number {
     return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0
 }
