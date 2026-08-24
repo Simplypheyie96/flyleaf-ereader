@@ -246,6 +246,36 @@ inline. A note, not a modal, and it does not appear twice for the same setting.
 
 Choosing Scrolled hides the turn control rather than greying it — there is no turn to style.
 
+#### Crossing a chapter in Scrolled flow
+
+foliate only ever leaves a section through `next()`/`prev()`; its own scroll handler relocates
+*inside* the section and never crosses. In Paginated flow that costs nothing, because every turn
+already goes through `next()`. In Scrolled flow it means native scrolling stops dead at the bottom
+of every chapter and the only way on is the arrow keys, which a phone does not have.
+
+So the end of a section is not a wall — **keep pushing and it crosses**. Arriving at the end is
+*not* the trigger: a reader who scrolls to the last paragraph and stops is reading it, not asking
+for what comes next. The trigger is a deliberate continued pull past the end, which is the same
+gesture they were already making.
+
+| | Value | Why |
+|---|---|---|
+| Pull past the end, by finger | 72px | More than the bottom rubber-band can spend on its own, short enough to read as "keep scrolling" rather than a second gesture |
+| The same by wheel | 140px | One trackpad flick is worth far more pixels than one thumb-length of screen |
+| Pause that spends the pull | 500ms | Resting at the last paragraph and then scrolling again is a fresh intent, not a continuation |
+| Cooldown after a crossing | 700ms | Otherwise the tail of one long swipe walks through two chapters |
+
+Forward lands at the **top** of the next chapter; backward lands at the **bottom** of the previous
+one, so a reader going back arrives where they left. Non-linear sections are skipped, and the last
+and first sections are guarded here rather than left to upstream, which reports "go on" at the end
+of every section including the last.
+
+This lives at `app/src/reader/scrollCross.ts`, outside the vendored tree, against public API only —
+so foliate stays upstream source with nothing to re-apply on an update.
+
+**Done means:** at the bottom of a chapter, resting does nothing; a continued scroll crosses; the
+same backwards; the first and last chapters do not cross; and one long swipe never advances twice.
+
 ### 5.2 The three turn styles
 
 All three track the finger, 1:1, on every page of the book — the thumb must never be able to

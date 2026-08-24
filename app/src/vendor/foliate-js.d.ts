@@ -80,6 +80,10 @@ interface FoliateLocation {
     type extends HTMLElement rather than hiding it. */
 interface FoliateRenderer extends HTMLElement {
   readonly scrolled: boolean
+  /** The spine, assigned straight across from the book on render
+      (paginator.js:656). Public, and read by reader/scrollCross.ts to find the
+      next section that is actually in the reading order. */
+  readonly sections?: FoliateSection[]
   /** The element a page turn transforms — the laid-out column strip inside the
       scroll port. Added by local patch (PATCHES.md 4a), because the paginator's
       shadow root is closed. Optional because `foliate-fxl` has no such element:
