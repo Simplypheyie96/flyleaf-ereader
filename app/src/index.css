@@ -1989,10 +1989,41 @@ body::before{
   text-align:start; cursor:pointer;
   font-family:var(--serif); font-weight:500;
   font-size:15px; line-height:1.35;
-  color:var(--ink);
+  /* Soft by default, full ink only where you are. Bolding one line among
+     sixty-five does almost nothing when every other line is already at full
+     ink — and least of all on roman numerals, which are too short to carry a
+     weight change. Dimming the rest is what makes the one legible. */
+  color:var(--ink-soft);
   text-wrap:pretty;
 }
 .reader-toc-link:active{ background:var(--rule); }
+/* Where you are: full ink and weight, against the dimmed list above. Not a
+   fill and not a row rule — either would make the contents read as a set of
+   cards, and the entry you are in is not a different kind of thing from the
+   ones you are not in. A sub-entry comes up to full ink on the same test, at
+   a lighter weight, so depth still reads. */
+.reader-toc-link[aria-current]{ font-weight:700; color:var(--ink); }
+/* And a mark on the leading edge, because weight alone is a comparison — it
+   only tells you anything if the entries above and below are on screen too.
+   The bar is the note-quote device two steps heavier — 4px rather than 2px,
+   and near the full height of the row, because a hairline beside a 700-weight
+   line reads as an artefact rather than a mark — and on the same token, drawn
+   as a pseudo-element rather than a border so the text does not step 2px
+   sideways when the reader moves into a chapter. Inset from the row's own
+   padding so it marks the line rather than filling the edge.
+
+   --accent is NOT a colour here and that is not a bug: [data-stock] re-pins it
+   to that stock's ink, so the bar is the stock's own ink on its own ground and
+   inherits that stock's measured contrast on all seven. */
+.reader-toc-link{ position:relative; }
+.reader-toc-link[aria-current]::before{
+  content:""; position:absolute;
+  inset-block:3px; inset-inline-start:0; width:4px;
+  border-radius:0 3px 3px 0; background:var(--accent);
+}
+.reader-toc-item[data-depth="1"] > .reader-toc-link[aria-current],
+.reader-toc-item[data-depth="2"] > .reader-toc-link[aria-current],
+.reader-toc-item[data-depth="3"] > .reader-toc-link[aria-current]{ font-weight:600; color:var(--ink); }
 .reader-toc-link:disabled{ color:var(--ink-soft); cursor:default; }
 /* Depth is indent plus a step down in voice: a sub-entry is the same list, one
    level quieter, not a different kind of thing. */

@@ -432,6 +432,33 @@ moves the slider without Enter; **Go to** lands there and closes the block; Begi
 at 0% and 100%; the readout agrees; a book with a contents list still shows its chapters, and one
 without shows this block with its lead-in; and the position that survives a reload is a CFI.
 
+### 6.7 Where you are in the contents
+
+A contents list that does not say which entry you are reading is a list of places you have to
+recognise. On a book that numbers its chapters in roman — sixty-five entries reading I, II, III —
+recognising is not possible at all, so the list has to say it.
+
+Three signals, all hung off `aria-current="location"` on the current entry, because a weight or a
+colour says nothing to a screen reader:
+
+| | |
+|---|---|
+| **The rest dim** | Every entry sits at `--ink-soft`; only the current one is full ink. This is the signal that does the work — bolding one line among sixty-five does almost nothing while the other sixty-four are already at full ink, and least of all on roman numerals, which are too short to carry a weight change. Measured AA on all seven stocks (4.62:1 on `tea`, the narrowest; 6.31:1 on `dusk`). |
+| **Weight** | 700 on a top-level entry, 600 on a sub-entry, so depth still reads. |
+| **An edge bar** | The `.note-quote` device two steps heavier — 4px rather than 2px, near the row's full height, on `--accent`, which inside the reader is that stock's own ink. Drawn as a pseudo-element, not a border, so the label does not step sideways when the reader moves into a chapter. Weight alone is a comparison and only works if the neighbours are on screen; the bar is absolute. |
+
+Matched on **href**, never on label: a book that numbers its parts I, II, III and its chapters
+I, II, III again has labels that repeat and hrefs that do not.
+
+And the entry **scrolls itself into view** on mount, centred, instantly. Marking chapter XVIII is
+worthless when it sits 1100px down a panel 812px tall — measured, not guessed. Instant rather than
+smooth: a panel opening is not a motion moment, and a list that visibly races to a position is
+worse than one that is simply already there.
+
+**Done means:** exactly one entry carries `aria-current` at any time; it matches the chapter in the
+readout; it is on screen the moment the panel opens; the label does not shift horizontally as the
+current entry changes; and a nested entry marks itself on the same test as a top-level one.
+
 ---
 
 ## 7. The library
