@@ -58,6 +58,11 @@ type Readout = {
     page: number
     pages: number
     chapter: string | null
+    /* The contents entry this page falls under, so the list can say which one
+       you are in. Matched on href rather than on label, because a book that
+       numbers its parts I, II, III and its chapters I, II, III again has
+       labels that repeat and hrefs that do not. */
+    href: string | null
     fraction: number
 }
 
@@ -484,13 +489,14 @@ export function Reader() {
         const pages = Math.max(1, (r?.pages ?? 3) - 2)
         const page = Math.min(pages, Math.max(1, r?.page ?? 1))
         const chapter = loc?.tocItem?.label?.trim() || null
+        const href = loc?.tocItem?.href ?? null
         const cfi = loc?.cfi ?? null
         const at = `${loc?.section?.current ?? -1}:${Math.round(r?.start ?? -1)}`
         const moved = at !== pagePosRef.current
         chapterRef.current = chapter
         pageCFIRef.current = cfi
         pagePosRef.current = at
-        setReadout({ page, pages, chapter, fraction: loc?.fraction ?? 0 })
+        setReadout({ page, pages, chapter, href, fraction: loc?.fraction ?? 0 })
         /* A menu anchored to a line that has left the page is pointing at
            nothing, so a turn closes it — but only a turn. */
         if (moved) setSel(null)
@@ -1061,6 +1067,7 @@ export function Reader() {
                                         key={`${item.href ?? i}-${i}`}
                                         item={item}
                                         depth={0}
+                                        here={readout?.href ?? null}
                                         onGo={href => {
                                             setPanelOpen(false)
                                             void viewRef.current?.goTo(href)
@@ -1238,17 +1245,38 @@ function clamp01(n: number): number {
     return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0
 }
 
-function TocRow({ item, depth, onGo }: {
+function TocRow({ item, depth, here, onGo }: {
     item: FoliateTOCItem
     depth: number
+    /* The href of the entry the reader is inside, or null before the first
+       relocate. Threaded down rather than looked up, so a nested entry marks
+       itself on the same test as a top-level one. */
+    here: string | null
     onGo: (href: string) => void
 }) {
+    const current = here !== null && item.href === here
+    /* Marking the entry is not enough on its own: a 65-chapter book opens its
+       contents at the top, and chapter XVIII sits 1100px down a viewport 812px
+       tall — measured, not guessed. So the entry brings itself into view as it
+       mounts. Instant, not smooth: a panel opening is not a motion moment, and
+       a list that visibly races to a position is worse than one that is simply
+       already there. */
+    const reveal = useCallback((node: HTMLButtonElement | null) => {
+        node?.scrollIntoView({ block: 'center' })
+    }, [])
     return (
         <li className="reader-toc-item" data-depth={Math.min(depth, 3)}>
             <button
                 type="button"
                 className="reader-toc-link"
+                ref={current ? reveal : undefined}
                 disabled={!item.href}
+                /* Three signals hang off this one attribute — the dim of every
+                   other row, the weight of this one, and the edge bar. All of
+                   them are invisible to a screen reader, so the state is also
+                   said out loud. `location` rather than `page`: these are
+                   places in one document, not pages of a set. */
+                aria-current={current ? 'location' : undefined}
                 onClick={() => item.href && onGo(item.href)}
             >
                 {item.label?.trim() || 'Untitled'}
@@ -1256,7 +1284,7 @@ function TocRow({ item, depth, onGo }: {
             {item.subitems?.length ? (
                 <ol className="reader-toc-list">
                     {item.subitems.map((sub, i) => (
-                        <TocRow key={`${sub.href ?? i}-${i}`} item={sub} depth={depth + 1} onGo={onGo} />
+                        <TocRow key={`${sub.href ?? i}-${i}`} item={sub} depth={depth + 1} here={here} onGo={onGo} />
                     ))}
                 </ol>
             ) : null}
