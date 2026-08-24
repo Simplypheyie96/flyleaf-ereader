@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, localDay, readingSince } from '../db'
 import { FORMAT_FAMILY, FORMAT_LABEL } from '../lib'
+import { DAY_MS, dayBefore, streakOf, weekStart } from '../days'
 import { StatsIcon, BackIcon } from '../components/icons'
 import { Cover } from '../components/Cover'
 import type { Book, ReadingDay } from '../types'
@@ -46,24 +47,6 @@ type Stats = {
     open: Book | null
 }
 
-/** `YYYY-MM-DD` for the day `n` days before `from`. Goes through Date rather
-    than subtracting from a string so month ends and leap days are the
-    platform's problem, not ours. */
-function dayBefore(from: string, n: number): string {
-    const [y, m, d] = from.split('-').map(Number)
-    return localDay(new Date(y, m - 1, d - n))
-}
-
-/** Monday of the week containing `day`. Monday because a reading week that
-    starts on Sunday splits every weekend in half. */
-function weekStart(day: string): string {
-    const [y, m, d] = day.split('-').map(Number)
-    const date = new Date(y, m - 1, d)
-    /* getDay is 0=Sunday, so Sunday is six days into its week, not none. */
-    const back = (date.getDay() + 6) % 7
-    return dayBefore(day, back)
-}
-
 function hm(ms: number): string {
     const min = Math.round(ms / 60_000)
     if (min < 1) return ms > 0 ? 'under a minute' : '—'
@@ -73,18 +56,6 @@ function hm(ms: number): string {
     /* `53h`, not `53h 0m`. The stray zero is the tell that a number was printed
        by a formatter rather than written by somebody. */
     return rest === 0 ? `${h}h` : `${h}h ${rest}m`
-}
-
-/** Consecutive days ending today, or ending yesterday if today is still
-    blank — a streak should not read as broken at breakfast. */
-function streakOf(minutes: Map<string, number>, today: string): number {
-    let cursor = minutes.has(today) ? today : dayBefore(today, 1)
-    let n = 0
-    while (minutes.has(cursor)) {
-        n += 1
-        cursor = dayBefore(cursor, 1)
-    }
-    return n
 }
 
 function longestOf(sorted: string[]): number {
@@ -164,7 +135,7 @@ export function Stats() {
         if (row.ms > 0) perDay.set(row.day, (perDay.get(row.day) ?? 0) + row.ms)
         const b = perBook.get(row.bookId) ?? { ms: 0, turns: 0 }
         perBook.set(row.bookId, { ms: b.ms + row.ms, turns: b.turns + row.turns })
-        if (row.ms >= 60_000) {
+        if (row.ms >= DAY_MS) {
             const list = dayBooks.get(row.day) ?? []
             list.push({ bookId: row.bookId, ms: row.ms })
             dayBooks.set(row.day, list)
