@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, localDay, readingSince } from '../db'
 import { percent, remember, shortDate, stored } from '../lib'
+import { dayBefore, streakOf, weekStart } from '../days'
 import { Cover } from '../components/Cover'
 import { InstallStrip } from '../components/InstallStrip'
 import { GridIcon, HomeIcon, ListIcon, StatsIcon } from '../components/icons'
@@ -78,7 +79,7 @@ export function Home() {
        it — the whole of the history is one tap away and rendered properly
        there. */
     const today = localDay()
-    const rows = await readingSince(sundayBefore(today, 400))
+    const rows = await readingSince(dayBefore(today, 400))
     const perDay = new Map<string, number>()
     for (const r of rows) perDay.set(r.day, (perDay.get(r.day) ?? 0) + r.ms)
 
@@ -90,15 +91,9 @@ export function Home() {
       if (day >= monday) week += ms
     }
 
-    /* Counted backwards from today, and a day only breaks the run if it has
-       under a minute on it — a thirty-second glance is not a reading day, and
-       counting it would make the streak flattering rather than true. */
-    let streak = 0
-    for (let i = 0; ; i += 1) {
-      const day = sundayBefore(today, i)
-      if ((perDay.get(day) ?? 0) < 60_000) break
-      streak += 1
-    }
+    /* Shared with the Stats page, which is one tap away and must not
+       disagree with the card. */
+    const streak = streakOf(perDay, today)
 
     return { reading: reading.map((book, i) => ({ book, locator: locators[i] })), fresh, total, week, streak }
   })
@@ -265,24 +260,6 @@ export function Home() {
       </div>
     </main>
   )
-}
-
-/* ── dates ────────────────────────────────────────────────────────────────
-   Both helpers go through Date rather than arithmetic on the string, so month
-   ends, leap days and DST are the platform's problem. */
-
-/** `YYYY-MM-DD` for the day `n` days before `from`. */
-function sundayBefore(from: string, n: number): string {
-  const [y, m, d] = from.split('-').map(Number)
-  return localDay(new Date(y, m - 1, d - n))
-}
-
-/** Monday of the week containing `day`. Monday because a reading week that
-    starts on Sunday splits every weekend in half. */
-function weekStart(day: string): string {
-  const [y, m, d] = day.split('-').map(Number)
-  const back = (new Date(y, m - 1, d).getDay() + 6) % 7
-  return sundayBefore(day, back)
 }
 
 /** Hours and minutes, never a bare count of minutes past an hour. */
