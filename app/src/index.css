@@ -1997,6 +1997,15 @@ body::before{
 .reader-toc-item[data-depth="3"] > .reader-toc-link{ padding-inline-start:88px; }
 .reader-toc-empty{ margin:0; padding:22px; }
 
+/* ── no contents list ─────────────────────────────────────────────────────
+   The same 22px inset as the empty line it replaces, so the tab does not
+   change shape depending on what the book carries. The .ctl below it draws its
+   own top rule, which is what separates the sentence from the control without
+   a second border. */
+.reader-goto{ padding:22px; }
+.reader-goto > .ui-p{ margin:0 0 4px; }
+.reader-goto-acts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+
 /* ── a book that would not open ───────────────────────────────────────────
    A refusal, not a spinner that never stops. DRM is caught at import and never
    reaches here; what reaches here is a corrupt file or one this app does not

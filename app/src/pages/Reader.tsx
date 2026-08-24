@@ -1016,24 +1016,29 @@ export function Reader() {
             {panelOpen && (
                 <Panel
                     tocNode={
-                        <ol className="reader-toc-list">
-                            {toc.length === 0 && (
-                                <li className="reader-toc-empty ui-p ui-p--soft">
-                                    This book carries no contents list.
-                                </li>
-                            )}
-                            {toc.map((item, i) => (
-                                <TocRow
-                                    key={`${item.href ?? i}-${i}`}
-                                    item={item}
-                                    depth={0}
-                                    onGo={href => {
-                                        setPanelOpen(false)
-                                        void viewRef.current?.goTo(href)
-                                    }}
-                                />
-                            ))}
-                        </ol>
+                        toc.length === 0 ? (
+                            <GoTo
+                                at={readout?.fraction ?? 0}
+                                onGo={f => {
+                                    setPanelOpen(false)
+                                    void viewRef.current?.goToFraction(f)
+                                }}
+                            />
+                        ) : (
+                            <ol className="reader-toc-list">
+                                {toc.map((item, i) => (
+                                    <TocRow
+                                        key={`${item.href ?? i}-${i}`}
+                                        item={item}
+                                        depth={0}
+                                        onGo={href => {
+                                            setPanelOpen(false)
+                                            void viewRef.current?.goTo(href)
+                                        }}
+                                    />
+                                ))}
+                            </ol>
+                        )
                     }
                     annotations={annotations}
                     bookmarks={bookmarks}
@@ -1076,6 +1081,75 @@ export function Reader() {
             )}
         </main>
     )
+}
+
+/* What stands where the contents list would be, for a book that carries none.
+
+   Plenty of files have no navigation document at all — a plain .txt, a
+   Markdown export, a hand-made EPUB — and until now the Contents tab said so
+   and stopped there, which left the end of the book reachable only by turning
+   every page to it.
+
+   PROPORTION, NOT PAGINATION. What this offers is a place to jump TO, and it
+   is deliberately not a page number: a reflowable book has no stable page
+   count, and DESIGN.md forbids pretending otherwise. Nothing here is ever
+   stored either — the jump lands, the engine reports a locator, and the
+   position written to the record is that locator's CFI, exactly as it is after
+   a page turn. The percentage is a control, not a representation of where the
+   reader is kept.
+
+   The slider seeds from the current position and then stops listening to it,
+   because the only thing that would move it while it is on screen is the
+   reader's own arrival — and a control that jumps under a thumb that is
+   dragging it is worse than one that is briefly stale. It is mounted with the
+   panel, so opening the panel again re-seeds it. */
+function GoTo({ at, onGo }: { at: number; onGo: (fraction: number) => void }) {
+    const [pc, setPc] = useState(() => Math.round(clamp01(at) * 100))
+
+    return (
+        <div className="reader-goto">
+            <p className="ui-p ui-p--soft">
+                This book carries no contents list, so there are no chapters to jump between.
+                Move through it by proportion instead.
+            </p>
+            <div className="ctl">
+                <p className="ctl-head">
+                    <span className="ctl-lbl">Position</span>
+                    <span className="ctl-val">{pc}%</span>
+                </p>
+                <div className="rng-wrap">
+                    <input
+                        type="range"
+                        className="rng"
+                        min={0} max={100} step={1} value={pc}
+                        aria-label="Position in the book"
+                        aria-valuetext={`${pc} percent`}
+                        style={{ ['--p' as string]: String(pc / 100) }}
+                        onChange={e => setPc(Number(e.currentTarget.value))}
+                    />
+                </div>
+                {/* Commit on a press, never on the drag. Every intermediate
+                    value of a drag is a whole re-layout of the book at a new
+                    place in it, and the reader did not ask to go to any of
+                    them. */}
+                <div className="reader-goto-acts">
+                    <button type="button" className="btn" onClick={() => onGo(pc / 100)}>
+                        Go to {pc}%
+                    </button>
+                    <button type="button" className="btn btn--ghost" onClick={() => onGo(0)}>
+                        Beginning
+                    </button>
+                    <button type="button" className="btn btn--ghost" onClick={() => onGo(1)}>
+                        End
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+function clamp01(n: number): number {
+    return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0
 }
 
 function TocRow({ item, depth, onGo }: {

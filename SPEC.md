@@ -388,6 +388,39 @@ Beneath it, when and only when `navigator.onLine`, one labelled row that opens *
 a new tab. Labelled as leaving the app, absent when offline. It is an enhancement that degrades,
 never a feature that needs a network.
 
+### 6.6 A book that carries no contents list
+
+Plenty of files have no navigation document: a plain `.txt`, a Markdown export, a hand-made
+EPUB. The Contents tab used to say so — *"This book carries no contents list"* — and stop, which
+left the end of the book reachable only by turning every page to it.
+
+Where the list would be, that book gets **one control and three buttons**:
+
+| | |
+|---|---|
+| **Position** | A slider, 0–100, step 1, seeded from where the reader currently is. |
+| **Go to N%** | Commits the slider. Filled — the one filled control in the block. |
+| **Beginning** | `goToFraction(0)`. |
+| **End** | `goToFraction(1)`. |
+
+Rules it is built to, all three of which it would be easy to break:
+
+- **It commits on a press, never on the drag.** Every intermediate value of a drag is a whole
+  re-layout of the book at a new place in it, and the reader did not ask to go to any of them.
+- **A percentage is a control here, not a position.** Nothing stores it. The jump lands, the
+  engine reports a locator, and what is written to the record is that locator's **CFI**, exactly
+  as after a page turn — `CLAUDE.md`'s "position is a CFI" is untouched.
+- **It is proportion, not pagination.** No page number is invented for a reflowable book; the
+  slider says how far through, which is the only true thing available.
+
+The slider seeds once, when the panel mounts, and then stops following the reader's own
+movement — a control that jumps under a thumb that is dragging it is worse than one that is
+briefly stale. Re-opening the panel re-seeds it.
+
+**Done means:** a book with a contents list is unchanged; a book without one shows the block;
+Beginning and End land at 0% and 100%; the readout agrees; and the position that survives a
+reload is a CFI.
+
 ---
 
 ## 7. The library
@@ -429,8 +462,25 @@ covers are glitching, they will show cover one minute and not show it another mi
   cover's shape changed, and a book's shape never changes, so one aborted load ghosted a good
   cover for the rest of the session and came back only on a remount.
 
-`audit/covers.mjs` is the gate, and its third question is the direct regression guard: a single
-`error` dispatched at a loaded, valid cover must recover to an image, not to the ghost.
+- **A successful load resets the count.** The two failures that ghost a cover have to be
+  consecutive. Without `onLoad` clearing the count they need not be — one interrupted load now and
+  another an hour later add up to a verdict about a cover that has decoded correctly a hundred
+  times in between, which is the second reported form of this bug: a cover that was there, then
+  was the format ghost, and stayed the ghost until a reload.
+- **An error never revokes.** It drops the cache entry so the retry mints a fresh URL, and leaves
+  the old handle alone. The same book is on screen in more than one place and those copies share
+  the URL; revoking it aborts *their* in-flight decodes, which is one error each, which is the
+  second failure, which is the ghost — the cascade the cache exists to prevent. The stale handle
+  leaks once per failure, on a Blob the shelf query retains anyway.
+- **A verdict does not outlive the mount that reached it.** `undecodable` is module-level so that
+  the two failures can come from two copies of one book on one screen, not so a book stays ghosted
+  for the session. Any fresh mount clears it and tries the bytes again, at the cost of one decode
+  of an at-most-120KB image.
+
+`audit/covers.mjs` is the gate. Its third question is the direct regression guard — a single
+`error` dispatched at a loaded, valid cover must recover to an image, not to the ghost — and
+question 3b is the guard for the non-consecutive form: two errors with a **successful load between
+them** must also recover.
 
 ---
 
@@ -692,7 +742,7 @@ all of it.
 
 ## 12. Settled
 
-The three open questions, decided. Reopening one is a decision, not a correction.
+The open questions, decided. Reopening one is a decision, not a correction.
 
 1. **The included books** — *The Time Machine* and *Pride and Prejudice*, both Standard Ebooks,
    CC0, 1.30 MiB together. § 1.1 and `app/public/seed/MANIFEST.md`.
@@ -704,6 +754,46 @@ The three open questions, decided. Reopening one is a decision, not a correction
    measured against. That is a legitimate reason and it is the harder one to write down, so it is
    written down — § 5.2.1, with the numbers it passed. Three styles is still two more than every
    reader that ships only a slide.
+4. **Comics and Word documents — out, and here is why.** The decision was in `CLAUDE.md` with no
+   reasoning anywhere, so it kept getting asked. § 12.1.
+
+### 12.1 Why comics (CBZ/CBR) and documents (DOCX/RTF) are out
+
+**Comics are not text, so the whole app goes quiet on them.**
+
+- Position is a CFI, which points at a piece of text. A page that is one image has no text to
+  point at.
+- The reading surface has nothing to do: no reflow, no font, size, leading or measure, no seven
+  stocks (a full-bleed image covers the page anyway), no selection, no highlights, no in-book
+  search, no concordance. Three tabs of controls would open empty.
+- What a comic actually needs is a different app: two-page spreads, panel-by-panel guided view,
+  fit-width and fit-height zoom, right-to-left paging for manga, and memory management for tens
+  of megabytes of decoded images. That is the same reason PDF needed its own view instead of
+  going through foliate (§ 13) — and PDF at least has text in it.
+- CBR is RAR. Supporting it means shipping a wasm RAR decompressor into a local-first PWA, and
+  RAR5 support in the JS options is patchy.
+- foliate-js has no comic parser, so there is nothing to extend. It would all be new.
+
+**DOCX and RTF are files you edit, not books you read.**
+
+- Converting them to clean reflowable HTML is lossy and has no floor: tables, footnotes, tracked
+  changes, list numbering, section breaks, embedded objects.
+- The one that settles it: the converted structure depends on the converter's version. Update the
+  converter and every saved CFI quietly moves, so a reader loses their place in a book they were
+  halfway through. That breaks the promise the whole app is built on — position survives
+  everything.
+- No cover and no dependable metadata, so every one of them lands on the shelf as a ghost card,
+  against "a real cover or nothing".
+
+**And the rule underneath both:** a format that is listed but does not really open is worse than a
+format that is not listed. Half-supporting either of these would be exactly that.
+
+**What the code does with them.** `import/sniff.ts` recognises a comic archive on purpose — an
+archive of nothing but images is refused as `'a comic archive'` rather than the useless
+`'a zip file'`, so the `cbz|cbr` in its `IMAGEY` pattern is a *refusal*, not leftover support.
+The vendored `foliate-js/view.js` knows `application/vnd.comicbook+zip`, but the sniffer refuses
+the file long before `makeBook` is reached, so that branch is unreachable here and is left alone
+as upstream source.
 
 ---
 
