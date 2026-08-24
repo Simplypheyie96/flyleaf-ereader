@@ -124,6 +124,40 @@ else {
 }
 say(`spurious error: ghosted=${spurious.ghosted} recovered=${spurious.recovered} reminted=${spurious.reminted}`)
 
+// ---- 3b. two failures an hour apart are not one verdict ----
+/* The count of failures is what decides the ghost, and it is module-level, so
+   without something to clear it the two failures need not be consecutive: one
+   interrupted load now and another much later add up to a verdict about a cover
+   that has decoded correctly in between. This dispatches an error, waits for
+   the retry to LOAD, and then dispatches a second one. That is two errors and
+   the cover must still be there — the successful decode between them is proof
+   the bytes are fine, and it resets the count. Corrupt bytes cannot produce
+   this sequence, because they never load. */
+const twice = await page.evaluate(async () => {
+  const box = document.querySelector('.cover')
+  const img = box?.querySelector('img')
+  if (!img) return { skipped: 'no cover to test' }
+  img.dispatchEvent(new Event('error'))
+  await new Promise(r => setTimeout(r, 900))
+  const mid = document.querySelectorAll('.cover')[0].querySelector('img')
+  if (!mid || !mid.complete || !mid.naturalWidth) return { skipped: 'the retry never loaded, so the second error would not be a fair test' }
+  mid.dispatchEvent(new Event('error'))
+  await new Promise(r => setTimeout(r, 900))
+  const end = document.querySelectorAll('.cover')[0]
+  const now = end.querySelector('img')
+  return {
+    recovered: !!now && now.complete && now.naturalWidth > 0,
+    ghosted: !!end.querySelector('.cover-ghost'),
+  }
+})
+m.twoErrorsWithALoadBetween = twice
+if (twice.skipped) bad('twice', twice.skipped)
+else {
+  if (twice.ghosted) bad('twice', 'two errors with a SUCCESSFUL load between them ghosted the cover — a load is proof the bytes decode, so it must reset the count of failures')
+  if (!twice.recovered) bad('twice', 'the cover did not come back after the second spurious error')
+}
+say(`two errors, one load between: ghosted=${twice.ghosted} recovered=${twice.recovered}`)
+
 // ---- 4. the urls survive a route change ----
 /* Clicked, not page.goto'd. A hard load tears down the module the cache lives
    in, so of course the urls are minted again — that is a new document, not a

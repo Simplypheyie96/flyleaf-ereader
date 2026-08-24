@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Book } from '../types'
 import { FORMAT_FAMILY, FORMAT_LABEL } from '../lib'
 
@@ -107,6 +107,13 @@ function coverUrl(shape: string, blob: Blob): string {
 const failures = new Map<string, number>()
 const undecodable = new Set<string>()
 
+/* size, not just presence: a zero-byte Blob is truthy and would render as a
+   broken glyph. */
+function shapeOf(book: Book): string | null {
+  const blob = book.cover
+  return blob?.size ? `${book.id}:${blob.size}:${blob.type}` : null
+}
+
 type Props = {
   book: Book
   /** kept for the call sites; the printed tilt was removed from the cover, so
@@ -120,10 +127,26 @@ export function Cover({ book }: Props) {
      get one more render out of the mount that saw the failure. */
   const [, repaint] = useState(0)
 
-  /* size, not just presence: a zero-byte Blob is truthy and would render as a
-     broken glyph. */
+  /* A verdict of "undecodable" is never allowed to outlive the mount that
+     reached it. It is module-level so that the two failures it takes to reach
+     it can come from two different copies of the same book on one screen — not
+     so that a book stays ghosted for the rest of the session. Any fresh mount
+     (a route change, a scroll that recycles a row) clears the verdict and the
+     count and tries the bytes again, which costs one decode of an at-most-120KB
+     image and is the difference between a transient failure that heals and the
+     reported bug: a cover that was there, then was the EPUB ghost, and stayed
+     the ghost until a reload. */
+  const first = useRef(true)
+  if (first.current) {
+    first.current = false
+    if (shapeOf(book)) {
+      undecodable.delete(shapeOf(book)!)
+      failures.delete(shapeOf(book)!)
+    }
+  }
+
   const blob = book.cover
-  const shape = blob?.size ? `${book.id}:${blob.size}:${blob.type}` : null
+  const shape = shapeOf(book)
   /* Derived during render, not in an effect, so the very first paint has the
      real src. This is what closes the one-render window the old code left
      between revoking a URL and committing the replacement. Minting is
@@ -145,6 +168,14 @@ export function Cover({ book }: Props) {
           src={url}
           alt=""
           decoding="async"
+          /* Proof the bytes decode, so the count of failures starts again from
+             zero. Without this the two failures that ghost a cover need not be
+             consecutive: one interrupted load now and another an hour later add
+             up to a verdict about a cover that has decoded correctly a hundred
+             times in between. */
+          onLoad={() => {
+            if (shape) failures.delete(shape)
+          }}
           onError={(e) => {
             /* Only if the failure is THIS url. An error arriving for a src the
                element has already moved off is not evidence about the cover in
@@ -157,10 +188,15 @@ export function Cover({ book }: Props) {
 
             const n = (failures.get(shape) ?? 0) + 1
             failures.set(shape, n)
-            /* Drop the URL either way, so a retry gets a fresh one and a
-               verdict of undecodable is not still holding a blob alive. */
+            /* Drop the cache entry so the retry mints a fresh URL — but DO NOT
+               revoke. The same book is on screen in more than one place (Home
+               renders it in the continue rail and the recent shelf), and those
+               copies share this URL; revoking it here aborts THEIR in-flight
+               decodes, which is one error each, which is the second failure,
+               which is the ghost. The stale handle leaks until the tab closes,
+               once per failure, on a blob that is retained by the shelf query
+               anyway. */
             urls.delete(shape)
-            URL.revokeObjectURL(url)
             if (n >= 2) undecodable.add(shape)
             repaint((x) => x + 1)
           }}
