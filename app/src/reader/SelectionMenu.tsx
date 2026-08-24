@@ -86,23 +86,19 @@ export function SelectionMenu(p: SelectionMenuProps) {
     let left: number
 
     const isTouch = window.matchMedia('(pointer: coarse)').matches
-    if (isTouch) {
-        // To completely avoid the unpredictable OS native selection menu on touch screens,
-        // we place our menu on the opposite half of the screen from the text selection.
-        const center = p.bounds.height / 2
-        if (p.anchor.top < center) {
-            top = Math.max(EDGE, p.bounds.height - h - 32)
-        } else {
-            top = 32
-        }
-        left = clamp((p.bounds.width - w) / 2, EDGE, Math.max(EDGE, p.bounds.width - w - EDGE))
-    } else {
-        const canGoAbove = p.anchor.top - GAP - h >= EDGE
-        top = canGoAbove
-            ? Math.max(EDGE, p.anchor.top - GAP - h)
-            : Math.min(p.bounds.height - h - EDGE, p.anchor.bottom + GAP)
-        left = clamp(p.anchor.x - w / 2, EDGE, Math.max(EDGE, p.bounds.width - w - EDGE))
-    }
+    // On touch devices, the native OS menu pops up right next to the text.
+    // It's usually about 45-50px tall. We use a 60px gap to float our menu
+    // just past the OS menu so they stack neatly!
+    const effectiveGap = isTouch ? 60 : GAP
+    
+    const canGoAbove = p.anchor.top - effectiveGap - h >= EDGE
+    const above = canGoAbove
+    
+    top = above
+        ? Math.max(EDGE, p.anchor.top - effectiveGap - h)
+        : Math.min(p.bounds.height - h - EDGE, p.anchor.bottom + effectiveGap)
+    
+    left = clamp(p.anchor.x - w / 2, EDGE, Math.max(EDGE, p.bounds.width - w - EDGE))
 
     return (
         <div
