@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev", "--", "--port", "5183", "--strictPort"],
       "cwd": "app",
       "port": 5183
+    },
+    {
+      "name": "flyleaf-ereader-built",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "preview", "--port", "5184", "--strictPort"],
+      "cwd": "app",
+      "port": 5184
     }
   ]
 }
