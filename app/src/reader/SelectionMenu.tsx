@@ -84,9 +84,14 @@ export function SelectionMenu(p: SelectionMenuProps) {
     /* Above by preference: a menu below the selection covers the next line,
        which is the line you are about to read. Below only when there is no
        room above. */
-    const above = p.anchor.top - GAP - h >= EDGE
+    const isTouch = window.matchMedia('(pointer: coarse)').matches
+    const preferBelow = isTouch
+    const above = preferBelow 
+        ? !(p.anchor.bottom + GAP + h <= p.bounds.height - EDGE) 
+        : (p.anchor.top - GAP - h >= EDGE)
+
     const top = above
-        ? p.anchor.top - GAP - h
+        ? Math.max(EDGE, p.anchor.top - GAP - h)
         : Math.min(p.bounds.height - h - EDGE, p.anchor.bottom + GAP)
     const left = clamp(p.anchor.x - w / 2, EDGE, Math.max(EDGE, p.bounds.width - w - EDGE))
 
