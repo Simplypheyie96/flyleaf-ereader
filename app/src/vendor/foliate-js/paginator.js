@@ -1268,7 +1268,15 @@ export class Paginator extends HTMLElement {
         on using #index and #view and needs no knowledge of the window. */
     #syncCurrent() {
         if (!this.scrolled || this.#views.length < 2) return false
-        const probe = this.#container.scrollTop + this.#margin + 1
+        /* PATCH 6. Probed at the MIDDLE of the viewport, not at the reading
+           margin. Against the margin, a chapter heading sits plainly on screen
+           — often halfway up it — while the readout still names the chapter
+           before it, which reads as a stale label rather than as a rule about
+           top edges. Against the middle, the name changes when the new chapter
+           takes the larger half of the screen, which is the moment a reader
+           would say they are in it. */
+        const el = this.#container
+        const probe = el.scrollTop + el.clientHeight / 2
         let cur = this.#views[0]
         for (const v of this.#views)
             if (v.view.element.offsetTop <= probe) cur = v

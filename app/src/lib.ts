@@ -73,6 +73,19 @@ export function percent(fraction: number): number {
   return Math.min(99, Math.max(1, Math.round(fraction * 100)))
 }
 
+/** Minutes remaining, phrased the way a person would say it. Under a minute
+    is "less than a minute" rather than "0 min", because a chapter you are
+    still reading never has none left; an hour or more breaks into hours and
+    minutes, because "94 min" is arithmetic the reader has to do themselves. */
+export function minutes(mins: number): string {
+  const m = Math.max(0, Math.round(mins))
+  if (m < 1) return 'less than a minute'
+  if (m < 60) return `${m} min`
+  const h = Math.floor(m / 60)
+  const rest = m % 60
+  return rest ? `${h} hr ${rest} min` : `${h} hr`
+}
+
 /** The printed tilt, per DESIGN.md: −1.4° to +1.6°, derived from the record id
     and never random — a cover that leans a different way on every render is a
     twitch, not a print. Library and book detail only; the reading page is
