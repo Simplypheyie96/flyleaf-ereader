@@ -199,8 +199,12 @@ Rules that go with it:
 - **Report what was not covered.** The driver names any screen it could not
   reach (no book on the shelf, no PDF imported). Never present a run as a pass
   for screens it skipped.
-- **A PDF is not seeded**, so `.sheet-lead` and the rest of the PDF sheet are
-  not reachable by the driver and must be measured by hand when touched.
+- **The PDF screens use a fixture, not a seeded book.** The shelf ships two
+  `INCLUDED` books and that stays a product decision; `audit/fixture-pdf.mjs`
+  generates a real two-page PDF at run time, the driver imports it through the
+  app's own picker, and it is deleted after. So the PDF reader and its two
+  sheets are measured like everything else — no hand measurement, and nothing
+  to add to the shelf to keep it that way.
 
 ## Guardrails (negative prompt, always on)
 
