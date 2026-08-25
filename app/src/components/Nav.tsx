@@ -45,8 +45,12 @@ export function Nav() {
       <div className="tab-pill">
         {TABS.map(({ to, label, Icon }) => {
           const on = owns(to, pathname)
+          /* `title` as well as `aria-label`, for the desktop rail: it is
+             icon-only there, and a mouse has no other way to ask what an icon
+             means. The phone bar names the tab you are on, so the tooltip is
+             the same answer, given to the only pointer that can hover. */
           return (
-            <Link key={to} to={to} aria-current={on ? 'page' : undefined} aria-label={label}>
+            <Link key={to} to={to} title={label} aria-current={on ? 'page' : undefined} aria-label={label}>
               <Icon />
               <span className="tab-lbl">{label}</span>
             </Link>

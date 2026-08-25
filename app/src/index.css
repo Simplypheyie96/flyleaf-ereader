@@ -1674,16 +1674,20 @@ body::before{
    rather than to invent a surface: no border-right, no full-height sidebar,
    no second kind of chrome.
 
-   It gains one thing the phone bar cannot afford: every tab keeps its label,
-   stacked under the icon, not just the active one. On a phone that costs the
-   width of the bar; here there is nothing to spend it against.
+   It is icon-only, exactly as the phone bar is at rest. A stacked label under
+   every icon was tried and shipped, and it is what made this thing wide: the
+   rail's width is the width of its longest word, so SETTINGS -- not the icon,
+   not the padding -- was setting the column. Shrinking the type only bought
+   ten pixels and cost legibility at 8px uppercase, so the label went instead.
+   Nothing is lost to a screen reader, which reads the link's aria-label either
+   way, and a mouse gets the name on hover.
 
    The page RESERVES the rail's column rather than letting the capsule float
    over the content. Content centres with `align-items:center`, so a floating
    rail would be centred against — and eventually overlap — a shelf that has
    just been allowed to grow to the width of the window. */
 @media (min-width:1024px){
-  :root{ --rail:76px; }
+  :root{ --rail:56px; }
 
   /* TWO gutters, not one: the rail lives in the first and the content clears
      it by the second. With a single gutter the arithmetic works out to the
@@ -1692,18 +1696,13 @@ body::before{
      at 1024, where it does not. Measured: 0px clearance on the left against
      32px on the right.
 
-     The rail was 88px wide with 60px tabs and a 56px button; the owner called
-     it too big for what it is, which is four destinations and one action on a
-     screen whose subject is a shelf of books. It is 72 / 52 / 48 now — the
-     tab still clears the 44px target floor, and the icon and label are
-     untouched, so what came off is padding rather than legibility.
-
-     76 and not 72, which was tried: at 72 the tab's padding box is 52px and
-     SETTINGS sets 54.7px, so the longest label ate its own 4px padding and
-     sat 2.7px into it on each side. Nothing clipped, but the declared padding
-     stopped being true, and the label a rail exists to show is the wrong
-     thing to squeeze. 76 gives 56px of padding box, which the longest label
-     clears. */
+     The rail was 88px wide with 60px tabs and a 56px button, for four
+     destinations and one action on a screen whose subject is a shelf of
+     books. Trimming padding took it to 76 and it was still too wide, because
+     padding was never the cause: with a label under each icon the column is
+     as wide as SETTINGS, and no amount of padding comes off that. Dropping
+     the labels does. 56 / 44 / 44 now, which is the 44px target floor exactly
+     and the phone bar's own geometry stood on its end. */
   .page{ padding-left:calc(var(--gutter) * 2 + var(--rail)); }
 
   .tabbar{
@@ -1714,24 +1713,25 @@ body::before{
   }
   .tab-pill{ flex-direction:column; gap:4px; width:var(--rail); }
   .tab-pill a{
-    /* stacked, so the label sits under its icon rather than beside it */
-    flex-direction:column; gap:6px;
-    width:100%; min-height:0;
-    padding:8px 4px;
-    /* Half the item's own height, so the ends go fully round. That is the
-       phone bar's pill rotated, which is what the note above this block says
-       this rail is, and it is also the one radius that can never cross the
-       capsule's inner arc: an item inset evenly inside a stadium and rounded
-       to its own half-height follows the same curve rather than cutting it.
-       A smaller corner does cut it -- 22px on the old 88px rail crossed by
-       1.6px, and the active tab visibly bulged past its container. */
-    border-radius:26px;
-    font-size:9.5px; letter-spacing:.09em;
+    /* square and icon-only: nothing to stack, nothing to sit beside */
+    width:100%; min-width:0; height:44px; min-height:44px;
+    padding:0;
+    /* A 44px square at 999px is a circle, and a circle inset evenly inside a
+       stadium follows its curve rather than cutting it. A part-way corner
+       does cut it -- 22px on the old 88px rail crossed the capsule's arc by
+       1.6px, and the active tab visibly bulged past its own container. */
+    border-radius:999px;
   }
-  /* every tab is named here, not only the current one */
-  .tab-pill a .tab-lbl{ display:block; }
-  .tab-pill a[aria-current="page"]{ padding-inline:4px; }
-  .tab-add{ width:48px; height:48px; }
+  /* No label, not even on the current tab. The phone bar names the one you
+     are on because it has the width lying spare; a 44px circle does not, and
+     the ink fill says the same thing without asking for a column.
+     The current tab is named in the base rules, so that selector has to be
+     answered rather than merely followed -- an unqualified `.tab-pill a
+     .tab-lbl` loses to it on the attribute. */
+  .tab-pill a .tab-lbl,
+  .tab-pill a[aria-current="page"] .tab-lbl{ display:none; }
+  .tab-pill a[aria-current="page"]{ padding-inline:0; }
+  .tab-add{ width:44px; height:44px; }
 
   /* NOT widened. A shelf capped at 680px in a 1920px window is four small
      covers with 360px of blank paper either side, and the obvious fix is one
