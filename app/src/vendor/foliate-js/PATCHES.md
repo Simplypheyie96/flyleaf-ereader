@@ -309,3 +309,107 @@ not.
 pass no longer throws and a book opens. The stale-chunk path is reasoned from
 Workbox's behaviour, not reproduced — no update boundary in this repo has been
 made to serve two hashes of the same chunk.
+
+---
+
+## 6. `paginator.js` — scrolled flow is a continuous column
+
+**Files:** `paginator.js`
+**Marked in source as:** `FLYLEAF PATCH 6`
+
+### The upstream behaviour
+
+`#createView()` destroys the current view before appending the new one, so exactly **one
+section** is ever in the DOM. In paginated flow that is invisible — every page turn already
+goes through `next()`. In scrolled flow it means a chapter boundary is necessarily a discrete
+event: the column dead-ends, something calls `next()`, the iframe is replaced and the reader
+lands at the top of a different document. No amount of app-side work makes that continuous,
+because there is never a second section to be continuous *with*.
+
+Apple Books and Kindle both put the end of a chapter, the whitespace, and the next chapter's
+heading in one scroller. `SPEC.md` § 5.1 requires the same.
+
+### The change
+
+Scrolled flow holds a **sliding window** of views stacked in `#container` in ascending spine
+order. Paginated flow is untouched and still holds exactly one.
+
+- `#views` (`[{index, view}]`, index-ordered) and `#loadingIndex` are new state.
+- `#createView(index)` branches: paginated clears first and appends one, as upstream; scrolled
+  splices the entry into `#views` and `insertBefore`s its element at the right position. Its
+  `onExpand` only re-anchors when `entry.index === this.#index`, so a neighbour finishing
+  layout cannot yank the column.
+- `#fillForward()` loads the next linear section and stacks it below once less than two screens
+  of column remain. It re-checks that the tail view is still the one it started from after the
+  await, then dispatches `create-overlayer`, applies `setStyles`, and dispatches `load` — the
+  same three things `#display` does, so a stitched-in section is indistinguishable from a
+  displayed one.
+- `#syncCurrent()` picks the last view whose `offsetTop` has passed the reading margin and
+  updates `#index`/`#view`. `#trimWindow()` keeps `{current, ±1}` and destroys/unloads the rest,
+  compensating `scrollTop` by the removed height when the removal was above the viewport.
+- A `scroll` listener drives both. It is unthrottled and passive, because it has to be right at
+  the moment the reader crosses: three `offsetTop` reads and one comparison, no layout writes.
+  The expensive half — `relocate`, which derives a CFI — stays on the existing 250ms debounce.
+- Per-section arithmetic is now relative to the current view rather than the container:
+  `#viewTop` is subtracted in the `fraction` calculation and added when scrolling to a
+  fractional anchor, so progress and CFI resolution stay per-section (`SPEC.md` § 5.1) instead
+  of silently becoming per-column. `#scrollNext`'s scrolled branch uses `#columnSize`
+  (`container.scrollHeight`), which is the thing it was actually asking for.
+- `#goTo` no longer unloads the outgoing section in scrolled flow — it may still be in the
+  window. `#display` gained a fast path that scrolls to a resident view instead of reloading it,
+  and clears the window on a jump outside it.
+- The inline `afterLoad` closure in `#display` is extracted to `#afterLoad(doc, index, onLoad)`
+  so `#fillForward` can use the same head-injection path. Its body, including the `<head>`-less
+  XHTML comment, is carried over verbatim.
+
+- `#scrollToRect` and `#getVisibleRange` are the two places where the two coordinate systems
+  meet, and both needed `#viewTop`. A rect always comes from the *current view's own document*,
+  so the mapper's output is view-relative while `start`/`end` are now column-relative. Upstream
+  they were the same number because the only view began at container offset 0. `#scrollToRect`
+  adds `#viewTop` on the way out; `#getVisibleRange` subtracts it on the way in. Measured
+  before the fix: at chapter XII the CFI resolved to `epubcfi(/6/28!/4)` — the section root,
+  with no offset into the text, so a reopen would have lost the sentence. After:
+  `epubcfi(/6/28!/4/2[chapter-12],/2,/6/1:248)`, and a `goTo` on it lands on the same
+  scrollTop it was taken at.
+- `#trimWindow` runs on every scroll rather than only on a section change, and again at the end
+  of `#fillForward`. Gating it on a change left a fourth view resident until the next scroll
+  event, because the fill appends after the trim in the same handler — measured as ids
+  `[13,14,15,16]` with 14 current. It is a set lookup per resident view and returns immediately
+  at three or fewer.
+
+### Scope and known limit
+
+Forward continuity is complete. **Backward continuity reaches only as far as the resident
+window**: scrolling back up a chapter you scrolled down is continuous, opening at chapter N and
+scrolling above its first line is not. Prepending a section of unknown height above the viewport
+requires compensating `scrollTop` inside the same frame, and a wrong compensation is a visible
+lurch at the top of every chapter. Not built; stated in `SPEC.md` § 5.1 rather than left silent.
+
+Verified in the pane at 375x812 on the seeded *Pride and Prejudice*, scrolled flow:
+
+- Forward across a boundary is continuous — `scrollTop` steps of 50px through the join at 6372
+  tracked exactly, no jump, and the running chapter flipped from XI to XII at the right offset.
+- A forty-step creep across three chapters ended with the window at exactly three views
+  (`[16,17,18]`, current 17) and the scroll offset inside the current view's own extent.
+- CFI round-trip across a boundary: `goTo` on a CFI taken at 4598 landed back at 4598 with the
+  same range text.
+- Backward within the window resolves correctly — at 1000 the CFI read
+  `epubcfi(/6/26!/4/2[chapter-11],…)` with a text offset.
+- `relocate.fraction` is book-level and comes from `view.js`'s `sectionProgress`, not from the
+  paginator's `detail.fraction`; the per-section number the reading UI shows is the one this
+  patch corrects with `#viewTop`.
+
+Not verified here: a real thumb on a real phone, which is the user's test.
+
+### Re-applying upstream
+
+This is the largest patch in the tree and it touches `#createView`, `#display`, `#goTo`,
+`#scrollNext` and the constructor. On an upstream update, re-apply by rule rather than by diff:
+keep upstream's single-view path intact for `!this.scrolled`, and re-add the window as the
+`scrolled` branch of the same functions.
+
+### App-side consequence
+
+`app/src/reader/scrollCross.ts` implemented the discrete crossing this replaces — a
+`next()` on the first scroll event past the end, behind a 450ms cooldown. It is **deleted**, and
+its five call sites in `app/src/pages/Reader.tsx` are removed.
