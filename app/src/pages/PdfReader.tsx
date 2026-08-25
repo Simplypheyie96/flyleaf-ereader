@@ -32,7 +32,7 @@ import { percent } from '../lib'
 import { BackIcon, BookmarkIcon, ContentsIcon, TypeIcon } from '../components/icons'
 import { readPaint } from '../reader/marks'
 import {
-    addBookmark, flatten, parsePdfLocator, removeBookmark, sortByPosition,
+    addBookmark, flatten, parsePdfFound, parsePdfLocator, removeBookmark, sortByPosition,
 } from '../reader/marks'
 import { ReadingClock } from '../reader/clock'
 import { Panel } from '../reader/Panel'
@@ -42,7 +42,7 @@ import type { SelAnchor } from '../reader/SelectionMenu'
 import { ExportSheet } from '../reader/ExportSheet'
 import { PdfSheet } from '../reader/pdf/PdfSheet'
 import { PdfView } from '../reader/pdf/PdfView'
-import type { PdfLocation, PdfViewHandle } from '../reader/pdf/PdfView'
+import type { PdfFound, PdfLocation, PdfViewHandle } from '../reader/pdf/PdfView'
 import { getPage, openPdf, pageText, PdfRefused, searchPage } from '../reader/pdf/engine'
 import type { PdfDoc, PdfOutlineItem } from '../reader/pdf/engine'
 
@@ -110,6 +110,9 @@ export function PdfReader() {
     const [sel, setSel] = useState<SelAnchor | null>(null)
     const [exportOpen, setExportOpen] = useState(false)
     const [at, setAt] = useState<PdfLocation>({ page: 1, fraction: 0 })
+    /* The one search hit the reader tapped. It belongs to the search and dies
+       with it, the same as the reflowable reader's found rule. */
+    const [found, setFound] = useState<PdfFound | null>(null)
     const [zoom, setZoom] = useState(1)
     const [paneW, setPaneW] = useState(0)
 
@@ -328,7 +331,7 @@ export function PdfReader() {
                 yield {
                     label: `Page ${n}`,
                     subitems: hits.map(h => ({
-                        cfi: `pdf:${n}:${h.fraction.toFixed(4)}`,
+                        cfi: `pdf:${n}:${h.fraction.toFixed(4)}:${h.x.toFixed(4)}:${h.w.toFixed(4)}`,
                         excerpt: { pre: h.pre, match: h.match, post: h.post },
                     })),
                 }
@@ -337,12 +340,22 @@ export function PdfReader() {
         }
         return walk() as AsyncIterable<SearchYield>
     }, [])
-    const stopSearch = useCallback(() => { searchToken.current++ }, [])
+    const stopSearch = useCallback(() => { searchToken.current++; setFound(null) }, [])
 
     const goTo = useCallback((cfi: string) => {
         const where = parsePdfLocator(cfi)
         if (where) viewRef.current?.goTo(where.page, where.fraction)
     }, [])
+
+    /* Tapping a result. The rule goes under the words, and the scroll puts
+       them a third of the way down rather than flush against the top edge,
+       where the chrome sits and where a reader reads "it did not go". */
+    const goToFound = useCallback((cfi: string) => {
+        const run = parsePdfFound(cfi)
+        if (!run) { goTo(cfi); return }
+        setFound(run)
+        viewRef.current?.goTo(run.page, run.fraction, true)
+    }, [goTo])
 
     const onLive = useCallback((patch: Partial<Settings>) => {
         /* Nothing here restyles a document — the only live setting is the
@@ -405,6 +418,7 @@ export function PdfReader() {
                         onReady={() => setReady(true)}
                         onTap={toggleChrome}
                         onZoom={setZoom}
+                        found={found}
                     />
                 )}
                 {sel && (
@@ -524,6 +538,10 @@ export function PdfReader() {
                     onGoCFI={cfi => {
                         setPanelOpen(false)
                         goTo(cfi)
+                    }}
+                    onGoFound={cfi => {
+                        setPanelOpen(false)
+                        goToFound(cfi)
                     }}
                     onEditNote={() => {}}
                     onRemoveAnnotation={() => {}}

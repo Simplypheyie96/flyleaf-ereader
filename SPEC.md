@@ -460,6 +460,38 @@ this*, and a search hit is not a mark. 30% is the lowest value clearing the 1.70
 floor in every stock (Press 1.94 · Day 1.92 · Butter 1.90 · Tea 1.80 · Coal 2.55 · Dusk 2.36 ·
 Pitch 1.79); ink on the band never falls below 5.15.
 
+**Tapping a result lands on the word, not just the page.** A search draws a 2px `currentColor`
+rule under *every* match it finds, so arriving on a page carrying five of them answered "somewhere
+here" and not "this one" — which is the whole reason a result was tapped. The tapped hit now
+carries its own mark, for as long as the search lives:
+
+- **Reflowable.** A transient annotation keyed by the hit's own CFI, drawn as a **4px** rule in
+  `--hl-underline`. It coexists with foliate's own `foliate-search:`-keyed underline because the
+  Overlayer keys by value, so both draw over the same range. It is re-added on `create-overlay`
+  (a freshly laid-out section starts with an empty overlay) and deleted in `stopSearch`, because
+  `clearSearch` drops only the engine's own annotations. If the reader has already highlighted
+  those words, **their** colour wins — their own mark is the truthful answer to "which one".
+- **PDF.** `searchPage` now also returns `x` and `w` — where across the page the run starts and
+  how wide it is, as fractions of page width, apportioned by character count inside the text item
+  and clipped at the item's end rather than guessed across a gap between two items. Those ride on
+  the end of the locator (`pdf:<page>:<y>:<x>:<w>`); `parsePdfLocator` ignores the tail, so nothing
+  that reads a *stored* locator changed and a bookmark still parses. The rule is a plain
+  percentage-positioned box inside `.pdf-page`, so it survives zoom and every change of fit for
+  free. `goTo` also gained a `centre` flag that lifts the target by `clientHeight / 3`: flush
+  against the top edge the match sits under the chrome and reads as "it did not go". Clamped at
+  0, and clamped by the scroller at the other end — in a document shorter than a viewport-and-a-
+  third the lift simply runs out, which is correct rather than a miss.
+
+A rule, not a band, in both. A band has to know whether the paper is light or dark to stay off
+the words and would need a measured alpha per stock; a rule sits under them and cannot swallow
+them either way. `--hl-underline` is the one accent `DESIGN.md` permits on a reading page, and it
+is already defined for both polarities — so **no new token and nothing new to measure**. Measured
+anyway, against the stock and against the ink: rule-vs-paper Press 7.99 · Day 7.14 · Butter 6.77 ·
+Tea 5.90 · Coal 7.72 · Dusk 7.31 · Pitch 9.80, all far above the 1.70 floor. Rule-vs-ink is
+thinner — Press/Day/Butter 2.19 · Tea 1.94 · Coal 1.91 · Dusk 1.67 · **Pitch 1.11**. On Pitch the
+found rule is very nearly the colour of the plain hits' rules, so **thickness alone separates them
+there**: 4px against 2px, which is why the weight is doubled rather than nudged.
+
 ### 6.5 Look up
 
 The offline answer first: **"Look up" shows every other place that word appears in this book** —

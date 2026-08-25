@@ -59,6 +59,11 @@ export interface PanelProps {
     search: (query: string, wholeWords: boolean) => AsyncIterable<SearchYield>
     clearSearch: () => void
     onGoCFI: (cfi: string) => void
+    /* Separate from onGoCFI because a search hit and a mark are not the same
+       arrival. A mark is already drawn on the page, so it says which one it
+       is; a hit is one of however many the search underlined, and the reader
+       has to be shown the one they picked. */
+    onGoFound: (cfi: string) => void
     onEditNote: (a: Annotation) => void
     onRemoveAnnotation: (a: Annotation) => void
     onRemoveBookmark: (b: Bookmark) => void
@@ -309,7 +314,7 @@ export function Panel(p: PanelProps) {
                     ? <Results
                         groups={groups} busy={busy} hits={hits}
                         limit={limit} onMore={() => setLimit(n => n + PAGE_OF_HITS)}
-                        onGo={p.onGoCFI}
+                        onGo={p.onGoFound}
                     />
                     : tab === 'contents'
                         ? p.tocNode

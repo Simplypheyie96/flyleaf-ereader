@@ -42,7 +42,7 @@ import { NoteEditor } from '../reader/NoteEditor'
 import { ExportSheet } from '../reader/ExportSheet'
 import { Overlayer } from '../vendor/foliate-js/overlayer.js'
 import {
-    addBookmark, addHighlight, drawFor, flatten, readPaint, removeAnnotation,
+    addBookmark, addHighlight, drawFor, drawForFound, flatten, readPaint, removeAnnotation,
     removeBookmark, setNote, setTint, sortByPosition, withinPage,
 } from '../reader/marks'
 import type { MarkPaint } from '../reader/marks'
@@ -231,6 +231,11 @@ export function Reader() {
        on apply and never on render, and a row that is redrawn on a resize is
        the same row. */
     const wipeRef = useRef(new Set<string>())
+    /* The one search hit the reader tapped, by CFI. A ref for the same reason
+       the marks map is one: the draw callback runs inside the engine's own
+       await, long after the render that knew about it. It belongs to the
+       search and dies with it -- see stopSearch. */
+    const foundRef = useRef<string | null>(null)
     /* Two copies of the same reading, deliberately. The draw callback needs it
        synchronously inside the engine's await, which a ref gives; the marks
        list needs it to re-render its dots when the stock changes, which only
@@ -516,9 +521,18 @@ export function Reader() {
         draw: (fn: (rects: DOMRect[], opts: never) => Element, opts: unknown) => void
         annotation: { value: string }
     }>) => {
-        const mark = marksRef.current.get(e.detail.annotation.value)
-        if (!mark) return
+        const value = e.detail.annotation.value
+        const mark = marksRef.current.get(value)
         const paint = paintRef.current ?? readPaint(stageRef.current?.closest('.reader') ?? null)
+        /* A real mark first: if the reader has already highlighted the words
+           the search landed on, their own colour is the truthful answer to
+           "which one is this", and the found rule would only argue with it. */
+        if (!mark) {
+            if (value !== foundRef.current) return
+            const { fn, opts } = drawForFound(paint, geom)
+            e.detail.draw(fn as never, opts)
+            return
+        }
         const wipeIt = wipeRef.current.delete(mark.cfi)
         const { fn, opts } = drawFor(mark.color, paint, geom, wipeIt)
         e.detail.draw(fn as never, opts)
@@ -533,6 +547,7 @@ export function Reader() {
         const view = viewRef.current
         if (!view) return
         for (const cfi of marksRef.current.keys()) void view.addAnnotation({ value: cfi })
+        if (foundRef.current) void view.addAnnotation({ value: foundRef.current })
     }, [])
 
     /* The page geometry the margin bar needs, in the overlay's own
@@ -970,7 +985,30 @@ export function Reader() {
             drawOptions: { color: 'currentColor', width: 2 }
         }) as AsyncIterable<SearchYield>
     }, [])
-    const stopSearch = useCallback(() => { viewRef.current?.clearSearch() }, [])
+    const stopSearch = useCallback(() => {
+        const view = viewRef.current
+        view?.clearSearch()
+        /* clearSearch only drops the engine's own SEARCH annotations, and the
+           found rule is one of the reader's. It has to go the same way: it
+           means "the hit you asked for", and once there is no search there is
+           no hit to mean. */
+        if (view && foundRef.current) void view.deleteAnnotation({ value: foundRef.current })
+        foundRef.current = null
+    }, [])
+
+    /* Tapping a result. goTo turns to the page; the rule says which of the
+       words on it was the one asked for. Awaited in order because the
+       annotation can only be drawn into an overlay that exists, and on a
+       section that is not loaded yet that is the one goTo is about to make. */
+    const goToFound = useCallback(async (cfi: string) => {
+        const view = viewRef.current
+        if (!view) return
+        const was = foundRef.current
+        foundRef.current = cfi
+        if (was && was !== cfi) await view.deleteAnnotation({ value: was })
+        await view.goTo(cfi)
+        await view.addAnnotation({ value: cfi })
+    }, [])
 
     /* ── keyboard ─────────────────────────────────────────────────────────
        Arrow keys stay VISUAL in an RTL book — the right arrow means the page
@@ -1254,6 +1292,10 @@ export function Reader() {
                     onGoCFI={cfi => {
                         setPanelOpen(false)
                         void viewRef.current?.goTo(cfi)
+                    }}
+                    onGoFound={cfi => {
+                        setPanelOpen(false)
+                        void goToFound(cfi)
                     }}
                     onEditNote={a => { setPanelOpen(false); setNoteFor(a) }}
                     onRemoveAnnotation={a => void removeAnnotation(a.id)}

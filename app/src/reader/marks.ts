@@ -103,6 +103,11 @@ export interface DrawOptions extends Record<string, unknown> {
         the two apart — the flag is cleared here, so the redraw after a resize
         repaints the mark without re-animating it. */
     wipe?: boolean
+    /** How tall the rule is, for the underline draw. 2 for a reader's own
+        underline; 4 for the one search hit they asked for, which has to be
+        told apart at reading distance from the 2px rules under every other hit
+        on the page -- twice the weight, not a shade more of it. */
+    thickness?: number
 }
 
 /** The four fills. */
@@ -135,13 +140,14 @@ export function fillDraw(rects: DOMRect[], options: DrawOptions): Element {
 export function underlineDraw(rects: DOMRect[], options: DrawOptions): Element {
     const g = svg('g')
     g.setAttribute('fill', options.color)
+    const t = options.thickness ?? 2
     const boxes = Array.from(rects)
     for (const r of boxes) {
         const el = svg('rect')
         el.setAttribute('x', String(r.left))
-        el.setAttribute('y', String(r.bottom - 2))
+        el.setAttribute('y', String(r.bottom - t))
         el.setAttribute('width', String(r.width))
-        el.setAttribute('height', '2')
+        el.setAttribute('height', String(t))
         g.append(el)
     }
     if (options.wipe) { options.wipe = false; wipe(g, boxes.length) }
@@ -207,6 +213,26 @@ function wipe(g: Element, lines: number) {
             { duration: each, delay: i * step, easing: 'cubic-bezier(.2,0,0,1)', fill: 'backwards' },
         )
     })
+}
+
+/** The one hit the reader tapped, told apart from every other hit on the page.
+
+    A search draws a 2px currentColor rule under every match it finds, so
+    landing on a page with five of them answers "somewhere here" and not "this
+    one" -- which is the whole reason a result was tapped. This draws the
+    tapped one at 4px in `--hl-underline`, the accent DESIGN.md already permits
+    on a reading page for exactly this shape of thing: a rule under a line is a
+    printed mark. It is measured per polarity and defined for all seven stocks,
+    so no new token and nothing new to measure.
+
+    A rule rather than a band on purpose. A band has to know whether the paper
+    is light or dark to stay off the words, and would need its own alpha per
+    stock; a rule sits under them and cannot swallow them either way. */
+export function drawForFound(paint: MarkPaint, geom: DrawOptions['geom']) {
+    const opts: DrawOptions = {
+        color: paint.solid.underline, blend: paint.blend, bar: null, geom, thickness: 4,
+    }
+    return { fn: underlineDraw, opts }
 }
 
 /** Which draw function a tint uses, and the options to draw it with. */
@@ -291,12 +317,34 @@ export type Sortable = { cfi: string }
     anchor to, so a page number and how far down it stand in for one; see
     types.ts on `Locator.cfi`. Returns null for anything that is not one, which
     is how every caller tells the two kinds of book apart. */
+/* A stored locator is `pdf:<page>:<fraction>`. A search hit is the same string
+   with two more numbers on the end -- where across the page the words start
+   and how wide they are -- because the panel's hit type is one string for both
+   kinds of book and there is nowhere else to put them. Nothing writes the long
+   form to Dexie: it exists for the length of one tap. The optional tail is why
+   parsePdfLocator can be handed either and a bookmark still parses. */
+const PDF_LOC = /^pdf:(\d+):([0-9]*\.?[0-9]+)(?::([0-9]*\.?[0-9]+):([0-9]*\.?[0-9]+))?$/
+
 export function parsePdfLocator(cfi: string): { page: number; fraction: number } | null {
-    const m = /^pdf:(\d+):([0-9]*\.?[0-9]+)$/.exec(cfi)
+    const m = PDF_LOC.exec(cfi)
     if (!m) return null
     const page = Number(m[1]), fraction = Number(m[2])
     if (!Number.isFinite(page) || page < 1 || !Number.isFinite(fraction)) return null
     return { page, fraction }
+}
+
+/** The long form, for the one search hit the reader tapped. Null for a
+    locator that carries no run -- a bookmark, or a hit from an older store. */
+export function parsePdfFound(
+    cfi: string,
+): { page: number; fraction: number; x: number; w: number } | null {
+    const m = PDF_LOC.exec(cfi)
+    if (!m || m[3] === undefined) return null
+    const where = parsePdfLocator(cfi)
+    if (!where) return null
+    const x = Number(m[3]), w = Number(m[4])
+    if (!Number.isFinite(x) || !Number.isFinite(w) || w <= 0) return null
+    return { ...where, x, w }
 }
 
 export async function sortByPosition<T extends Sortable>(rows: T[]): Promise<T[]> {

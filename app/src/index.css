@@ -3340,6 +3340,20 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
   pointer-events:none;
 }
 
+/* The one search hit the reader tapped. A PDF has no overlay layer to draw
+   into, so this is a plain box positioned in fractions of the page, which is
+   why it survives a zoom and a change of fit for free. Same 4px rule in
+   --hl-underline as the reflowable reader's, for the same reason: it is the
+   one accent DESIGN.md allows on a reading page, it is measured for both
+   polarities, and a rule under the words cannot swallow them the way a band
+   would need a per-stock alpha to avoid. */
+.pdf-found{
+  position:absolute; height:4px;
+  transform:translateY(2px);
+  background:var(--hl-underline);
+  pointer-events:none;
+}
+
 /* ── pdfjs's own text-layer contract ──────────────────────────────────────
    Trimmed from pdfjs-dist/web/pdf_viewer.css. It is here rather than imported
    because the shipped file also carries the annotation layer, the editor and
