@@ -54,6 +54,20 @@ const BAND = 0.55
 /** iOS scroll deceleration. Used only to project a resting point. */
 const DECEL = 0.998
 
+/* How far the projected reach has to carry before a drag counts as a turn,
+   as a fraction of the page. Half a page — 176px on a 375px phone — was the
+   first pass, and it is what the owner felt as "a lot of resistance for some
+   pages": a deliberate 120px drag over 700ms projects to 103px and springs
+   back, having looked for all the world like a page turn. Just over a
+   quarter is a clearly intentional drag and still nowhere near a graze. */
+const COMMIT = 0.28
+
+/* A flick commits on its own, whatever it travelled, as long as it is still
+   moving the way the drag was going. This is the other half of the same
+   complaint — "and sometimes it isn't there" is the same threshold being met
+   by momentum on a fast gesture and missed on a slow one. px/ms. */
+const FLICK = 0.25
+
 const COMMIT_MIN = 260
 const COMMIT_MAX = 420
 /** A turn a key or a tap asked for has no velocity to read. */
@@ -188,6 +202,8 @@ export class TurnController {
         again: whether the page after this one is in another section. */
     /** the neighbouring page lives in another section, so the turn has to
         cross a file boundary rather than just scroll the column */
+    #pending: Promise<unknown> = Promise.resolve()
+    #turning = 0
     #crossFwd = false
     #crossBack = false
     #edgeFwd = false
@@ -456,7 +472,11 @@ export class TurnController {
         const dir: 1 | -1 = (this.#cfg.rtl ? -this.#offset : this.#offset) < 0 ? 1 : -1
         const blocked = dir === 1 ? this.#edgeFwd : this.#edgeBack
 
-        if (blocked || reach < this.#size * 0.5) {
+        /* Still travelling the way the finger was: a throw, and a throw
+           turns the page however short it was. */
+        const flick = Math.abs(v) >= FLICK && Math.sign(v) === Math.sign(this.#offset)
+
+        if (blocked || (!flick && reach < this.#size * COMMIT)) {
             void this.#springBack()
             return
         }
@@ -597,6 +617,38 @@ export class TurnController {
         return anim.finished.then(() => true, () => false)
     }
 
+    /** Every prev/next goes through here. foliate's #turnPage takes a lock,
+        holds it across the scroll AND a further 100ms — `await wait(100)`,
+        unconditional for us because we deliberately do not set `animated`
+        (PATCHES.md § 4) — and a turn that arrives while it is held returns
+        SILENTLY. The page just does not move.
+
+        That is the "I slide left or right and it makes no difference" fault.
+        It is worst going into a new chapter, because there the lock is held
+        across the file load as well as the 100ms, so the window in which a
+        gesture is swallowed is several times longer — which is exactly where
+        the owner reported it. And a tap issued later, after the lock cleared,
+        worked, which is what made it look like slide specifically was broken.
+
+        So a turn is queued rather than dropped: one that lands during the
+        lock waits for it and then runs. */
+    #page(r: FoliateRenderer, dir: 1 | -1): Promise<unknown> {
+        /* One in flight and one waiting is the ceiling. Queueing without a
+           ceiling trades a swallowed turn for a worse fault: a reader who
+           swipes three or four times at a page that seems stuck gets the
+           whole burst at once the moment the lock clears, and lands pages
+           further on than they asked for. Measured — one 250px drag over a
+           queue built up this way ran 1 -> 8. Past the ceiling the extra
+           turn is dropped, which is the old behaviour and the right one for
+           a gesture the reader has already repeated. */
+        if (this.#turning >= 2) return this.#pending
+        this.#turning++
+        const run = this.#pending.then(() => (dir === 1 ? r.next() : r.prev()))
+        const done = () => { this.#turning-- }
+        this.#pending = run.then(done, done)
+        return run
+    }
+
     async #springBack() {
         const dur = this.#cfg.reducedMotion ? REDUCED : SPRING_BACK
         /* Interrupted: the new gesture owns the leaf now, and settling here
@@ -627,7 +679,7 @@ export class TurnController {
             }
             this.#offset = 0
             this.#clearLayer()
-            await (dir === 1 ? r.next() : r.prev())
+            await this.#page(r, dir)
             if (stage && style !== 'instant') {
                 /* On #fade for the same reason the fade-OUT is, and the reason
                    is in #settle's comment: this fills forwards at 1, and a
@@ -672,7 +724,7 @@ export class TurnController {
             if (stage) stage.style.opacity = '0'
             this.#offset = 0
             this.#clearLayer()
-            await (dir === 1 ? r.next() : r.prev())
+            await this.#page(r, dir)
             if (stage) {
                 /* On #fade for the reason #settle gives: a forwards fill
                    outranks a later inline opacity write, so this one has to be
@@ -691,9 +743,17 @@ export class TurnController {
            `animated` attribute absent, the paginator's prev/next are a
            synchronous scrollLeft assignment, so both land in the same frame
            and the pre-turn page is never painted again. PATCHES.md § 4. */
+        const run = this.#page(r, dir)
+        /* Idle, which is the ordinary case: #page's next() is one microtask
+           away, so it still lands in this frame alongside the clear and the
+           spent page is never painted again.
+
+           Queued behind someone else's lock: hold the leaf where the finger
+           left it — off screen — until the turn actually runs, instead of
+           snapping it back for the length of the lock and then moving. */
+        if (this.#turning > 1) await run
         this.#offset = 0
         this.#clearLayer()
-        void (dir === 1 ? r.next() : r.prev())
         this.#settle()
     }
 
