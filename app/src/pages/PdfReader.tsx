@@ -26,6 +26,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, DEFAULT_SETTINGS, saveSettings, touchBook, useSettings } from '../db'
+import { fetchBookFile } from '../sync/sync'
 import type { Bookmark, Settings } from '../types'
 import { percent } from '../lib'
 import { BackIcon, BookmarkIcon, ContentsIcon, TypeIcon } from '../components/icons'
@@ -72,11 +73,16 @@ function chapterAt(lines: Line[], page: number): string | null {
 /* TWO DIFFERENT FAILURES, and telling them apart is the whole point. No row
    means the book was deleted — nothing to do about that. A row with no bytes
    means the book came from another device and its file has not been carried
-   across, which is a normal state of a synced shelf rather than an error the
-   reader caused, and it has an answer they can act on. */
+   across yet.
+
+   That second one is not shown until it has been earned: opening a book whose
+   bytes are missing fetches that one file from Drive first, ahead of the
+   background queue, because the reader is looking at the book they just
+   tapped rather than at a shelf. This sentence is what is left when that
+   fetch itself fails. */
 const missing = (row: boolean) =>
     row
-        ? 'This book came from another device, and its file is not on this one yet. Turn on “Carry the book files too” in Settings and it will arrive on its own — or open the file here again.'
+        ? 'This book came from another device, and its file has not reached this one yet. Flyleaf just tried to fetch it and could not — check the connection, or that “Carry the book files too” is still on in Settings. Opening the file here again also works.'
         : 'That book is not in this library any more.'
 
 export function PdfReader() {
@@ -130,10 +136,15 @@ export function PdfReader() {
         let live = true
         let opened: PdfDoc | null = null
         void (async () => {
-            const [rec, meta, locator] = await Promise.all([
+            let [rec, meta, locator] = await Promise.all([
                 db.files.get(id), db.books.get(id), db.locators.get(id),
             ])
             if (!live) return
+            /* The row is here and the bytes are not — see Reader.tsx. */
+            if (!rec && meta) {
+                if (await fetchBookFile(id)) rec = await db.files.get(id)
+                if (!live) return
+            }
             if (!rec || !meta) { setFailed(missing(!!meta)); return }
             try {
                 opened = await openPdf(new Blob([rec.data], { type: rec.type }))

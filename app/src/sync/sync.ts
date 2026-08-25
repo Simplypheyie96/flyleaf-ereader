@@ -58,8 +58,20 @@ const MAP_KEY = 'flyleaf-ereader-sync-map'
     Drive has never seen is the one case where two libraries genuinely diverged
     without anybody being able to watch it happen. */
 const OFFLINE_KEY = 'flyleaf-ereader-wrote-offline'
-/** Opt-in: also carry the book files, not just the record. Off by default,
-    because the bytes come out of the reader's own Drive allowance. */
+/** Whether the book files travel as well as the record. ON unless the reader
+    has turned it off, because a sync that carries the shelf but not the books
+    is not a sync: the other device shows a row it cannot open and a cover it
+    cannot draw, since the cover rides inside the file bundle and nowhere else.
+    The bytes do come out of the reader's own Drive allowance, which is why the
+    switch exists at all — but that is a choice to make against a working sync,
+    not a wall to discover on a new device.
+
+    THREE VALUES, NOT TWO. '1' on, '0' off, absent never-decided. The old shape
+    wrote '' for off, which read the same as absent, so the default could not be
+    changed without silently re-enabling somebody's explicit opt-out. An opt-out
+    made before this change does read as absent and does turn back on; that is
+    the one-time cost of the old shape, and it is a copy of their own books into
+    their own Drive rather than anything leaving their hands. */
 const FILES_KEY = 'flyleaf-ereader-sync-files'
 
 /** How many book files move in one pass, each way.
@@ -67,9 +79,12 @@ const FILES_KEY = 'flyleaf-ereader-sync-files'
     A cap, and a loud one — `SyncResult.filesLeft` carries what did not go, and
     Settings says so in words. Uncapped, connecting a phone with a forty-book
     library would start forty concurrent multi-megabyte uploads on somebody's
-    mobile data, and the first thing they would know about it is the bill. Three
-    a pass with a sync every ninety seconds clears forty books in about twenty
-    minutes of the app being open, and stops the moment it is closed. */
+    mobile data, and the first thing they would know about it is the bill. Ten a
+    pass with a sync every ninety seconds clears forty books in about six
+    minutes of the app being open, and stops the moment it is closed.
+
+    A book somebody has actually tapped does not wait for its turn here —
+    `fetchBookFile` below pulls that one file straight away. */
 const FILES_PER_PASS = 10
 
 export interface SyncResult {
@@ -120,11 +135,11 @@ export function lastSync(): number | null {
 
 /** Are the book files themselves being carried, or only the record? */
 export function filesIncluded(): boolean {
-  return read(FILES_KEY) === '1'
+  return read(FILES_KEY) !== '0'
 }
 
 export function includeFiles(on: boolean) {
-  put(FILES_KEY, on ? '1' : '')
+  put(FILES_KEY, on ? '1' : '0')
   window.dispatchEvent(new Event(SYNC_EVENT))
 }
 
@@ -383,6 +398,30 @@ async function moveFiles(
   }
   const left = Math.max(0, work.down.length - FILES_PER_PASS) + Math.max(0, work.up.length - FILES_PER_PASS)
   return { files, left }
+}
+
+/** ONE BOOK, NOW. The pass above moves files a batch at a time in the
+    background, which is right for a shelf and wrong for the book somebody has
+    just tapped: they are looking at a blank page while their own file sits in
+    Drive. So opening a book whose bytes are missing fetches that one file
+    ahead of the queue, and the reader waits on a spinner instead of on an
+    instruction.
+
+    Returns false rather than throwing for every ordinary reason it cannot —
+    not connected, offline, files turned off, the file genuinely not up there.
+    The caller shows the same explanation in all of those cases. */
+export async function fetchBookFile(bookId: string): Promise<boolean> {
+  if (!optedIn() || !filesIncluded()) return false
+  const book = await db.books.get(bookId)
+  if (!book?.fp) return false
+  try {
+    const token = await silentToken()
+    const file = (await listFolder(token)).get(bookFileName(book.fp))
+    if (!file) return false
+    return await unpackBook(await readBlob(token, file.id))
+  } catch {
+    return false
+  }
 }
 
 /* ── the one entry point ───────────────────────────────────────────────── */
