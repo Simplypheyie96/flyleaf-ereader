@@ -242,7 +242,7 @@ inline. A note, not a modal, and it does not appear twice for the same setting.
 | Flow | Behaviour |
 |---|---|
 | **Paginated** *(default)* | Discrete pages. The turn styles below apply |
-| **Scrolled** | One continuous column per section. Native momentum, **no scroll-snap** — snap on a reflowable book fights the finger. A hairline and the chapter name in Playfair mark each section break. The progress readout drops "page n of m", because there are no pages to count, and reads `12 MIN LEFT IN CHAPTER · XVIII · 34%` — the readout's three slots in their usual order, with the time in the one the page count vacated. Under a minute reads `LESS THAN A MINUTE`; an hour or more breaks into `1 HR 12 MIN`. The per-cent is the **book's** in both flows, so changing flow never moves the number the jump slider is bound to. Tap zones do nothing but toggle chrome |
+| **Scrolled** | One continuous column per section. Native momentum, **no scroll-snap** — snap on a reflowable book fights the finger. A hairline and the chapter name in Playfair mark each section break. The progress readout drops "page n of m", because there are no pages to count, and reads `12 MIN LEFT · 34%` — the two facts that survive the loss of pagination. Under a minute reads `LESS THAN A MINUTE`; an hour or more breaks into `1 HR 12 MIN`. The per-cent is the **book's** in both flows, so changing flow never moves the number the jump slider is bound to. Tap zones do nothing but toggle chrome |
 
 Choosing Scrolled hides the turn control rather than greying it — there is no turn to style.
 
@@ -443,12 +443,21 @@ never a feature that needs a network.
 
 ### 6.6 Going to a place in the book
 
-**The readout is the control.** `PAGE 4 OF 14 · XLIII · 63%` is the thing on screen that says
+**The readout is the control.** `PAGE 4 OF 14 · 9 MIN LEFT · 63%` is the thing on screen that says
 where you are, so it is the thing you press to be somewhere else — a jump reached from a line of
 text sitting *beside* the readout is a jump nobody finds. It is a button, it inverts to ink while
 open like every other reader control, and it opens the **Go to** block in the sheet row, so the
 page shrinks and reflows once and the reader can see the book behind the control they are setting.
 It closes the settings sheet and the panel, and they close it.
+
+**Numbers on the button, the name in the card.** The readout carries the three *numbers* —
+where you are in the chapter, how long is left in it, how far through the book you are — and the
+chapter's **name** sits at the head of the block the button opens, where it has the width to be
+said in full. The name was the longest and most variable thing in the readout: measured at 375px
+it grew the pill to 484px and hung it 173px past the edge of the window, and truncating it to fit
+made it the one part of the readout that could not be read. In the card it wraps, and under it
+the time left is repeated in words — `2 MIN LEFT IN THIS CHAPTER`. Contents prices every chapter
+in minutes now (§ 6.7), so the name is reachable there too.
 
 The same block also stands in for the contents list on a book that has none — a plain `.txt`, a
 Markdown export, a hand-made EPUB — where the Contents tab used to say *"This book carries no
@@ -499,6 +508,18 @@ colour says nothing to a screen reader:
 | **The rest dim** | Every entry sits at `--ink-soft`; only the current one is full ink. This is the signal that does the work — bolding one line among sixty-five does almost nothing while the other sixty-four are already at full ink, and least of all on roman numerals, which are too short to carry a weight change. Measured AA on all seven stocks (4.62:1 on `tea`, the narrowest; 6.31:1 on `dusk`). |
 | **Weight** | 700 on a top-level entry, 600 on a sub-entry, so depth still reads. |
 | **An edge bar** | The `.note-quote` device two steps heavier — 4px rather than 2px, near the row's full height, on `--accent`, which inside the reader is that stock's own ink. Drawn as a pseudo-element, not a border, so the label does not step sideways when the reader moves into a chapter. Weight alone is a comparison and only works if the neighbours are on screen; the bar is absolute. |
+
+**Every entry carries its length in minutes**, set as a mono figure against the trailing edge,
+baseline-aligned to the first line of the label so a title that wraps keeps its number where the
+eye is. Not a page number: a reflowable book has no whole-book pagination (§ 6.6), and a number
+that changed every time the reader changed type size would be worse than none. The length is
+reckoned from the sizes of the sections the entry spans, at foliate's own 1600 characters to the
+minute — the same constant behind the readout, so the two never disagree.
+
+An entry that resolves to the **same section** as the one before it shows **no length**. A book
+that puts six sub-headings in one file gives no honest way to split that file between them, and
+an invented sixth is worse than a blank — the same rule as the readout, where a fact the book
+cannot supply is absent rather than guessed.
 
 Matched on **href**, never on label: a book that numbers its parts I, II, III and its chapters
 I, II, III again has labels that repeat and hrefs that do not.

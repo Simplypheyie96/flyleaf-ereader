@@ -1982,7 +1982,10 @@ body::before{
   border-top:1px solid var(--rule);
 }
 .reader-toc-link{
-  display:block; width:100%;
+  /* A row, not a block: the label takes the room it needs and the length sits
+     against the trailing edge. Baseline-aligned so a wrapped two-line label
+     keeps its length beside the FIRST line, where the eye is. */
+  display:flex; align-items:baseline; gap:16px; width:100%;
   border:0; background:transparent;
   padding:14px 22px;
   text-align:start; cursor:pointer;
@@ -1996,6 +1999,22 @@ body::before{
   text-wrap:pretty;
 }
 .reader-toc-link:active{ background:var(--rule); }
+/* The label owns the wrap; the length never does. min-width:0 or a long
+   unbroken title would push the minutes out of the row entirely. */
+.reader-toc-label{ flex:1 1 auto; min-width:0; }
+/* The length is a figure, so it is set as one — mono, tabular, so a column of
+   them lines up down the list — and dimmer than the label it belongs to, since
+   it is the answer to a question the reader only sometimes asks. */
+.reader-toc-len{
+  flex:none;
+  font-family:var(--mono); font-size:11px; font-weight:500;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:.06em; text-transform:uppercase;
+  color:var(--ink-soft); opacity:.75;
+}
+/* Where you are, the length comes up with the label rather than staying dim
+   behind it. */
+.reader-toc-link[aria-current] .reader-toc-len{ color:var(--ink); opacity:1; }
 /* Where you are: full ink and weight, against the dimmed list above. Not a
    fill and not a row rule — either would make the contents read as a set of
    cards, and the entry you are in is not a different kind of thing from the
@@ -2045,6 +2064,24 @@ body::before{
    a second border. */
 .reader-goto{ padding:22px; }
 .reader-goto > .ui-p{ margin:0 0 4px; }
+/* What the readout no longer has room to say. The chapter's NAME is the first
+   line and is allowed to wrap — this card has the width the pill did not — and
+   the time left in it sits under, as the smaller of the two facts. */
+.reader-goto-where{
+  margin:0 0 16px;
+  display:flex; flex-direction:column; gap:4px;
+}
+.reader-goto-chapter{
+  font-family:var(--serif); font-weight:600;
+  font-size:17px; line-height:1.25; color:var(--ink);
+  text-wrap:pretty;
+}
+.reader-goto-left{
+  font-family:var(--mono); font-size:11px; font-weight:500;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:.06em; text-transform:uppercase;
+  color:var(--ink-soft);
+}
 .reader-goto-acts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 
 /* In the sheet row the block is the whole sheet, so it owns the scroll the
