@@ -42,7 +42,7 @@ if (!process.env.BASE) {
 const SLACK = Number(process.env.SLACK || 0.10)
 const findings = []
 const rows = []
-let centred = 0, layout = 0
+let centred = 0, layout = 0, covered = 0
 
 const PROBE = `((slack) => {
   const out = []
@@ -126,7 +126,79 @@ const PROBE = `((slack) => {
   return { out, skipped }
 })(${SLACK})`
 
-const ROUTES = ['/', '/library', '/open', '/stats', '/collections', '/settings', '/privacy', '/terms']
+/* SCREENS, not routes.
+
+   This walked eight paths and called it the app, and two of them were not what
+   they looked like: /collections is not a route at all (App.tsx redirects it
+   home), so a quarter of the desktop findings were Home counted twice, and the
+   two screens with the most prose on them — a book's detail page and the
+   reader — were never opened. Neither was any sheet, because a sheet is not a
+   URL.
+
+   So a screen here is a name and the steps to GET there. Anything that cannot
+   be reached in this run (no book on the shelf, no PDF imported) is named in
+   the output as not covered rather than passing quietly, because a driver that
+   silently measures less than it claims is how the last cap survived. */
+const uncovered = []
+
+const SCREENS = [
+    { name: '/', go: async p => { await p.goto(BASE + '/', { waitUntil: 'networkidle' }) } },
+    { name: '/library', go: async p => { await p.goto(BASE + '/library', { waitUntil: 'networkidle' }) } },
+    { name: '/open', go: async p => { await p.goto(BASE + '/open', { waitUntil: 'networkidle' }) } },
+    { name: '/stats', go: async p => { await p.goto(BASE + '/stats', { waitUntil: 'networkidle' }) } },
+    { name: '/settings', go: async p => { await p.goto(BASE + '/settings', { waitUntil: 'networkidle' }) } },
+    { name: '/privacy', go: async p => { await p.goto(BASE + '/privacy', { waitUntil: 'networkidle' }) } },
+    { name: '/terms', go: async p => { await p.goto(BASE + '/terms', { waitUntil: 'networkidle' }) } },
+
+    /* The id comes off the shelf rather than being hard-coded, so this keeps
+       working when the seed changes. */
+    { name: '/book/:id', go: async p => {
+        await p.goto(BASE + '/library', { waitUntil: 'networkidle' })
+        await p.waitForTimeout(900)
+        const href = await p.evaluate(() => document.querySelector('a[href^="/book/"]')?.getAttribute('href') ?? null)
+        if (!href) return 'no book on the shelf to open'
+        await p.goto(BASE + href, { waitUntil: 'networkidle' })
+    } },
+
+    { name: '/read/:id', go: async p => {
+        const href = await openReader(p)
+        if (!href) return 'no book on the shelf to read'
+    } },
+
+    /* The two sheets that carry prose. Both hang off the reader's chrome, which
+       is why they were invisible to a walk over URLs. */
+    { name: 'reader · contents/marks/search', go: async p => {
+        if (!(await openReader(p))) return 'no book on the shelf to read'
+        return openChrome(p, 'Contents, marks and search')
+    } },
+    { name: 'reader · text and page settings', go: async p => {
+        if (!(await openReader(p))) return 'no book on the shelf to read'
+        return openChrome(p, 'Text and page settings')
+    } },
+]
+
+/* The reader hides its chrome until the page is tapped, and the tap has to land
+   in the middle third or it turns the page instead. */
+async function openReader(p) {
+    await p.goto(BASE + '/library', { waitUntil: 'networkidle' })
+    await p.waitForTimeout(900)
+    const href = await p.evaluate(() => document.querySelector('a[href^="/book/"]')?.getAttribute('href') ?? null)
+    if (!href) return null
+    await p.goto(BASE + href.replace('/book/', '/read/'), { waitUntil: 'networkidle' })
+    await p.waitForTimeout(2200)                                // parse + first paint
+    return href
+}
+
+async function openChrome(p, label) {
+    const vp = p.viewportSize()
+    await p.mouse.click(vp.width / 2, vp.height / 2)            // reveal the chrome
+    await p.waitForTimeout(600)
+    const btn = p.locator(`[aria-label="${label}"]`).first()
+    if (!(await btn.count()) || !(await btn.isVisible())) return `the ${label} control never appeared`
+    await btn.click()
+    await p.waitForTimeout(800)
+    return null
+}
 
 const browser = await chromium.launch()
 for (const [w, h, name] of [[390, 844, 'phone'], [1280, 900, 'desktop'], [1024, 1366, 'ipad']]) {
@@ -134,15 +206,18 @@ for (const [w, h, name] of [[390, 844, 'phone'], [1280, 900, 'desktop'], [1024, 
     const page = await ctx.newPage()
     await page.goto(BASE + '/', { waitUntil: 'networkidle' })
     await page.waitForTimeout(2600)                             // splash + seed
-    for (const route of ROUTES) {
-        await page.goto(BASE + route, { waitUntil: 'networkidle' })
+    for (const screen of SCREENS) {
+        let why = null
+        try { why = await screen.go(page) } catch (e) { why = e.message.split('\n')[0] }
+        if (why) { uncovered.push(`${name} ${screen.name} — ${why}`); continue }
         await page.waitForTimeout(700)
         const { out: seen, skipped } = await page.evaluate(PROBE)
+        covered++
         centred += skipped.centred
         layout += skipped.layout
         for (const s of seen) {
-            rows.push({ view: name, route, ...s })
-            findings.push(`${name} ${route}  ${s.sel} wraps to ${s.lines} lines but its widest is ${s.widest}px in a ${s.hostW}px ${s.host} (own box ${s.ownW}px) — ${s.unusedPct}% of the box unused (max-width: ${s.cap}) — "${s.text}"`)
+            rows.push({ view: name, route: screen.name, ...s })
+            findings.push(`${name} ${screen.name}  ${s.sel} wraps to ${s.lines} lines but its widest is ${s.widest}px in a ${s.hostW}px ${s.host} (own box ${s.ownW}px) — ${s.unusedPct}% of the box unused (max-width: ${s.cap}) — "${s.text}"`)
         }
     }
     await ctx.close()
@@ -151,6 +226,17 @@ await browser.close()
 
 console.log(JSON.stringify({ slack: SLACK, rows }, null, 2))
 console.log(`\nexempt: ${centred} centred (slack sits evenly on both sides), ${layout} uncapped and filling ≥90% of their own box (the element is narrow, not the text)`)
+console.log(`\ncovered: ${covered} screen renders across 3 viewports`)
+/* One boundary, stated rather than left to be discovered: the reader's own
+   page is foliate's iframe, so the BOOK's text is not measured here and should
+   not be -- its measure is a reader setting with its own control, not a
+   layout fault. What is measured on /read/:id is the app's chrome around it,
+   and the two sheets are where that chrome's prose actually lives. */
+console.log('note: /read/:id measures the chrome only; the book text is inside foliate\'s iframe and is governed by the measure control, not by this driver')
+if (uncovered.length) {
+    console.log(`NOT COVERED (${uncovered.length}) — these were not measured, and this driver does not claim they pass:`)
+    for (const u of uncovered) console.log('  · ' + u)
+}
 console.log(`\n=== FINDINGS: ${findings.length}`)
 for (const f of findings) console.log('  · ' + f)
 
