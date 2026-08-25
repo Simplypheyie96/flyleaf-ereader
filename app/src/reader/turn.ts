@@ -140,6 +140,13 @@ export interface TurnHooks {
         is worse than no hairline. */
     /** middle-third tap. */
     toggleChrome(): void
+    /** Did this tap land on a highlight that is already on the page? Answered
+        by the overlay's own hit test, which is the only thing that knows where
+        a mark's rectangles are. A tap that hits one belongs to the mark: it
+        opens the mark's menu and must not also turn the page or take the
+        chrome away, because both leave the reader hunting for the sentence
+        they were just looking at. */
+    onMark(e: PointerEvent): boolean
 }
 
 type Phase = 'idle' | 'watching' | 'dragging' | 'committing'
@@ -799,6 +806,15 @@ export class TurnController {
         /* A tap that dismisses a selection is doing that and nothing else. */
         const sel = doc?.getSelection?.()
         if (sel && !sel.isCollapsed) { sel.removeAllRanges(); return false }
+
+        /* A tap on an existing highlight is a tap on the highlight. foliate's
+           own click listener will emit `show-annotation` for it a moment from
+           now; all this has to do is stay out of the way. Before this guard the
+           same tap ALSO ran the thirds below — so a highlight in the outer
+           third turned the page under the menu that was opening over it, and a
+           highlight in the middle third took the chrome (and with it the page
+           readout) away instead. */
+        if (this.#hooks.onMark(e)) return false
 
         /* Chrome drawn OVER the page is not the page. The selection menu, and
            anything else mounted inside the stage, is in the HOST document, so
