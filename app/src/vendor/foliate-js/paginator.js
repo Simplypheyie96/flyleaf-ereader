@@ -456,6 +456,7 @@ export class Paginator extends HTMLElement {
        Paginated mode is untouched and still holds exactly one.
        See PATCHES.md § 6. */
     #views = []
+    #hold = null
     #loadingIndex = new Set()
     #index = -1
     #anchor = 0 // anchor view to a fraction (0-1), Range, or Element
@@ -586,6 +587,7 @@ export class Paginator extends HTMLElement {
             this.#syncCurrent()
             this.#trimWindow()
             void this.#fillForward()
+            void this.#fillBackward()
         }, { passive: true })
         this.#container.addEventListener('scroll', debounce(() => {
             if (this.scrolled) {
@@ -711,6 +713,22 @@ export class Paginator extends HTMLElement {
         entry.view = new View({
             container: this,
             onExpand: () => {
+                /* A section ABOVE the reader is the whole difficulty of a
+                   continuous column. It is inserted at height 0 and grows to
+                   its full extent a frame or two later, and every pixel it
+                   grows pushes the text the reader is looking at down the
+                   screen. So each growth is cancelled by the same number of
+                   pixels of scrollTop, in the same callback that observes it:
+                   the reader's line does not move, and the column simply
+                   becomes taller above them. Scroll anchoring would do this
+                   natively, but Safari does not implement it and this is a
+                   phone-first app. */
+                if (this.#hold) {
+                    /* A section is being stitched in above the reader. Hold
+                       the line they are on, absolutely — see #holdPosition. */
+                    this.#restoreHold()
+                    return
+                }
                 /* Only the section the reader is actually in re-anchors. A
                    neighbour finishing its layout must not yank the column. */
                 if (entry.index === this.#index) this.#scrollToAnchor(this.#anchor)
@@ -729,6 +747,15 @@ export class Paginator extends HTMLElement {
             view.element.remove()
         }
         this.#views = []
+    }
+    /** Every document currently in the DOM: the window when scrolled, the one
+        view otherwise. Used by anything that has to treat the whole column as
+        one reading surface rather than one section at a time. */
+    get #residentDocuments() {
+        const docs = this.scrolled && this.#views.length
+            ? this.#views.map(v => v.view.document)
+            : [this.#view?.document]
+        return docs.filter(Boolean)
     }
     #viewAt(index) {
         return this.#views.find(v => v.index === index)
@@ -1149,6 +1176,91 @@ export class Paginator extends HTMLElement {
         }
     }
 
+    /** Pin the reader's line while sections are stitched in ABOVE it.
+
+        The obvious approach — watch each view grow and add the same number of
+        pixels to scrollTop — double-counts, because #scrollToAnchor is doing
+        its own absolute repositioning at the same moment and the anchor is up
+        to 250ms stale. Measured: a single prepend moved the reader's
+        paragraph 3505px up the screen while the arithmetic said it had been
+        compensated exactly.
+
+        So the hold is absolute, not incremental. It remembers the current
+        view's ELEMENT and how far into it the reader is, and every time the
+        column relayouts it puts the scroll back at that same point in that
+        same element. Re-applying it is idempotent, which is what makes it
+        safe to run on every expand of every view. */
+    #holdPosition() {
+        const el = this.#container
+        const element = this.#view?.element
+        if (!element) return
+        this.#hold = { element, delta: el.scrollTop - element.offsetTop }
+    }
+    #restoreHold() {
+        if (!this.#hold) return
+        const { element, delta } = this.#hold
+        if (!element.isConnected) return this.#hold = null
+        this.#container.scrollTop = element.offsetTop + delta
+    }
+    #releaseHold() {
+        this.#restoreHold()
+        this.#hold = null
+    }
+
+    /** The mirror of #fillForward, and the harder direction: a section
+        prepended above the reading position changes the offset of everything
+        below it, so it is only safe because #createView's onExpand cancels
+        each growth against scrollTop as it happens.
+
+        Runs within one screen of the top rather than two, because backward
+        reading is the rarer motion and a chapter loaded upward is more
+        expensive than one loaded downward — it has to be compensated for the
+        whole time it is laying out. */
+    async #fillBackward() {
+        if (!this.scrolled) return
+        const first = this.#views[0]
+        if (!first) return
+        const prev = this.#adjacentFrom(first.index, -1)
+        if (prev == null || this.#loadingIndex.has(prev) || this.#viewAt(prev)) return
+        const el = this.#container
+        if (el.scrollTop > el.clientHeight) return
+        this.#loadingIndex.add(prev)
+        try {
+            const src = await this.sections[prev].load()
+            if (typeof src !== 'string') return
+            /* Re-checked after the await, as forward: a TOC jump may have
+               reset the window while the file was loading. */
+            if (this.#views[0] !== first) return
+            this.#holdPosition()
+            const view = this.#createView(prev)
+            await view.load(src,
+                doc => this.#afterLoad(doc, prev),
+                this.#beforeRender.bind(this))
+            this.dispatchEvent(new CustomEvent('create-overlayer', {
+                detail: {
+                    doc: view.document, index: prev,
+                    attach: overlayer => view.overlayer = overlayer,
+                },
+            }))
+            this.setStyles(this.#styles)
+            this.dispatchEvent(new CustomEvent('load', {
+                detail: { doc: view.document, index: prev },
+            }))
+            this.#trimWindow()
+        } catch (e) {
+            console.warn(e)
+            console.warn(new Error(`Failed to load section ${prev}`))
+        } finally {
+            this.#loadingIndex.delete(prev)
+            /* Fonts land after load and grow the section again, so the hold
+               outlives the await by a beat rather than being dropped here. */
+            const view = this.#viewAt(prev)?.view
+            const done = () => this.#releaseHold()
+            if (view?.document?.fonts?.ready) view.document.fonts.ready.then(done, done)
+            else done()
+        }
+    }
+
     /** Which resident section is the reader actually in? The column no longer
         answers that by construction, so it is read from the scroll offset:
         the last view whose top is at or above the reading line. Everything
@@ -1372,14 +1484,25 @@ export class Paginator extends HTMLElement {
     }
     setStyles(styles) {
         this.#styles = styles
-        const $$styles = this.#styleMap.get(this.#view?.document)
-        if (!$$styles) return
-        const [$beforeStyle, $style] = $$styles
-        if (Array.isArray(styles)) {
-            const [beforeStyle, style] = styles
-            $beforeStyle.textContent = beforeStyle
-            $style.textContent = style
-        } else $style.textContent = styles
+        /* PATCH 6. Upstream wrote into the current view's document only,
+           because there was never another one. A stitched-in section got its
+           two style elements created and left EMPTY, so it rendered in the
+           publisher's own CSS — black headings and blue links on a dark
+           stock, which is the reading surface failing contrast outright, not
+           a cosmetic difference. Every resident document gets the styles. */
+        let applied = false
+        for (const doc of this.#residentDocuments) {
+            const $$styles = this.#styleMap.get(doc)
+            if (!$$styles) continue
+            const [$beforeStyle, $style] = $$styles
+            if (Array.isArray(styles)) {
+                const [beforeStyle, style] = styles
+                $beforeStyle.textContent = beforeStyle
+                $style.textContent = style
+            } else $style.textContent = styles
+            applied = true
+        }
+        if (!applied) return
 
         // NOTE: needs `requestAnimationFrame` in Chromium
         requestAnimationFrame(() =>

@@ -270,13 +270,22 @@ Progress stays **per section** (`34% · 12 MIN LEFT IN CHAPTER`), measured again
 view's own height rather than the column's, so it reads the same as it did before the sections
 were stitched together.
 
-**Backward continuity reaches only as far as the window.** Scrolling up through a chapter you
-scrolled down through is continuous, because the previous section is resident. Opening the book
-*at* chapter N and immediately scrolling up past its first line is not: there is nothing above it
-in the column yet, and the reader has to use the TOC or the back arrow. Filling backwards means
-prepending a section of unknown height above the viewport and compensating `scrollTop` for it
-within the same frame, and a wrong compensation is a visible lurch at the top of every chapter.
-It is not built.
+**The column runs backwards too.** Jumping to chapter N from the table of contents and then
+scrolling up past its first line reaches chapter N-1, the same way scrolling down reaches N+1.
+The fill triggers with one screen of lead rather than two, because a reader who has just jumped
+somewhere is more likely to read down than back.
+
+Prepending a section of unknown height above the viewport is the hard half of a continuous
+column: the section arrives at zero height and grows, and every pixel it grows would push the
+line the reader is on down the screen. Compensating incrementally — watch it grow, add the same
+number of pixels of `scrollTop` — does not work, because the anchor logic is repositioning at the
+same moment and its anchor is up to 250ms stale; measured, that double-counting threw the
+reader's paragraph 3505px up the screen on a single prepend. So the hold is **absolute**: the
+current view's element and the reader's offset into it are remembered before the prepend, and
+every relayout puts the scroll back at that same point in that same element. Re-applying it is
+idempotent, and it is held until the new section's fonts have settled rather than dropped at
+load. Verified: fourteen 100px steps up through a prepend moved the reference paragraph exactly
+100px each time, with no exception at the join.
 
 Non-linear sections are skipped when the window fills, as they are on a `next()`.
 
