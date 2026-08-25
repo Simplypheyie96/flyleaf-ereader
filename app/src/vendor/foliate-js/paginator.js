@@ -445,6 +445,18 @@ export class Paginator extends HTMLElement {
     #vertical = false
     #rtl = false
     #margin = 0
+    /* FLYLEAF PATCH 6 — scrolled flow is a continuous column.
+       Upstream keeps exactly ONE view: #createView destroys the old iframe
+       before appending the new one, so a chapter boundary in scrolled mode is
+       necessarily a discrete jump — there is nothing below the end of the
+       section because no other section exists in the DOM. Kindle and Apple
+       Books both present one column: the chapter ends, whitespace, the next
+       chapter's heading, no event. To do that, scrolled mode holds a WINDOW
+       of loaded views stacked in #container, ascending by index.
+       Paginated mode is untouched and still holds exactly one.
+       See PATCHES.md § 6. */
+    #views = []
+    #loadingIndex = new Set()
     #index = -1
     #anchor = 0 // anchor view to a fraction (0-1), Range, or Element
     #justAnchored = false
@@ -565,6 +577,16 @@ export class Paginator extends HTMLElement {
 
         this.#observer.observe(this.#container)
         this.#container.addEventListener('scroll', () => this.dispatchEvent(new Event('scroll')))
+        /* PATCH 6. Cheap and unthrottled, because it has to be right at the
+           moment the reader crosses: three offsetTop reads and one arithmetic
+           comparison, no layout writes. The expensive half — relocate, which
+           derives a CFI — stays on the 250ms debounce below. */
+        this.#container.addEventListener('scroll', () => {
+            if (!this.scrolled) return
+            this.#syncCurrent()
+            this.#trimWindow()
+            void this.#fillForward()
+        }, { passive: true })
         this.#container.addEventListener('scroll', debounce(() => {
             if (this.scrolled) {
                 if (this.#justAnchored) this.#justAnchored = false
@@ -671,17 +693,61 @@ export class Paginator extends HTMLElement {
                     `break-${x}: ${y ?? ''}column`))
         })
     }
-    #createView() {
-        if (this.#view) {
-            this.#view.destroy()
-            this.#container.removeChild(this.#view.element)
+    /* PATCH 6. Paginated is upstream's behaviour verbatim: destroy, replace.
+       Scrolled inserts into the window in index order and destroys nothing. */
+    #createView(index = this.#index) {
+        if (!this.scrolled) {
+            this.#clearViews()
+            const view = new View({
+                container: this,
+                onExpand: () => this.#scrollToAnchor(this.#anchor),
+            })
+            this.#views.push({ index, view })
+            this.#container.append(view.element)
+            this.#view = view
+            return view
         }
-        this.#view = new View({
+        const entry = { index, view: null }
+        entry.view = new View({
             container: this,
-            onExpand: () => this.#scrollToAnchor(this.#anchor),
+            onExpand: () => {
+                /* Only the section the reader is actually in re-anchors. A
+                   neighbour finishing its layout must not yank the column. */
+                if (entry.index === this.#index) this.#scrollToAnchor(this.#anchor)
+            },
         })
-        this.#container.append(this.#view.element)
-        return this.#view
+        let at = this.#views.findIndex(v => v.index > index)
+        if (at < 0) at = this.#views.length
+        this.#views.splice(at, 0, entry)
+        this.#container.insertBefore(entry.view.element,
+            this.#container.children[at] ?? null)
+        return entry.view
+    }
+    #clearViews() {
+        for (const { view } of this.#views) {
+            view.destroy()
+            view.element.remove()
+        }
+        this.#views = []
+    }
+    #viewAt(index) {
+        return this.#views.find(v => v.index === index)
+    }
+    /** Offset of the current section within the column. Always 0 when the
+        column holds one view, which is every paginated case. */
+    get #viewTop() {
+        return this.scrolled ? (this.#view?.element?.offsetTop ?? 0) : 0
+    }
+    /** The whole scrollable column, as against `viewSize`, which stays the
+        CURRENT SECTION's own extent — progress and CFI are per-section and
+        must not become per-window. */
+    get #columnSize() {
+        return this.#container.scrollHeight
+    }
+    #adjacentFrom(from, dir) {
+        for (let index = from + dir; this.#canGoToIndex(index); index += dir)
+            if (this.sections[index]?.linear !== 'no') return index
+        return null
     }
     #beforeRender({ vertical, rtl, background }) {
         this.#vertical = vertical
@@ -926,8 +992,14 @@ export class Paginator extends HTMLElement {
     }
     async #scrollToRect(rect, reason) {
         if (this.scrolled) {
+            /* PATCH 6. The rect comes from the current view's own document, so
+               the mapper returns an offset within that view. The column may
+               hold sections above it, so it has to be lifted into container
+               coordinates before it can be a scrollTop. Zero when paginated,
+               and zero when this view is the first in the window, which is why
+               it was invisible upstream. */
             const offset = this.#getRectMapper()(rect).left - this.#margin
-            return this.#scrollTo(offset, reason)
+            return this.#scrollTo(this.#viewTop + offset, reason)
         }
         const offset = this.#getRectMapper()(rect).left
         return this.#scrollToPage(Math.floor(offset / this.size) + (this.#rtl ? -1 : 1), reason)
@@ -977,7 +1049,7 @@ export class Paginator extends HTMLElement {
         }
         // if anchor is a fraction
         if (this.scrolled) {
-            await this.#scrollTo(anchor * this.viewSize, reason)
+            await this.#scrollTo(this.#viewTop + anchor * this.viewSize, reason)
             return
         }
         const { pages } = this
@@ -987,8 +1059,18 @@ export class Paginator extends HTMLElement {
         await this.#scrollToPage(newPage + 1, reason)
     }
     #getVisibleRange() {
-        if (this.scrolled) return getVisibleRange(this.#view.document,
-            this.start + this.#margin, this.end - this.#margin, this.#getRectMapper())
+        if (this.scrolled) {
+            /* PATCH 6. Same coordinate mismatch as #scrollToRect, the other way
+               round: the walker compares against rects from the current view's
+               document, so the window has to be brought down into that view's
+               space. Without this the visible range of every section after the
+               first resolves to the section root and the CFI loses the
+               sentence. */
+            const top = this.start - this.#viewTop
+            return getVisibleRange(this.#view.document,
+                top + this.#margin, top + this.size - this.#margin,
+                this.#getRectMapper())
+        }
         const size = this.#rtl ? -this.size : this.size
         return getVisibleRange(this.#view.document,
             this.start - size, this.end - size, this.#getRectMapper())
@@ -1003,7 +1085,11 @@ export class Paginator extends HTMLElement {
 
         const index = this.#index
         const detail = { reason, range, index }
-        if (this.scrolled) detail.fraction = this.start / this.viewSize
+        /* PATCH 6. start is a column offset now and viewSize is still the
+           current SECTION's extent, so the section's own top has to come off
+           the top of the fraction or progress reads as the whole window. */
+        if (this.scrolled) detail.fraction =
+            Math.min(1, Math.max(0, (this.start - this.#viewTop) / this.viewSize))
         else if (this.pages > 0) {
             const { page, pages } = this
             this.#header.style.visibility = page > 1 ? 'visible' : 'hidden'
@@ -1012,47 +1098,161 @@ export class Paginator extends HTMLElement {
         }
         this.dispatchEvent(new CustomEvent('relocate', { detail }))
     }
+    /* ── PATCH 6: the continuous column ──────────────────────────────── */
+
+    /** Load the section after the last one resident and stack it below, so
+        the reader scrolls out of one chapter and into the next without any
+        crossing event: the end of the text, its trailing whitespace, then the
+        next chapter's heading, one column. Runs when the bottom of the column
+        comes within two screens, which on a phone is far enough ahead that
+        the load and layout are finished long before the text is wanted, and
+        near enough that opening a book does not parse the whole file. */
+    async #fillForward() {
+        if (!this.scrolled) return
+        const last = this.#views[this.#views.length - 1]
+        if (!last) return
+        const next = this.#adjacentFrom(last.index, 1)
+        if (next == null || this.#loadingIndex.has(next) || this.#viewAt(next)) return
+        const el = this.#container
+        if (el.scrollHeight - (el.scrollTop + el.clientHeight) > el.clientHeight * 2) return
+        this.#loadingIndex.add(next)
+        try {
+            const src = await this.sections[next].load()
+            if (typeof src !== 'string') return
+            /* Re-checked after the await: a jump through the TOC may have
+               reset the window while the file was loading, in which case this
+               section no longer belongs below anything. */
+            if (this.#views[this.#views.length - 1] !== last) return
+            const view = this.#createView(next)
+            await view.load(src,
+                doc => this.#afterLoad(doc, next),
+                this.#beforeRender.bind(this))
+            this.dispatchEvent(new CustomEvent('create-overlayer', {
+                detail: {
+                    doc: view.document, index: next,
+                    attach: overlayer => view.overlayer = overlayer,
+                },
+            }))
+            this.setStyles(this.#styles)
+            this.dispatchEvent(new CustomEvent('load', {
+                detail: { doc: view.document, index: next },
+            }))
+            /* The append can take the window to four, and the scroll that
+               triggered it has already been trimmed. Trim again rather than
+               leave the extra iframe resident until the reader moves. */
+            this.#trimWindow()
+        } catch (e) {
+            console.warn(e)
+            console.warn(new Error(`Failed to load section ${next}`))
+        } finally {
+            this.#loadingIndex.delete(next)
+        }
+    }
+
+    /** Which resident section is the reader actually in? The column no longer
+        answers that by construction, so it is read from the scroll offset:
+        the last view whose top is at or above the reading line. Everything
+        downstream — CFI, progress, the running head, the TOC highlight — goes
+        on using #index and #view and needs no knowledge of the window. */
+    #syncCurrent() {
+        if (!this.scrolled || this.#views.length < 2) return false
+        const probe = this.#container.scrollTop + this.#margin + 1
+        let cur = this.#views[0]
+        for (const v of this.#views)
+            if (v.view.element.offsetTop <= probe) cur = v
+        if (cur.index === this.#index) return false
+        this.#index = cur.index
+        this.#view = cur.view
+        return true
+    }
+
+    /** Sections outside the window are dropped so a long session does not
+        accumulate an iframe per chapter. Only ever BELOW the reading
+        position, or above it by a whole view that is already off screen and
+        whose removal is compensated in the same frame — a removal above the
+        viewport that is not compensated is the classic infinite-scroll jump. */
+    #trimWindow() {
+        /* Unconditional on every scroll rather than only on a section change:
+           #fillForward appends after the trim in the same handler, so gating
+           it on a change left a fourth view resident until the next scroll
+           event — measured, ids [13,14,15,16] with 14 current. Trimming is a
+           set lookup per resident view and does nothing at three or fewer. */
+        if (!this.scrolled || this.#views.length <= 3) return
+        const el = this.#container
+        const keep = new Set([this.#index,
+            this.#adjacentFrom(this.#index, -1), this.#adjacentFrom(this.#index, 1)])
+        for (const entry of [...this.#views]) {
+            if (keep.has(entry.index)) continue
+            const above = entry.view.element.offsetTop < el.scrollTop
+            const before = el.scrollHeight
+            const top = el.scrollTop
+            this.#views.splice(this.#views.indexOf(entry), 1)
+            entry.view.destroy()
+            entry.view.element.remove()
+            this.sections[entry.index]?.unload?.()
+            if (above) el.scrollTop = top - (before - el.scrollHeight)
+        }
+    }
+
+    /** Everything that must happen to a freshly loaded section document,
+        shared by #display and by the continuous filler so a section appended
+        below the current one gets exactly the same treatment.
+
+        FLYLEAF PATCH: a document with no <head> used to get no style elements
+        at all, and so none of the reading CSS. Not a hypothetical — an EPUB
+        section may be an XHTML body-only fragment, in which case
+        documentElement IS the <body> and `doc.head` is null (measured; the
+        text/html parser synthesises a head, the XML parser does not). The
+        failure mode is specific and was reported from a screenshot: the stock
+        ground and ink survive, because those are set inline on documentElement
+        and body by `View`, while every rule from `reader/readingCss.ts` is
+        missing — so the section renders on the right paper in the browser's
+        default face at the browser's default measure, and
+        `a:any-link { color: inherit }` is gone, which is UA blue on a dark
+        stock.
+
+        The two elements go on documentElement instead. A <style> in the HTML
+        namespace applies wherever it sits, and prepend/append keeps the
+        cascade the pair exists for: ours first, author's in between, ours
+        last. `createElement` is right rather than createElementNS — per DOM it
+        uses the HTML namespace for an HTML document and for an
+        application/xhtml+xml one, which is every document that reaches here.
+        What it does NOT do is make `doc.head` resolve: that getter wants a
+        head child of a root <html>, so synthesising one inside a <body> root
+        would be a lie in the tree for no gain. See PATCHES.md. */
+    #afterLoad(doc, index, onLoad) {
+        const $head = doc.head ?? doc.documentElement
+        if ($head) {
+            const $styleBefore = doc.createElement('style')
+            $head.prepend($styleBefore)
+            const $style = doc.createElement('style')
+            $head.append($style)
+            this.#styleMap.set(doc, [$styleBefore, $style])
+        }
+        onLoad?.({ doc, index })
+    }
     async #display(promise) {
         const { index, src, anchor, onLoad, select } = await promise
         this.#index = index
         const hasFocus = this.#view?.document?.hasFocus()
+        /* PATCH 6. The window already holds this section — the reader scrolled
+           into it, or came back to it — so there is nothing to load and
+           nothing to tear down. Navigating to it is a scroll. */
+        const resident = this.scrolled ? this.#viewAt(index) : null
+        if (resident) {
+            this.#view = resident.view
+            await this.scrollToAnchor((typeof anchor === 'function'
+                ? anchor(resident.view.document) : anchor) ?? 0, select)
+            if (hasFocus) this.focusView()
+            return
+        }
+        /* A jump to a section the window does not reach — the TOC, a link, a
+           restored position. The old column has nothing to do with where the
+           reader is going, so it goes. */
+        if (this.scrolled && src) this.#clearViews()
         if (src) {
-            const view = this.#createView()
-            const afterLoad = doc => {
-                // FLYLEAF PATCH: a document with no <head> used to get no style
-                // elements at all, and so none of the reading CSS. Not a
-                // hypothetical — an EPUB section may be an XHTML body-only
-                // fragment, in which case documentElement IS the <body> and
-                // `doc.head` is null (measured; the text/html parser synthesises
-                // a head, the XML parser does not). The failure mode is specific
-                // and was reported from a screenshot: the stock ground and ink
-                // survive, because those are set inline on documentElement and
-                // body by `View`, while every rule from `reader/readingCss.ts` is
-                // missing — so the section renders on the right paper in the
-                // browser's default face at the browser's default measure, and
-                // `a:any-link { color: inherit }` is gone, which is UA blue on a
-                // dark stock.
-                //
-                // The two elements go on documentElement instead. A <style> in
-                // the HTML namespace applies wherever it sits, and prepend/append
-                // keeps the cascade the pair exists for: ours first, author's in
-                // between, ours last. `createElement` is right rather than
-                // createElementNS — per DOM it uses the HTML namespace for an
-                // HTML document and for an application/xhtml+xml one, which is
-                // every document that reaches here. What it does NOT do is make
-                // `doc.head` resolve: that getter wants a head child of a root
-                // <html>, so synthesising one inside a <body> root would be a lie
-                // in the tree for no gain. See PATCHES.md.
-                const $head = doc.head ?? doc.documentElement
-                if ($head) {
-                    const $styleBefore = doc.createElement('style')
-                    $head.prepend($styleBefore)
-                    const $style = doc.createElement('style')
-                    $head.append($style)
-                    this.#styleMap.set(doc, [$styleBefore, $style])
-                }
-                onLoad?.({ doc, index })
-            }
+            const view = this.#createView(index)
+            const afterLoad = doc => this.#afterLoad(doc, index, onLoad)
             const beforeRender = this.#beforeRender.bind(this)
             await view.load(src, afterLoad, beforeRender)
             this.dispatchEvent(new CustomEvent('create-overlayer', {
@@ -1075,7 +1275,10 @@ export class Paginator extends HTMLElement {
         else {
             const oldIndex = this.#index
             const onLoad = detail => {
-                this.sections[oldIndex]?.unload?.()
+                /* PATCH 6. In a continuous column the previous section may
+                   still be on screen above the reader; #trimWindow owns its
+                   lifetime instead. */
+                if (!this.scrolled) this.sections[oldIndex]?.unload?.()
                 this.setStyles(this.#styles)
                 this.dispatchEvent(new CustomEvent('load', { detail }))
             }
@@ -1107,8 +1310,9 @@ export class Paginator extends HTMLElement {
     #scrollNext(distance) {
         if (!this.#view) return true
         if (this.scrolled) {
-            if (this.viewSize - this.end > 2) return this.#scrollTo(
-                Math.min(this.viewSize, distance ? this.start + distance : this.end), null, true)
+            const size = this.#columnSize
+            if (size - this.end > 2) return this.#scrollTo(
+                Math.min(size, distance ? this.start + distance : this.end), null, true)
             return true
         }
         if (this.atEnd) return

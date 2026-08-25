@@ -248,31 +248,37 @@ Choosing Scrolled hides the turn control rather than greying it — there is no 
 
 #### Crossing a chapter in Scrolled flow
 
-foliate only ever leaves a section through `next()`/`prev()`; its own scroll handler relocates
-*inside* the section and never crosses. In Paginated flow that costs nothing, because every turn
-already goes through `next()`. In Scrolled flow it means native scrolling stops dead at the bottom
-of every chapter and the only way on is the arrow keys, which a phone does not have.
+There is no crossing. Scrolled flow is **one continuous column**: the end of a chapter, the
+whitespace after it, and the next chapter's heading are all in the same scroller, reached by the
+same unbroken finger movement. That is what Kindle and Apple Books do, and it is the only
+behaviour that makes a chapter boundary something the reader does not notice.
 
-So the end of a section is not a wall and it is not a gate either — **the scroll simply carries
-on into the next chapter**, the way it does in every other reader. When the column has nothing
-left and the scroll is still going that way, it crosses. There is no distance to overcome, no
-pause to wait out, no second gesture: a chapter boundary is not somewhere the reader should have
-to push through, it is somewhere they should not notice.
-
-A first pass gated this behind 72px of extra pull and a 500ms idle reset, reasoning that resting
-at the last paragraph should not carry you onward. In the hand it read as the book jamming at
-every chapter, which is worse than the thing it guarded against — and resting is safe anyway,
-because resting produces no scroll events at all.
+Upstream foliate cannot do this — `#createView` destroys the previous iframe before appending the
+next, so exactly one section is ever in the DOM and a boundary is necessarily a discrete jump. The
+paginator is patched (`PATCHES.md` § 6) to hold, in Scrolled flow only, a **sliding window of
+loaded sections stacked in the scroll container** in spine order. Paginated flow is untouched and
+still holds exactly one.
 
 | | Value | Why |
 |---|---|---|
-| Threshold to cross | none | One scroll event past the end, in that direction |
-| Cooldown after a crossing | 450ms | A flick keeps firing after the finger is gone; without this one flick walks three chapters. Long enough to outlast the load, short enough that a reader who wants two chapters can have them |
+| Window | current section, plus one either side | Three iframes is enough to make a boundary invisible in both directions and cheap enough to keep on a phone |
+| Forward fill | when less than two screens of column remain below | The next section is laid out before the reader can reach it, so no fill ever happens under the finger |
+| Trim | anything outside the window is destroyed and unloaded | With `scrollTop` compensated for removals above the viewport, so trimming never moves the page |
+| Current section | the last view whose top has passed the reading margin | Drives the chapter name, the progress readout and the CFI. Recomputed on every scroll event — three `offsetTop` reads, no layout writes |
 
-Forward lands at the **top** of the next chapter; backward lands at the **bottom** of the previous
-one, so a reader going back arrives where they left. Non-linear sections are skipped, and the last
-and first sections are guarded here rather than left to upstream, which reports "go on" at the end
-of every section including the last.
+Progress stays **per section** (`34% · 12 MIN LEFT IN CHAPTER`), measured against the current
+view's own height rather than the column's, so it reads the same as it did before the sections
+were stitched together.
+
+**Backward continuity reaches only as far as the window.** Scrolling up through a chapter you
+scrolled down through is continuous, because the previous section is resident. Opening the book
+*at* chapter N and immediately scrolling up past its first line is not: there is nothing above it
+in the column yet, and the reader has to use the TOC or the back arrow. Filling backwards means
+prepending a section of unknown height above the viewport and compensating `scrollTop` for it
+within the same frame, and a wrong compensation is a visible lurch at the top of every chapter.
+It is not built.
+
+Non-linear sections are skipped when the window fills, as they are on a `next()`.
 
 This lives at `app/src/reader/scrollCross.ts`, outside the vendored tree, against public API only —
 so foliate stays upstream source with nothing to re-apply on an update.
