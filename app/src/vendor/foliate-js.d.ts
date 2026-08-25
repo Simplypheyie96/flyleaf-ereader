@@ -109,13 +109,20 @@ interface FoliateRenderer extends HTMLElement {
   scrollBy(dx: number, dy: number): void
   snap(vx: number, vy: number): void
   scrollToAnchor(anchor: unknown, select?: boolean): Promise<void>
-  getContents(): { index: number; doc: Document; overlayer?: unknown }[]
+  getContents(): { index: number; doc: Document; overlayer?: FoliateOverlayer }[]
   /** A string, or a `[beforeStyle, style]` pair. The pair exists so the app's
       own rules can be split around the book's: `before` loses to the
       publisher's CSS, `style` wins over it. The type controls need both. */
   setStyles(styles: string | [string, string]): void
   focusView(): void
   destroy(): void
+}
+
+/** The drawn annotation layer for one section. Only the hit test is declared,
+    because that is the only part of it this app calls: given a point in the
+    section document, it answers which mark — if any — is under it. */
+interface FoliateOverlayer {
+  hitTest(point: { x: number; y: number }): [string?, Range?]
 }
 
 declare module '*/foliate-js/view.js' {

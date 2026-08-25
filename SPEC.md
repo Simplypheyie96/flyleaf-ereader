@@ -242,7 +242,17 @@ inline. A note, not a modal, and it does not appear twice for the same setting.
 | Flow | Behaviour |
 |---|---|
 | **Paginated** *(default)* | Discrete pages. The turn styles below apply |
-| **Scrolled** | One continuous column per section. Native momentum, **no scroll-snap** — snap on a reflowable book fights the finger. A hairline and the chapter name in Playfair mark each section break. The progress readout reads exactly as it does paginated — `PAGE 214 OF 480 · 12 MIN LEFT · 34%` — because the page it names is the **book's**, not the renderer's (§ 6.6), and nothing about it depends on there being pages on screen. Under a minute reads `LESS THAN A MINUTE`; an hour or more breaks into `1 HR 12 MIN`. The per-cent is the **book's** in both flows, so changing flow never moves the number the jump slider is bound to. Tap zones do nothing but toggle chrome |
+| **Scrolled** | One continuous column per section. Native momentum, **no scroll-snap** — snap on a reflowable book fights the finger. A hairline and the chapter name in Playfair mark each section break. The progress readout reads exactly as it does paginated — `PAGE 214 OF 480 · 34%` — because the page it names is the **book's**, not the renderer's (§ 6.6), and nothing about it depends on there being pages on screen. The minutes left, and the chapter's name, are in the card the readout opens; under a minute that card reads `LESS THAN A MINUTE`, and an hour or more breaks into `1 HR 12 MIN`. The per-cent is the **book's** in both flows, so changing flow never moves the number the jump slider is bound to. Tap zones do nothing but toggle chrome |
+
+**Changing flow lands on the same sentence.** Flow is the one setting the engine cannot carry a
+position across on its own: its anchor is a `Range` in the layout being torn down, and the two
+flows do not map a rectangle to a position the same way. Left to it, paginated → scrolled moved a
+reader a whole section, sometimes through a blank frame first. So the CFI of the page being left is
+taken before the attribute changes and put back once the relayout settles, per the standing rule
+that position is a CFI. The blank came from the same call writing `flow` and `max-inline-size` and
+laying the book out **twice**; an attribute is now written only when its value actually changes.
+Verified at 2% and at 42% of a 428-page book, both directions: same sentence at the top of the
+pane, same page and per-cent on the readout.
 
 Choosing Scrolled hides the turn control rather than greying it — there is no turn to style.
 
@@ -387,7 +397,7 @@ pages; it just does not move.
 | Input | Behaviour |
 |---|---|
 | **Swipe** | Tracked 1:1. Requires **8px of horizontal travel** before it claims the gesture — below that, the touch belongs to text selection. There is deliberately **no time window** on it: an earlier build only claimed inside 200ms, so a slow deliberate drag travelled its 8px, missed the window and left the page sitting still, which is what "the slide is resisting" was. A horizontal drag turns the page however long the reader takes over it. By **mouse** the threshold is **24px** and the turn stands down if a selection has actually formed — a measured fact rather than a guess at intent, and the reason a desktop drag now turns at all |
-| **Tap zones** | Left third back, right third forward, middle third toggles chrome. Setting: **Tap to turn**, default on. Off leaves the whole pane as a chrome toggle |
+| **Tap zones** | Left third back, right third forward, middle third toggles chrome. Setting: **Tap to turn**, default on. Off leaves the whole pane as a chrome toggle. **A tap that lands on a highlight is a tap on the highlight and nothing else** — it opens that mark's menu and neither turns the page nor takes the chrome away. Without that exemption the same tap did two things at once: a mark in an outer third turned the page out from under the menu opening over it, and a mark in the middle third took the readout away, and either way the reader had to go looking for the sentence they had just pressed. The overlay's own hit test is the authority on "on it", because it holds the mark's rectangles after the text has reflowed |
 | **Keyboard** | `→` `Space` `PgDn` forward · `←` `⇧Space` `PgUp` back · `Home` `End` book ends · `T` contents · `F` find · `B` bookmark · `+` `−` size. Flat 300ms on the commit curve |
 | **Never swallowed** | foliate's `#turnPage` takes a lock, holds it across the scroll **and** a further unconditional 100ms, and a turn arriving while it is held returns silently — the page simply does not move. Longer into a new chapter, where the lock also spans the file load. This was the "I slide left or right and it makes no difference, and it won't budge until I tap" fault, and it is why a tap issued a moment later worked. Turns are now queued through `#page()` rather than dropped, **capped at one pending**: unbounded queueing traded it for a worse fault, a reader who swipes at a stuck-looking page getting the whole burst at once (measured, one drag ran page 1 → 8) |
 | **Edges** | At **the book's own first and last page** — not at a chapter boundary — a drag meets rubber-band resistance (Apple's constant, 0.55) and springs back over 220ms. It never turns and it never feels stuck |
@@ -443,7 +453,7 @@ never a feature that needs a network.
 
 ### 6.6 Going to a place in the book
 
-**The readout is the control.** `PAGE 214 OF 480 · 12 MIN LEFT · 63% · XVIII` is the thing on screen that says
+**The readout is the control.** `PAGE 214 OF 480 · 63%` is the thing on screen that says
 where you are, so it is the thing you press to be somewhere else — a jump reached from a line of
 text sitting *beside* the readout is a jump nobody finds. It is a button, it inverts to ink while
 open like every other reader control, and it opens the **Go to** block in the sheet row, so the
@@ -459,17 +469,16 @@ section sizes — so it spans the whole book, it is the same figure in both flow
 move when the type does. It is not a printed page and never claims to be a particular edition's;
 it is a fixed measure of text wearing the word every reader already understands.
 
-**The name is on the button as well as in the card.** The readout carries the three figures and
-the chapter's name; the name also heads the block the button opens, where it wraps and is said in
-full, with the time left repeated in words underneath — `2 MIN LEFT IN THIS CHAPTER`.
+**Two figures on the button, everything else in the card.** The readout carries the page and the
+per-cent and nothing more. The chapter's name and the minutes left in it were on it as well, and
+are not any more: they head the block the button opens, where the name wraps and is said in full
+with the time under it — `2 MIN LEFT IN THIS CHAPTER`.
 
-Four things do not fit on one line on a phone. Measured at 375px the pill's whole track is 247px
-and the three figures need almost all of it, and asking the name to share that line crushed it to
-a width of zero — two dots with nothing between them, which is worse than leaving it out. So
-**below 640px the pill wraps and the name takes the second line whole**, with the full width of
-the pill to ellipsise into; at 640px and above it sits inline as the fourth part, and is still
-the first thing to truncate. Neither shape is allowed to grow the pill past its track: verified
-at 375 and 1280, with a long chapter name and with four-figure page numbers.
+Four parts did not fit on one line on a phone. Measured at 375px the pill's whole track is 247px,
+and a name like `CHAPTER ONE: ACKNOWLEDGEMENTS` either crushed to a width of zero — two dots with
+nothing between them — or took a whole second line to say something a reader glancing down at the
+foot of the page was not asking for. Two figures fit on one line at every supported width: measured
+at 375px the pill is 163px wide and 30px tall, one row, with four-figure page numbers to spare.
 
 The same block also stands in for the contents list on a book that has none — a plain `.txt`, a
 Markdown export, a hand-made EPUB — where the Contents tab used to say *"This book carries no

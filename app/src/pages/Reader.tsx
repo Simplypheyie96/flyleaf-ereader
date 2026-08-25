@@ -83,20 +83,17 @@ type Readout = {
     minsLeft: number | null
 }
 
-/** The readout's FIGURES, in order: where you are in the book, how much of the
-    chapter is left, how far through you are. Parts a book cannot supply are
-    simply absent. The chapter's NAME is not among them — it is rendered after
-    these, because it is the one part that has to be able to take a line of its
-    own; see `.reader-chapter` in index.css.
+/** The readout's two figures: where you are in the book, and how far through it
+    you are. Nothing else. The chapter's name and the minutes left in it were on
+    this button and are now in the card it opens — see the comment at the button.
 
-    The flow no longer changes what this says. That was the whole point of
+    The flow does not change what this says. That was the whole point of
     counting the book rather than the render: a scrolled reader was being told
     the pages of one chapter, or nothing at all, and what they wanted was the
     same number a paginated reader gets. */
 function readoutParts(r: Readout): ReactNode[] {
     const parts: ReactNode[] = []
     if (r.page !== null) parts.push(<span>Page {r.page} of {r.pages}</span>)
-    if (r.minsLeft !== null) parts.push(<span>{minutes(r.minsLeft)} left</span>)
     parts.push(<span>{percent(r.fraction)}%</span>)
     return parts
 }
@@ -287,6 +284,19 @@ export function Reader() {
         }
     }, [])
 
+    /* Does a point in a section document fall on a mark that is already drawn?
+       Asked by the gesture layer on every tap, so that a tap on a highlight is
+       only ever a tap on the highlight. The overlay's hit test is the authority
+       — it holds the mark's own rectangles, which is what "on it" means once
+       the text has reflowed. */
+    const onMark = useCallback((e: PointerEvent) => {
+        const doc = (e.target as Element | null)?.ownerDocument
+        if (!doc) return false
+        const contents = viewRef.current?.renderer?.getContents().find(c => c.doc === doc)
+        const [value] = contents?.overlayer?.hitTest({ x: e.clientX, y: e.clientY }) ?? []
+        return !!value && marksRef.current.has(value)
+    }, [])
+
     /* ── the engine ───────────────────────────────────────────────────────
        Mounted once per book id. Settings are applied by the effect below
        instead of here, so changing a setting never reopens the file. */
@@ -359,6 +369,7 @@ export function Reader() {
                     renderer: () => viewRef.current?.renderer ?? null,
                     stage: () => stageRef.current,
                     toggleChrome,
+                    onMark,
                 })
                 turnRef.current = turn
                 turn.attach(document)
@@ -726,14 +737,41 @@ export function Reader() {
            `margin` is a different thing entirely: the head and foot strip
            inside the pane. */
         marginRef.current = s.margin
-        r.setAttribute('gap', s.flow === 'scrolled'
+
+        /* Write an attribute only when its value actually changes. `setAttribute`
+           runs the custom element's attributeChangedCallback even when the value
+           is identical, and TWO of these attributes — `flow` and
+           `max-inline-size` — call `render()` from there (paginator.js:660–677).
+           So every call of `apply` used to re-lay the book out twice and
+           re-anchor it twice, for a slider that had moved something else
+           entirely. That is the churn behind the blank frame on a flow change. */
+        const set = (name: string, value: string) => {
+            if (r.getAttribute(name) === value) return
+            r.setAttribute(name, value)
+        }
+
+        /* A flow change is the one setting the engine cannot carry a position
+           across on its own: its anchor is a Range in the OLD layout, and the
+           two flows do not map a rect to a position the same way (paginator.js
+           §#scrollToAnchor). Left to it, paginated → scrolled landed pages away.
+           CLAUDE.md is explicit that position is CFI-anchored, so the CFI of the
+           page being left is taken here and put back once the relayout settles —
+           two frames, because `render()` schedules its own scroll. */
+        const reflow = r.getAttribute('flow') !== s.flow
+        const anchor = reflow ? pageCFIRef.current : null
+
+        set('gap', s.flow === 'scrolled'
             ? `${(100 * s.margin) / (100 + s.margin)}%`
             : `${s.margin}%`)
-        r.setAttribute('margin', `${CHROME_INSET}px`)
-        r.setAttribute('flow', s.flow)
-        r.setAttribute('max-inline-size', `${Math.round(s.measure * s.size)}px`)
+        set('margin', `${CHROME_INSET}px`)
+        set('flow', s.flow)
+        set('max-inline-size', `${Math.round(s.measure * s.size)}px`)
         const columns = s.columns === 'auto' ? (twoUp ? 2 : 1) : s.columns
-        r.setAttribute('max-column-count', String(columns))
+        set('max-column-count', String(columns))
+
+        if (anchor) requestAnimationFrame(() => requestAnimationFrame(() => {
+            void viewRef.current?.goTo(anchor)
+        }))
 
         const palette = readPalette(root)
         r.setStyles?.(readingCss({
@@ -1127,41 +1165,28 @@ export function Reader() {
                             setPanelOpen(false)
                         }}
                     >
-                        {/* All three numbers, and only numbers: page in chapter,
-                            minutes left in it, per-cent through the book. Scrolled
-                            flow drops the page count — it has no pages to count,
-                            SPEC.md 5.1 — and the other two are unchanged by flow,
-                            so switching never moves the number the slider below is
-                            bound to. The chapter's name lives in the card this
-                            button opens.
+                        {/* Two figures, and only figures: the page you are on in
+                            the whole book, and the per-cent through it. Neither
+                            changes with flow, so switching never moves the number
+                            the slider below is bound to.
 
                             Built as a list and joined, rather than as separators
-                            hung off each part: a book that reports no size for a
-                            section has no minutes to show, and hanging the dot off
-                            the part after it would open the readout with one.
+                            hung off each part, so a book that cannot supply a page
+                            count does not open the readout with a stray dot.
 
-                            The chapter's NAME comes after the figures and is not
-                            one of them. Four things do not fit on one line at
-                            375px — measured, the pill caps at 247px and the name
-                            was crushed to zero width, printing two dots with
-                            nothing between them — so below 640px it takes a line
-                            of its own beneath the figures, and its separator goes
-                            away with the line break. Wider than that it sits
-                            inline as the fourth part and truncates first. */}
-                        <span className="reader-readout-figures">
-                            {readout ? readoutParts(readout).map((part, i) => (
-                                <Fragment key={i}>
-                                    {i > 0 && <span className="reader-readout-sep">·</span>}
-                                    {part}
-                                </Fragment>
-                            )) : <span>&nbsp;</span>}
-                        </span>
-                        {readout?.chapter && (
-                            <>
-                                <span className="reader-readout-sep reader-readout-sep--chapter">·</span>
-                                <span className="reader-chapter">{readout.chapter}</span>
-                            </>
-                        )}
+                            The chapter's NAME and the minutes left in it were here
+                            and are not any more. They are in the card this button
+                            opens, which has the width to print a name like
+                            "Chapter One: Acknowledgements" instead of crushing it —
+                            at 375px the pill caps at 247px, and the name took the
+                            whole of a second line to say something a reader
+                            glancing down was not looking for. */}
+                        {readout ? readoutParts(readout).map((part, i) => (
+                            <Fragment key={i}>
+                                {i > 0 && <span className="reader-readout-sep">·</span>}
+                                {part}
+                            </Fragment>
+                        )) : <span>&nbsp;</span>}
                     </button>
                     <button
                         type="button"
