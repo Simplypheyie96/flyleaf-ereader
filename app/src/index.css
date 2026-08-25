@@ -1683,20 +1683,33 @@ body::before{
    rail would be centred against — and eventually overlap — a shelf that has
    just been allowed to grow to the width of the window. */
 @media (min-width:1024px){
-  :root{ --rail:88px; }
+  :root{ --rail:76px; }
 
   /* TWO gutters, not one: the rail lives in the first and the content clears
      it by the second. With a single gutter the arithmetic works out to the
      content starting at exactly the rail's right edge — invisible at 1280,
      where the 1080 cap leaves slack to centre in, and flush against the rail
      at 1024, where it does not. Measured: 0px clearance on the left against
-     32px on the right. */
+     32px on the right.
+
+     The rail was 88px wide with 60px tabs and a 56px button; the owner called
+     it too big for what it is, which is four destinations and one action on a
+     screen whose subject is a shelf of books. It is 72 / 52 / 48 now — the
+     tab still clears the 44px target floor, and the icon and label are
+     untouched, so what came off is padding rather than legibility.
+
+     76 and not 72, which was tried: at 72 the tab's padding box is 52px and
+     SETTINGS sets 54.7px, so the longest label ate its own 4px padding and
+     sat 2.7px into it on each side. Nothing clipped, but the declared padding
+     stopped being true, and the label a rail exists to show is the wrong
+     thing to squeeze. 76 gives 56px of padding box, which the longest label
+     clears. */
   .page{ padding-left:calc(var(--gutter) * 2 + var(--rail)); }
 
   .tabbar{
     left:var(--gutter); bottom:auto; top:50%;
     transform:translateY(-50%);
-    flex-direction:column; gap:14px;
+    flex-direction:column; gap:12px;
     max-width:none;
   }
   .tab-pill{ flex-direction:column; gap:4px; width:var(--rail); }
@@ -1704,22 +1717,21 @@ body::before{
     /* stacked, so the label sits under its icon rather than beside it */
     flex-direction:column; gap:6px;
     width:100%; min-height:0;
-    padding:12px 4px;
-    /* 30px, not 22px, and the difference is geometry rather than taste. The
-       capsule is 88px wide at border-radius:999px, so its inner corner is a
-       43px arc, and an item sits 5px inside it. A 22px corner on that item
-       crosses the capsule's arc by 1.6px at the top and bottom of the rail --
-       the active tab bulging past its own container, which is what the owner
-       saw. The item clears only at 26px or more; 30px is half its 60px height,
-       so the ends go fully round and it is the phone bar's pill rotated, which
-       is what the note above this block says this rail is. */
-    border-radius:30px;
+    padding:8px 4px;
+    /* Half the item's own height, so the ends go fully round. That is the
+       phone bar's pill rotated, which is what the note above this block says
+       this rail is, and it is also the one radius that can never cross the
+       capsule's inner arc: an item inset evenly inside a stadium and rounded
+       to its own half-height follows the same curve rather than cutting it.
+       A smaller corner does cut it -- 22px on the old 88px rail crossed by
+       1.6px, and the active tab visibly bulged past its container. */
+    border-radius:26px;
     font-size:9.5px; letter-spacing:.09em;
   }
   /* every tab is named here, not only the current one */
   .tab-pill a .tab-lbl{ display:block; }
   .tab-pill a[aria-current="page"]{ padding-inline:4px; }
-  .tab-add{ width:56px; height:56px; }
+  .tab-add{ width:48px; height:48px; }
 
   /* NOT widened. A shelf capped at 680px in a 1920px window is four small
      covers with 360px of blank paper either side, and the obvious fix is one
