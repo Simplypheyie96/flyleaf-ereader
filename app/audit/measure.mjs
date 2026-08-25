@@ -21,6 +21,20 @@
 import { chromium } from '/Users/simplypheyie/.npm/_npx/e41f203b7505f1fb/node_modules/playwright/index.mjs'
 
 const BASE = process.env.BASE || 'http://localhost:4173'
+
+/* Serve the BUILT app ourselves unless BASE was pointed somewhere already.
+   This driver used to require a preview server the caller had to remember to
+   start, which in practice meant it was never run at all -- see the note on
+   the measure in index.css. Owning the server is what makes
+   `npm run audit:measure` one command with nothing to remember. */
+let server = null
+if (!process.env.BASE) {
+    const { spawn } = await import('node:child_process')
+    server = spawn('npx', ['vite', 'preview', '--port', '4173', '--strictPort'], { stdio: 'ignore' })
+    for (let i = 0; i < 80; i++) {
+        try { await fetch(BASE); break } catch { await new Promise(r => setTimeout(r, 250)) }
+    }
+}
 /* Of the box the words were ALLOWED (see `host` in the probe). A tenth is
    already more than ragged-right accounts for — measured, the widest line of
    ordinary prose lands within 4–7% of its own content box on every page here,
@@ -139,3 +153,7 @@ console.log(JSON.stringify({ slack: SLACK, rows }, null, 2))
 console.log(`\nexempt: ${centred} centred (slack sits evenly on both sides), ${layout} uncapped and filling ≥90% of their own box (the element is narrow, not the text)`)
 console.log(`\n=== FINDINGS: ${findings.length}`)
 for (const f of findings) console.log('  · ' + f)
+
+server?.kill()
+/* Non-zero so this can gate a release rather than merely narrate one. */
+process.exit(findings.length ? 1 : 0)

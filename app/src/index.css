@@ -521,8 +521,15 @@ body::before{
     sheet), which at 13px is ~78ch of prose after panel padding — the top of
     the comfortable band — and prose fills the box it is given. Do not add
     max-width to a paragraph inside .page-inner or .sheet-body; narrow the
-    container instead if a narrower measure is wanted. audit/measure.mjs
-    fails the build on any block leaving more than 5% of its host empty.
+    container instead if a narrower measure is wanted.
+
+    `npm run audit:measure` reports any block whose widest line leaves more
+    than 10% of its host box empty, at 390/1024/1280. It is NOT part of `npm
+    run build` and cannot be — it needs the built app served — and this comment
+    used to claim it was, which is how a 46ch cap on the install strip survived
+    in here until the owner saw it on screen: at 1280 it stopped the sentence
+    at 323px inside a 618px box, 48% of the box empty, and the driver that
+    would have caught it was never run. Run it before shipping a layout.
 
     The two deliberate exceptions are centred: .drop-lead on /open and the
     empty states, where a narrower column inside a centred card is the point
@@ -630,7 +637,12 @@ body::before{
 }
 .instl-txt{ flex:1 1 220px; min-width:0; padding-inline-end:24px; }
 .instl-txt .ui-lbl{ margin:0 0 5px; }
-.instl-txt .ui-p{ margin:0; max-width:46ch; }
+/* No max-width. The measure rule above is not advisory and this line used to
+   break it: 46ch resolves to 342px inside a 642px text box, so the notice
+   filled half its own card and left the other half empty — the ragged
+   one-sided step-in the owner has reported more than once. The card is already
+   a capped 680px column; that IS the measure. */
+.instl-txt .ui-p{ margin:0; }
 .instl .btn--sm{ flex:0 0 auto; }
 .instl-x{
   position:absolute; top:1.5px; inset-inline-end:3.5px;
@@ -2145,7 +2157,12 @@ body::before{
    introduction rather than as another row's note. */
 .sheet-lead{
   margin:0 0 12px;
-  max-width:46ch;
+  /* No max-width, for the reason at the top of this file: .sheet-body is one
+     of the two containers named there, and 46ch here resolves to 329px inside
+     a 720px sheet -- 54% of the box empty, the same fault as the install
+     strip's cap and found in the same pass. Not reachable by
+     audit/measure.mjs, which walks routes and cannot open a PDF sheet, so it
+     was measured by hand. */
   font-family:var(--sans);
   font-size:12.5px; line-height:1.55;
   text-wrap:pretty;
