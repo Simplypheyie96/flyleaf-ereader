@@ -429,7 +429,18 @@ export async function pageText(page: PDFPageProxy): Promise<string> {
    match starts in gives a real fraction down the page — the same `fraction`
    half of the `pdf:<page>:<fraction>` locator a bookmark stores. */
 
-export type PdfHit = { fraction: number; pre: string; match: string; post: string }
+/* `fraction` is how far down the page the match sits; `x` and `w` are where
+   across it the words start and how wide they are, both as fractions of the
+   page width. The two extra numbers exist so that tapping a result can put a
+   rule under the words themselves rather than dropping the reader at the top
+   of the right line and leaving them to find it. They are derived from the
+   text item the match falls in, and the match's share of that item is
+   apportioned by character count -- an approximation, and an honest one for a
+   rule under a word, which does not have to be to the glyph. */
+export type PdfHit = {
+    fraction: number; x: number; w: number
+    pre: string; match: string; post: string
+}
 
 /** How much of the line either side of a hit the list shows. Long enough to
     tell two uses of the same word apart, short enough that a row stays one
@@ -444,10 +455,18 @@ export async function searchPage(page: PDFPageProxy, re: RegExp): Promise<PdfHit
     let text = ''
     const starts: number[] = []
     const ys: number[] = []
-    for (const item of content.items as Array<{ str?: string; transform?: number[]; hasEOL?: boolean }>) {
+    const xs: number[] = []
+    const ws: number[] = []
+    const lens: number[] = []
+    for (const item of content.items as Array<{
+        str?: string; width?: number; transform?: number[]; hasEOL?: boolean
+    }>) {
         if (typeof item.str !== 'string') continue
         starts.push(text.length)
         ys.push(item.transform?.[5] ?? 0)
+        xs.push(item.transform?.[4] ?? 0)
+        ws.push(item.width ?? 0)
+        lens.push(item.str.length)
         text += item.str
         if (item.hasEOL) text += '\n'
     }
@@ -455,6 +474,7 @@ export async function searchPage(page: PDFPageProxy, re: RegExp): Promise<PdfHit
 
     const viewport = page.getViewport({ scale: 1 })
     const height = viewport.height || 1
+    const width = viewport.width || 1
     const hits: PdfHit[] = []
     /* A fresh regex per call would be the caller's job; resetting here means a
        /g regex handed in twice cannot skip the first half of the second page. */
@@ -467,8 +487,18 @@ export async function searchPage(page: PDFPageProxy, re: RegExp): Promise<PdfHit
             if (starts[mid] <= m.index) { at = mid; lo = mid + 1 } else hi = mid - 1
         }
         const vy = viewport.convertToViewportPoint(0, ys[at])[1] as number
+        /* The match's share of the item it starts in. A match that runs past
+           the end of its item is clipped to it rather than guessed at: two
+           items are two runs of glyphs with a gap of unknown width between
+           them, and a rule drawn across that gap would be a lie. */
+        const len = lens[at] || 1
+        const from = Math.min(len, Math.max(0, m.index - starts[at]))
+        const chars = Math.min(len - from, m[0].length)
+        const vx = viewport.convertToViewportPoint(xs[at], ys[at])[0] as number
         hits.push({
             fraction: Math.min(1, Math.max(0, vy / height)),
+            x: Math.min(1, Math.max(0, (vx + ws[at] * (from / len)) / width)),
+            w: Math.min(1, Math.max(0, (ws[at] * (chars / len)) / width)),
             pre: text.slice(Math.max(0, m.index - HIT_CONTEXT), m.index).replace(/\s+/g, ' '),
             match: m[0].replace(/\s+/g, ' '),
             post: text.slice(m.index + m[0].length, m.index + m[0].length + HIT_CONTEXT).replace(/\s+/g, ' '),

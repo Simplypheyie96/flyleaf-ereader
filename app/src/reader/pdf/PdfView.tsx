@@ -37,11 +37,17 @@ import {
 } from './engine'
 
 export type PdfLocation = { page: number; fraction: number }
+/** The one search hit the reader tapped: which page, and the run of words on
+    it, in fractions of the page box so it survives every zoom and fit. */
+export type PdfFound = { page: number; fraction: number; x: number; w: number }
 export type PdfFit = 'width' | 'page'
 
 export type PdfViewHandle = {
-    /** Jump to a page (1-based) and optionally a fraction down it. */
-    goTo(page: number, fraction?: number): void
+    /** Jump to a page (1-based) and optionally a fraction down it. `centre`
+        lands that point a third of the way down the viewport instead of flush
+        against its top edge, which is where a search hit wants to be: at the
+        very top it sits under the chrome and reads as "not found". */
+    goTo(page: number, fraction?: number, centre?: boolean): void
     /** Where the top of the viewport is now. */
     location(): PdfLocation
     /** Multiply the zoom about the centre of the viewport. */
@@ -62,6 +68,8 @@ export interface PdfViewProps {
     /** A tap that was not a selection and not a drag: toggle the chrome. */
     onTap: () => void
     onZoom?: (zoom: number) => void
+    /** Draw the found rule under this run. Null when there is no search. */
+    found?: PdfFound | null
 }
 
 /* The surround. PAD is the margin the stock shows around the paper; GAP is the
@@ -217,12 +225,18 @@ export function PdfView(p: PdfViewProps) {
     useEffect(() => { sweep() }, [L, sweep])
 
     /* ── going somewhere ──────────────────────────────────────────────── */
-    const goTo = useCallback((page: number, fraction = 0) => {
+    const goTo = useCallback((page: number, fraction = 0, centre = false) => {
         const el = scrollRef.current
         const { tops, hs } = Lref.current
         if (!el || !tops.length) return
         const i = clamp(Math.round(page) - 1, 0, tops.length - 1)
-        el.scrollTop = Math.round(tops[i] + clamp(fraction, 0, 1) * hs[i])
+        const y = tops[i] + clamp(fraction, 0, 1) * hs[i]
+        /* A third rather than a half: the chrome is at both ends, and a line
+           put dead centre reads as further from the top than the eye expects
+           of a thing it just asked to be taken to. Never scrolled past the top
+           of the document, so a hit on page one still shows page one. */
+        const lift = centre ? el.clientHeight / 3 : 0
+        el.scrollTop = Math.round(Math.max(0, y - lift))
         sweep()
     }, [sweep])
 
@@ -443,6 +457,7 @@ export function PdfView(p: PdfViewProps) {
                         h={L.hs[n - 1]}
                         left={L.lefts[n - 1]}
                         top={L.tops[n - 1]}
+                        found={p.found && p.found.page === n ? p.found : null}
                         onPaint={onPaint}
                     />
                 ))}
@@ -468,6 +483,7 @@ function PdfPage(pp: {
     h: number
     left: number
     top: number
+    found: PdfFound | null
     onPaint: () => void
 }) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -518,6 +534,17 @@ function PdfPage(pp: {
             <canvas className="pdf-canvas" ref={canvasRef} width={pp.w} height={pp.h} />
             <div className="pdf-veil" aria-hidden="true" />
             <div className="pdf-text textLayer" ref={textRef} />
+            {pp.found && (
+                <div
+                    className="pdf-found"
+                    aria-hidden="true"
+                    style={{
+                        left: `${pp.found.x * 100}%`,
+                        top: `${pp.found.fraction * 100}%`,
+                        width: `${pp.found.w * 100}%`,
+                    }}
+                />
+            )}
         </div>
     )
 }
