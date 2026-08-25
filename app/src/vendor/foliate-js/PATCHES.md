@@ -377,18 +377,43 @@ order. Paginated flow is untouched and still holds exactly one.
   `[13,14,15,16]` with 14 current. It is a set lookup per resident view and returns immediately
   at three or fewer.
 
-### Scope and known limit
+### Backward fill
 
-Forward continuity is complete. **Backward continuity reaches only as far as the resident
-window**: scrolling back up a chapter you scrolled down is continuous, opening at chapter N and
-scrolling above its first line is not. Prepending a section of unknown height above the viewport
-requires compensating `scrollTop` inside the same frame, and a wrong compensation is a visible
-lurch at the top of every chapter. Not built; stated in `SPEC.md` § 5.1 rather than left silent.
+`#fillBackward` mirrors `#fillForward`, gated on one screen of lead instead of two, and
+prepends via the same `#createView` path. The difficulty is entirely in holding the reader's
+position while a section of unknown height is inserted above them.
+
+The incremental approach — observe each growth, add the same number of pixels to `scrollTop` —
+was built first and is wrong. `#scrollToAnchor` repositions absolutely during the same
+expansion off an anchor that is up to 250ms stale, so the two mechanisms double-count. Measured
+in the pane: a single prepend moved the reader's paragraph **3505px** up the screen while the
+arithmetic claimed exact compensation.
+
+`#holdPosition` / `#restoreHold` / `#releaseHold` replace it with an absolute hold. Before the
+prepend, the current view's **element** and the reader's offset into it are captured; every
+subsequent expand restores `scrollTop = element.offsetTop + delta` and returns early instead of
+re-anchoring. Restoring is idempotent, which is what makes it safe to run on every expand of
+every view. The hold outlives the `await` — it is released on `document.fonts.ready`, because
+fonts land after load and grow the section again.
+
+### setStyles applies to every resident document
+
+Upstream wrote the two style elements of `this.#view.document` only, because there was never
+another document. With a window of three, a stitched-in section had its style elements created
+and left **empty**, so it rendered in the publisher's own CSS — black headings and blue links on
+a dark stock. That is the reading surface failing contrast outright, not a cosmetic difference.
+`#residentDocuments` returns every view's document in scrolled flow (the single view otherwise),
+and `setStyles` writes to all of them.
+
+Verified with three sections resident on the dark stock: ink `rgb(244, 242, 237)` on
+`rgb(34, 30, 27)` in every resident document — **14.79:1**, identical across all three.
 
 Verified in the pane at 375x812 on the seeded *Pride and Prejudice*, scrolled flow:
 
 - Forward across a boundary is continuous — `scrollTop` steps of 50px through the join at 6372
   tracked exactly, no jump, and the running chapter flipped from XI to XII at the right offset.
+- Fourteen 100px steps *upwards* from a TOC jump to chapter 16 moved a reference paragraph
+  exactly 100px on every step, including the step on which section 14 was prepended.
 - A forty-step creep across three chapters ended with the window at exactly three views
   (`[16,17,18]`, current 17) and the scroll offset inside the current view's own extent.
 - CFI round-trip across a boundary: `goTo` on a CFI taken at 4598 landed back at 4598 with the
