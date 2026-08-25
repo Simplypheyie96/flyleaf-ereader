@@ -32,13 +32,18 @@ import type { Turn } from '../types'
 
 /* ── the numbers, all of them, in one place ───────────────────────────── */
 
-/** Horizontal travel that claims the gesture, if it happens fast enough. */
+/** Horizontal travel that claims the gesture. No time limit on it: an
+    earlier build only claimed inside a 200ms window, so a slow deliberate
+    drag — the one a reader makes when they mean to look at the next page
+    rather than flick past it — travelled its 8px, missed the window, and the
+    page stayed put. That is what "the slide is resisting" was. A horizontal
+    drag on a paginated book is a turn however long the reader takes over it. */
 const CLAIM_PX = 8
-/** …and the window it has to happen in. Past this, a slow drag is a
-    selection or a scroll and the turn never takes it. */
-const CLAIM_MS = 200
-/** …or this much speed, at any distance. A flick is a flick immediately. */
-const CLAIM_SPEED = 0.15        // px/ms
+/** The same by mouse. Higher, because a pointing device is precise enough
+    that a short drag from a word is far more likely to be the start of a
+    selection than a page turn. Past this, with nothing selected, it is a
+    turn — see #move. */
+const CLAIM_MOUSE_PX = 24
 /** Vertical travel that gives the gesture away to something else. */
 const YIELD_PX = 12
 
@@ -58,10 +63,10 @@ const FADE = 120
 const REDUCED = 150
 /** A section crossing slides like any other turn; only the arriving section
     fades, because it is not laid out until the slide is over. Measured: the
-    load itself costs 34-37ms of the 137ms a seam turn takes, the rest being
+    load itself costs 34-37ms of the 137ms a crossing takes, the rest being
     the paginator's own fixed wait — so this covers about two frames of real
     work, not a stall. */
-const SEAM_IN = 140
+const CROSS_IN = 140
 
 const EASE_TURN = 'cubic-bezier(.16,1,.3,1)'
 
@@ -100,7 +105,7 @@ const clamp = (lo: number, hi: number, v: number) => Math.min(hi, Math.max(lo, v
 export interface TurnConfig {
     /** live, because every one of these can change under a running gesture. */
     turn: Turn
-    /** right-to-left book: swipe, tap zones and the seam all mirror. */
+    /** right-to-left book: swipe and tap zones both mirror. */
     rtl: boolean
     /** left and right thirds turn; off makes the whole pane a chrome toggle. */
     tapToTurn: boolean
@@ -119,7 +124,6 @@ export interface TurnHooks {
         animating a custom property would work only where that property has
         been registered, and a hairline a frame behind the edge it is drawing
         is worse than no hairline. */
-    seam(): HTMLElement | null
     /** middle-third tap. */
     toggleChrome(): void
 }
@@ -174,7 +178,6 @@ export class TurnController {
         x it is given is short by that inset. Measured: a 358.8px pane sitting
         at 15.6 in a stage starting at 0, and a hairline asked for the page's
         trailing edge landing 15.6px to the left of it. */
-    #paneX = 0
     /* Set when a touch-down landed on a turn that was still flying, so the
        paths that end a gesture know the leaf is holding a position it was
        not given by this gesture. */
@@ -183,8 +186,10 @@ export class TurnController {
     #size = 1
     /** decided once, at claim, from a layout read that happens then and not
         again: whether the page after this one is in another section. */
-    #seamFwd = false
-    #seamBack = false
+    /** the neighbouring page lives in another section, so the turn has to
+        cross a file boundary rather than just scroll the column */
+    #crossFwd = false
+    #crossBack = false
     #edgeFwd = false
     #edgeBack = false
     #anim: Animation | null = null
@@ -259,18 +264,6 @@ export class TurnController {
         l.style.willChange = ''
     }
 
-    /** Where the reading pane sits inside the stage — the inset the hairline
-        is drawn from. Taken at claim with every other layout read, so it never
-        asks again while the finger is down. */
-    #measurePane() {
-        const stage = this.#hooks.stage()
-        const layer = this.#layer()
-        const box = layer?.parentElement
-        if (!stage || !layer || !box) return
-        const pane = box.getBoundingClientRect()
-        this.#paneX = pane.left - stage.getBoundingClientRect().left
-    }
-
     /* ── a turn with no gesture behind it: keys, tap zones, chrome ─────── */
 
     /** dir 1 = forward in reading order, -1 = back. Visual, not logical:
@@ -311,7 +304,7 @@ export class TurnController {
         const host = this.#hooks.stage()
         if (!host || target.ownerDocument !== host.ownerDocument) return true
         return target === host
-            || target.closest('foliate-view, .reader-seam, .reader-tick') !== null
+            || target.closest('foliate-view, .reader-tick') !== null
     }
 
     #down = (e: PointerEvent) => {
@@ -332,13 +325,11 @@ export class TurnController {
             this.#pointerId = -1
             return
         }
-        /* Mouse DRAGS are left to text selection. SPEC.md § 5.3 requires that
-           a slow drag beginning on a word selects rather than turns, and on a
-           pointing device that is exactly what a drag from a word means —
-           there is no threshold that separates the two honestly. So a mouse
-           gesture is watched, but #move will never claim it: it can end as a
-           tap (which #tap already rejects past 8px of travel) and it can end
-           as a selection, and nothing in between. */
+        /* Mouse drags share the page with text selection. SPEC.md § 5.3 gives
+           selection the drag that begins on a word, so #move holds a mouse to
+           a longer threshold and stands down if a selection has actually
+           formed. It used to stand down unconditionally, which meant slide
+           simply did not respond to a drag on a desktop at all. */
         this.#mouse = e.pointerType === 'mouse'
 
         /* Interrupting a commit: continue from where it actually is on
@@ -384,17 +375,19 @@ export class TurnController {
         if (this.#phase === 'watching') {
             const dx = this.#travel(e)
             const dy = (e.screenY - this.#y0) / this.#scale
-            const dt = e.timeStamp - this.#t0 || 1
 
             if (Math.abs(dy) > YIELD_PX && Math.abs(dy) > Math.abs(dx)) {
                 this.#phase = 'idle'
                 return
             }
-            if (this.#mouse) return
-            const fast = Math.abs(dx) / dt > CLAIM_SPEED
-            const far = Math.abs(dx) >= CLAIM_PX && dt <= CLAIM_MS
-            if (!fast && !far) return
+            if (Math.abs(dx) < (this.#mouse ? CLAIM_MOUSE_PX : CLAIM_PX)) return
             if (Math.abs(dx) <= Math.abs(dy)) return
+            /* A mouse drag that is actually selecting has a live selection
+               behind it, and that is a fact rather than a guess about intent
+               — so it is the test, instead of refusing every mouse drag the
+               way this used to. Drag from the margin, or from a word without
+               catching any text, and the page turns. */
+            if (this.#mouse && this.#selecting()) return
             if (!this.#cfg.paginated) { this.#phase = 'idle'; return }
 
             /* Claimed. Every layout read the drag needs happens here, once. */
@@ -409,7 +402,7 @@ export class TurnController {
                under an early rotateY fold, since removed, where the
                foreshortening made it florid: on a 17-page chapter, one grab,
                pages came back 5 at 70 degrees and 3 higher up the flight. `page >= pages - 2`
-               is then trivially true, so #seamFwd latches and the commit takes
+               is then trivially true, so #crossFwd latches and the commit takes
                the crossing path — a fade-in of a section that was never
                crossed, mid-chapter. Same class of defect
                as measuring travel in clientX: reading the world through the
@@ -422,12 +415,10 @@ export class TurnController {
                while the layer was flat, and the commit was cancelled before it
                paged, so they still describe the page under the finger. */
             if (!this.#caught) this.#readEdges(r)
-            this.#measurePane()
             this.#phase = 'dragging'
             this.#target?.setPointerCapture?.(e.pointerId)
             const l = this.#layer()
             if (l) l.style.willChange = 'transform'
-            this.#hooks.stage()?.setAttribute('data-turning', '')
         }
 
         e.preventDefault()
@@ -495,8 +486,8 @@ export class TurnController {
         this.#edgeBack = Boolean(r.atStart)
         /* pages counts the two blank slack pages expand() adds, one at each
            end, so the last page of text is pages - 2 and the first is 1. */
-        this.#seamFwd = !this.#edgeFwd && page >= pages - 2
-        this.#seamBack = !this.#edgeBack && page <= 1
+        this.#crossFwd = !this.#edgeFwd && page >= pages - 2
+        this.#crossBack = !this.#edgeBack && page <= 1
     }
 
     /** The page follows the finger 1:1. The rubber-band is the book's own
@@ -532,7 +523,7 @@ export class TurnController {
         return dt > 8 ? (b.x - a.x) / dt : 0
     }
 
-    /** Fast release settles sooner. The seam between the drag and the
+    /** Fast release settles sooner. The join between the drag and the
         animation is only invisible if the animation starts at the speed the
         finger left at, and duration is how a timed animation says that. */
     #duration(v: number): number {
@@ -555,25 +546,6 @@ export class TurnController {
         if (style === 'instant' || style === 'reduced') return
         const l = this.#layer()
         if (l) l.style.transform = `translate3d(${offset}px,0,0)`
-        const seam = this.#hooks.seam()
-        if (seam) seam.style.transform = `translate3d(${this.#seamAt(offset, offset < 0)}px,0,0)`
-    }
-
-    /** Where the rule sits: the boundary between the outgoing page and the
-        incoming one. Turning forward that boundary is the outgoing page's
-        TRAILING edge — it starts at the pane's trailing edge and travels in
-        with the content; turning back it is the leading edge and starts at
-        the pane's leading edge.
-
-        The direction is PASSED, never inferred from the offset's sign. A tap
-        or a key turn commits from an offset of exactly 0, and `0 < 0` is
-        false, so inferring put the start keyframe at the leading edge while
-        the end keyframe — paneX − size + size — landed on the leading edge
-        too. Both keyframes computed to the same x, so instead of an edge
-        travelling across the pane the turn drew a stationary hairline down
-        the leading margin: the straight line at the edge, on every tap. */
-    #seamAt(offset: number, fwd: boolean): number {
-        return this.#paneX + offset + (fwd ? this.#size : 0)
     }
 
     #liveOffset(): number {
@@ -622,18 +594,6 @@ export class TurnController {
             ],
             { duration, easing, fill: 'forwards' })
         this.#anim = anim
-        /* The seam rides the same clock, the same easing and the same
-           property, so it cannot drift a frame away from the edge it draws. */
-        /* Which way this turn goes: the destination says it on a commit,
-           and on a spring back — where the destination is 0 — the offset
-           being abandoned says it instead. */
-        const fwd = to !== 0 ? to < 0 : this.#offset < 0
-        this.#hooks.seam()?.animate(
-            [
-                { transform: `translate3d(${this.#seamAt(this.#offset, fwd)}px,0,0)` },
-                { transform: `translate3d(${this.#seamAt(to, fwd)}px,0,0)` },
-            ],
-            { duration, easing, fill: 'forwards' })
         return anim.finished.then(() => true, () => false)
     }
 
@@ -649,11 +609,8 @@ export class TurnController {
         if (!r) { this.#settle(); return
         }
         const style = this.#cfg.reducedMotion ? 'reduced' : this.#cfg.turn
-        const seam = dir === 1 ? this.#seamFwd : this.#seamBack
+        const cross = dir === 1 ? this.#crossFwd : this.#crossBack
         const stage = this.#hooks.stage()
-        /* A tap or a key turn never went through the drag, so it sets the
-           flag the hairline is drawn behind here instead. */
-        stage?.setAttribute('data-turning', '')
         const dur = style === 'fade' ? FADE : style === 'reduced' ? REDUCED : duration
 
         if (style === 'fade' || style === 'reduced' || style === 'instant') {
@@ -692,14 +649,6 @@ export class TurnController {
         }
 
         const to = dir === 1 ? -this.#size : this.#size
-        /* A tap or a key turn never passed through claim, so the pane has not
-           been measured on this path and #paneX is whatever the last gesture
-           left — zero in a session where nothing has been dragged, which draws
-           the hairline a whole pane inset to the left of the edge it belongs
-           on (measured: 15.6px on a 390px phone). Taken here, before anything
-           animates: this is the one path where a layout read is not on the
-           finger's critical path, because there is no finger. */
-        this.#measurePane()
         /* Grabbed mid-flight: leave the page where it is. The gesture that
            grabbed it decides what happens next — that is the whole point of
            being able to grab it. */
@@ -719,7 +668,7 @@ export class TurnController {
            without anything visibly going out. The transform is NOT cleared
            first — r.next() is asynchronous here, and clearing early snaps the
            spent page back into view for the ~37ms the load takes. */
-        if (seam) {
+        if (cross) {
             if (stage) stage.style.opacity = '0'
             this.#offset = 0
             this.#clearLayer()
@@ -729,7 +678,7 @@ export class TurnController {
                    outranks a later inline opacity write, so this one has to be
                    cancellable or it disables the dim on every later drag. */
                 const back = stage.animate([{ opacity: 0 }, { opacity: 1 }],
-                    { duration: SEAM_IN, easing: 'linear', fill: 'forwards' })
+                    { duration: CROSS_IN, easing: 'linear', fill: 'forwards' })
                 this.#fade = back
                 await back.finished.then(() => { }, () => { })
                 stage.style.opacity = ''
@@ -754,7 +703,6 @@ export class TurnController {
         this.#base = 0
         this.#phase = 'idle'
         const stage = this.#hooks.stage()
-        stage?.removeAttribute('data-turning')
         /* Same reason as in #clearLayer, on the other property: the fade
            fills forwards, so clearing the inline opacity is not enough to
            get the page back. Measured on a spring-back, where the leftover
@@ -764,12 +712,18 @@ export class TurnController {
         this.#fade?.cancel()
         this.#fade = null
         if (stage) stage.style.opacity = ''
-        const seam = this.#hooks.seam()
-        if (seam) { seam.getAnimations().forEach(a => a.cancel()); seam.style.transform = '' }
         this.#clearLayer()
     }
 
     /* ── tap ──────────────────────────────────────────────────────────── */
+
+    /** Is the browser mid-selection in the document the gesture started in?
+        Checked in the section's own document, because a selection made inside
+        an iframe does not show up in the host's. */
+    #selecting(): boolean {
+        const sel = this.#target?.ownerDocument?.defaultView?.getSelection()
+        return !!sel && !sel.isCollapsed
+    }
 
     /** TRUE only when the tap itself started a turn, so #up can tell a tap
         that took over a caught leaf from one that left it hanging. */
