@@ -217,6 +217,6 @@ that actually catches things here is `npm run audit:measure` above, not a merge 
 
 No glass, no `backdrop-filter`, no shadows. No paper texture over the text, no drawn spine
 gutter. **No page curl** — the shadowless fold was tried, measured green, and cut on feel, so
-there is no version of this left to try. No generated covers. No whole-book page numbers on a reflowable book. No rotation on the
+there is no version of this left to try. No generated covers. No rotation on the
 reading page. No Kalam outside the reader's own notes. No AI. No feature that needs a network to
 work. No custom stock picker, and no cool-grey or blue-shifted page.

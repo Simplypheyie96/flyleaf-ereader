@@ -1883,9 +1883,11 @@ body::before{
 }
 
 /* ── the readout ──────────────────────────────────────────────────────────
-   Per-chapter pages, never a whole-book page number: on a reflowable book that
-   number is a property of this font at this size on this screen, and printing
-   it as if it were a property of the book is a lie. `tabular-nums` because the
+   A page of the whole book, not of this chapter. The renderer's own count is a
+   property of this font at this size on this screen and restarts at every
+   chapter break; the number here is foliate's location counter, 1500
+   characters of the spine to the page, so it spans the book and does not move
+   when the type does. `tabular-nums` because the
    figure changes on every turn and a shifting readout draws the eye off the
    page. */
 .reader-readout{
@@ -1933,11 +1935,45 @@ body::before{
    above sets flex:none, and at (0,1,1) it outranks a bare `.reader-chapter`.
    The chapter was the one part meant to give way when the readout runs out of
    room, and it could not — measured at 375px with a long chapter name, the
-   pill grew to 484px and hung 173px past the right edge of the window. */
-.reader-readout > .reader-chapter{
+   pill grew to 484px and hung 173px past the right edge of the window.
+
+   Giving way is right; vanishing is not. With the page, the minutes and the
+   percentage all present the pill needs most of its 247px track at 375px, and
+   what was left over rounded the chapter down to a width of zero — two dots
+   with nothing between them. So below 640px the name is not asked to fit on
+   that line at all: the pill wraps and the name takes the second line whole,
+   with the full width of the pill to ellipsise into. Wider than that there is
+   room for four parts and it sits inline as the last of them, still the first
+   thing to truncate. */
+.reader-readout{ flex-wrap:wrap; row-gap:2px; height:auto; padding:6px 10px; line-height:1.3; }
+/* The figures travel together. Left loose among the pill's own flex children
+   they wrapped independently, and the percentage — the shortest of the three —
+   dropped to a line of its own, making three rows where two were intended. */
+.reader-readout > .reader-readout-figures{
   flex:0 1 auto; min-width:0;
+  display:flex; align-items:center; justify-content:center;
+  /* Tighter than the pill's own 8px. The three figures at their natural widths
+     came to within a pixel of the track, and a pixel is not a margin — 6px
+     buys the row enough slack to stay on one line, and it still wraps rather
+     than overflowing if a book's numbers run longer than this one's. */
+  column-gap:6px; row-gap:2px; flex-wrap:wrap;
+}
+/* Nesting the figures put them out of reach of `.reader-readout > span`, and
+   without its flex:none each figure shrank and broke its own words over two
+   lines. They size to their content; the row wraps, they do not. */
+.reader-readout-figures > span{ flex:none; }
+.reader-readout > .reader-chapter{
+  flex:1 1 100%; min-width:0; text-align:center;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   text-transform:none; letter-spacing:.04em;
+}
+/* The dot that would have joined the name to the figures. On its own line it
+   would read as a bullet, so it only exists once the name comes back inline. */
+.reader-readout-sep--chapter{ display:none; }
+@media (min-width:640px){
+  .reader-readout{ flex-wrap:nowrap; height:30px; padding:0 14px; }
+  .reader-readout > .reader-chapter{ flex:0 1 auto; }
+  .reader-readout-sep--chapter{ display:inline; }
 }
 
 /* ── the stage ────────────────────────────────────────────────────────────
