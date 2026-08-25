@@ -2089,6 +2089,18 @@ body::before{
 }
 .reader-goto-acts{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 
+/* The same fault --lift was introduced to fix, in the one place it had not
+   been applied. .btn--ghost fills with --card-w, which is CHROME, while
+   [data-stock] re-pins --ink to the READING stock. The two are chosen
+   independently, so with the chrome dark and the stock light the Beginning
+   and End pills painted near-black #1E1E1E under the light stock's near-black
+   #1B1917 ink -- 1.02:1, a label you could not read at all. --lift is the
+   stock's own raised surface, the same ground .reader-goto-num beside them
+   already stands on, and --rule is re-pinned by the stock too, so the ring
+   comes right for free. Scoped to .reader rather than to these two buttons:
+   any ghost button that ever lands on the reading page has the same fault. */
+.reader .btn--ghost{ background:var(--lift); }
+
 /* In the sheet row the block is the whole sheet, so it owns the scroll the
    .sheet-body owns for the settings sheet. min-height:0 or the flex child
    refuses to shrink below its content and the 40dvh cap does nothing. */
