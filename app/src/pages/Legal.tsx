@@ -12,7 +12,8 @@ import { SEEDS } from '../seed'
    sentence that explains it, skimmable for the one thing somebody came for.
 
    Every claim below was checked against the code before it was written, not
-   assumed. No analytics anywhere (`main.tsx`), the complete list of hosts the
+   assumed. The only measurement is Vercel's page-view count, with both id
+   routes collapsed to their pattern before send (`main.tsx`), the complete list of hosts the
    app can ever reach is the four in "When this app talks to the internet",
    the Wiktionary row is a user-tapped link that is absent offline
    (`reader/Panel.tsx`), and Drive sync writes only to appDataFolder
@@ -47,11 +48,13 @@ export function PrivacyPage() {
         <section className="panel">
           <p className="ui-lbl">The short version</p>
           <p className="ui-p" style={{ marginTop: 8 }}>
-            Flyleaf eReader has no account, no server of its own and no analytics
-            of any kind. Your books, your highlights, your notes and your place in
-            each one are held in this browser's storage on this device. Nothing
-            about what you read leaves the device unless you switch on Google
-            Drive sync yourself, and you can switch it off again in Settings.
+            Flyleaf eReader has no account and no server of its own. Your books,
+            your highlights, your notes and your place in each one are held in
+            this browser's storage on this device. Nothing about <em>what</em> you
+            read leaves the device unless you switch on Google Drive sync
+            yourself, and you can switch it off again in Settings. The one thing
+            that is counted is how many people open the app, and that count can
+            never say which book.
           </p>
           <p className="ui-p ui-p--soft" style={{ marginTop: 12 }}>
             Last updated {UPDATED}.
@@ -70,12 +73,18 @@ export function PrivacyPage() {
               installed app, deletes all of it — so export a backup from Settings
               first if you would miss it.
             </dd>
-            <dt>Nothing is collected</dt>
+            <dt>What is counted, and what is not</dt>
             <dd>
-              There is no telemetry, no crash reporting, no advertising identifier
-              and no third-party script watching the page. No page views are
-              counted. Nobody, including the person who made this, can see which
-              books are in your library or what you have underlined in them.
+              Vercel, which hosts this app, counts page views: a visit, the page
+              shape, a rough country, and where the visit came from. It sets no
+              cookie and builds no profile of you. Before anything is sent, the
+              two addresses that carry a book's identity are rewritten to
+              <code>/read/:id</code> and <code>/book/:id</code> — so the count can
+              say a book was opened, and never which one. There is no crash
+              reporting, no advertising identifier and no other third-party
+              script on the page. Nobody, including the person who made this, can
+              see which books are in your library or what you have underlined in
+              them.
             </dd>
             <dt>The two included books</dt>
             <dd>
@@ -88,8 +97,8 @@ export function PrivacyPage() {
             <dd>
               Every typeface is served from this app's own domain and cached for
               offline use. No font, stylesheet or script is fetched from a
-              content delivery network, so no third party learns that you opened
-              the app.
+              content delivery network. Apart from the page-view count above,
+              no third party is involved in serving you this app.
             </dd>
           </dl>
         </section>
@@ -97,9 +106,18 @@ export function PrivacyPage() {
         <section className="panel">
           <p className="ui-lbl">When this app talks to the internet</p>
           <p className="ui-p ui-p--soft" style={{ marginTop: 8 }}>
-            Four occasions, all of them optional, and this is the complete list.
+            Five occasions, and this is the complete list. Four of them are
+            optional; the page-view count is the one that is not.
           </p>
           <dl className="fine">
+            <dt>The page-view count — always on</dt>
+            <dd>
+              Each page you open sends Vercel one measurement, described in full
+              under "What is counted, and what is not" above. It is the only part
+              of this list you cannot turn off inside the app; a content blocker
+              or your browser's Do Not Track setting will stop it, and the app
+              works exactly the same either way, offline included.
+            </dd>
             <dt>Google Drive sync — only if you turn it on</dt>
             <dd>
               If you sign in from Settings, the app asks Google for two things:

@@ -1398,9 +1398,12 @@ pages in this app rather than a hosted afterthought:
 
 They are **routes in the app** (`app/src/pages/Legal.tsx`, linked from Settings) because
 `read.flyleaf.cc` *is* the app, and a policy on a separate host would be one more thing to keep
-true. Every claim on both pages was checked against the code before it was written — the four hosts
-the app can ever reach, no analytics, appDataFolder only — so if any of that changes, those pages
-change with it. Verified after the branding save persisted across a hard reload, and after the
+true. Every claim on both pages was checked against the code before it was written — the hosts the
+app can ever reach, what the page-view count does and does not carry, appDataFolder only — so if any
+of that changes, those pages change with it. It changed once already: the reader shipped with no
+analytics at all, on the reasoning that `/read/<id>` is a list of what somebody is reading. It now
+sends Vercel page views with both id routes collapsed to `/read/:id` and `/book/:id` in
+`beforeSend`, so the count says a book was opened and never which one, and the policy says so. Verified after the branding save persisted across a hard reload, and after the
 publish: status **In production**, the *Test users* section gone, *Publish app* replaced by *Back to
 testing*.
 

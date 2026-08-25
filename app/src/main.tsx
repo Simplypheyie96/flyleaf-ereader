@@ -6,6 +6,7 @@ import App from './App'
 import { initServiceWorker } from './pwa'
 import { startSeeding } from './seed'
 import { initOpenQueue } from './openQueue'
+import { Analytics } from '@vercel/analytics/react'
 
 /* Before the first paint: the @font-face rules live in a module rather than in
    a stylesheet, so they have to be installed by hand. */
@@ -26,12 +27,23 @@ initOpenQueue()
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
+    {/* Page views only, and only the SHAPE of the path. The objection this file
+        used to carry still stands — /read/<id> is a list of what somebody is
+        reading, and that must not leave the device — so beforeSend rewrites both
+        id routes to their pattern before anything is sent. What Vercel receives
+        is /read/:id and /book/:id: that a book was opened, never which one.
+        Every other route here is already generic. Same treatment, same reason,
+        as Press's collage and review routes. */}
+    <Analytics
+      beforeSend={(e) => ({
+        ...e,
+        url: e.url
+          .replace(/\/read\/[^/?#]+/, '/read/:id')
+          .replace(/\/book\/[^/?#]+/, '/book/:id'),
+      })}
+    />
   </StrictMode>
 )
-
-/* No analytics. Press sends page views; a reader does not, because the paths
-   here are books — and a list of what somebody is reading is exactly the sort
-   of thing that should not leave the device even in aggregate. */
 
 /* Importing ./pwa is itself load-bearing: the beforeinstallprompt listener
    goes on at module scope, and that event fires once, early. Register the
