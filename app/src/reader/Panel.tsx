@@ -78,6 +78,28 @@ export interface PanelProps {
    the list says how many of them are showing and offers the next batch. */
 const PAGE_OF_HITS = 300
 
+/* Search runs as the query is typed. Pressing a key and then having to press
+   a second one to make anything happen is the reader asking twice for the
+   thing they already asked for, and on a phone the second ask is a trip to
+   the keyboard's own search key.
+
+   Two numbers keep that honest, because a walk of the whole book is not free:
+
+   TYPING_SETTLE is how long the field has to be still before the walk starts.
+   Long enough that "elizabeth" is one search and not nine; short enough that
+   it feels like the results are following the typing rather than arriving
+   afterwards. Each keystroke inside the window cancels the pending run, and a
+   run already walking is cancelled by the same token bump that has always
+   handled a second search.
+
+   SHORTEST_TYPED is the floor under an automatic search. "a" matches a
+   quarter of the book — thousands of hits, and the cap above exists precisely
+   because that is expensive. It is a floor under the AUTOMATIC search only:
+   pressing Enter searches whatever is in the field, however short, because
+   that is a reader asking on purpose. */
+const TYPING_SETTLE = 280
+const SHORTEST_TYPED = 2
+
 type Group = { label: string; subitems: SearchHit[] }
 type Kind = 'highlights' | 'notes' | 'bookmarks'
 const ALL_KINDS: Kind[] = ['highlights', 'notes', 'bookmarks']
@@ -116,6 +138,7 @@ export function Panel(p: PanelProps) {
         if (!p.request) return
         setQuery(p.request.text)
         setLookup(p.request.kind === 'lookup')
+        asked.current = { q: p.request.text.trim(), whole: p.request.kind === 'lookup' }
         void run(p.request.text, p.request.kind === 'lookup')
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [p.request?.nonce])
@@ -150,11 +173,38 @@ export function Panel(p: PanelProps) {
         }
     }
 
+    /* ── search as it is typed ────────────────────────────────────────────
+       It fires only on a query that has not been handed over yet, which is
+       what keeps it from re-running the search the selection menu just
+       started, or the one Enter just ran.
+
+       A query shorter than the floor clears the results rather than leaving
+       the previous ones under a field that no longer says them: deleting back
+       to one letter should not still be showing hits for the word that was
+       there.
+
+       `asked` is what was last handed to `run`, not what `run` settled on —
+       and it has to be, because a too-short query is handed over as an empty
+       one. Comparing against the results on screen instead would see "a"
+       against "" forever and re-fire every settle. */
+    const asked = useRef<{ q: string; whole: boolean }>({ q: '', whole: false })
+    useEffect(() => {
+        const trimmed = query.trim()
+        if (trimmed === asked.current.q && lookup === asked.current.whole) return
+        const timer = window.setTimeout(() => {
+            asked.current = { q: trimmed, whole: lookup }
+            void run(trimmed.length >= SHORTEST_TYPED ? query : '', lookup)
+        }, TYPING_SETTLE)
+        return () => window.clearTimeout(timer)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [query, lookup])
+
     function clearQuery() {
         token.current++
         setQuery('')
         setRan('')
         setLookup(false)
+        asked.current = { q: '', whole: false }
         setGroups([])
         setLimit(PAGE_OF_HITS)
         setBusy(false)
@@ -194,7 +244,14 @@ export function Panel(p: PanelProps) {
                         enterKeyHint="search"
                         onChange={e => setQuery(e.target.value)}
                         onKeyDown={e => {
-                            if (e.key === 'Enter') { e.preventDefault(); void run(query, lookup) }
+                            /* Still here, and it still searches: the typed
+                               search has a floor and a settle, and Enter is
+                               how a reader overrides both. */
+                            if (e.key === 'Enter') {
+                                e.preventDefault()
+                                asked.current = { q: query.trim(), whole: lookup }
+                                void run(query, lookup)
+                            }
                             if (e.key === 'Escape' && query) { e.preventDefault(); clearQuery() }
                         }}
                     />
