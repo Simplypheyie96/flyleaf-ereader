@@ -19,6 +19,10 @@
    that stops well short of the edge is a cap fighting its container, which is
    the bug. */
 import { chromium } from '/Users/simplypheyie/.npm/_npx/e41f203b7505f1fb/node_modules/playwright/index.mjs'
+import { writeFileSync, rmSync, mkdtempSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { fixturePdf } from './fixture-pdf.mjs'
 
 const BASE = process.env.BASE || 'http://localhost:4173'
 
@@ -175,7 +179,42 @@ const SCREENS = [
         if (!(await openReader(p))) return 'no book on the shelf to read'
         return openChrome(p, 'Text and page settings')
     } },
+
+    /* The PDF reader and its two sheets. A PDF is not seeded -- the shelf ships
+       two INCLUDED books and that is a product decision, not an audit one -- so
+       the fixture is imported through the app's own picker at the start of each
+       viewport's run and thrown away at the end. Before this, .sheet-lead was
+       measured by hand, which is how it kept a 46ch cap that left 54% of its
+       sheet empty. */
+    { name: '/read/:id (pdf)', go: async p => {
+        const href = await openPdf(p)
+        if (!href) return 'the PDF fixture did not import'
+    } },
+    { name: 'pdf · contents/bookmarks/search', go: async p => {
+        if (!(await openPdf(p))) return 'the PDF fixture did not import'
+        return openChrome(p, 'Contents, bookmarks and search')
+    } },
+    { name: 'pdf · page settings', go: async p => {
+        if (!(await openPdf(p))) return 'the PDF fixture did not import'
+        return openChrome(p, 'Page settings')
+    } },
 ]
+
+/* Imported once per context, then reused: importing the same file again lands
+   on the duplicate path, which still ends at the book, but there is no reason
+   to pay for the parse three times. */
+let pdfHref = null
+async function openPdf(p) {
+    if (!pdfHref) {
+        await p.goto(BASE + '/open', { waitUntil: 'networkidle' })
+        await p.locator('input[type=file]').setInputFiles(FIXTURE)
+        try { await p.waitForURL(/\/book\//, { timeout: 15000 }) } catch { return null }
+        pdfHref = new URL(p.url()).pathname
+    }
+    await p.goto(BASE + pdfHref.replace('/book/', '/read/'), { waitUntil: 'networkidle' })
+    await p.waitForTimeout(2200)                                // pdfjs + first page
+    return pdfHref
+}
 
 /* The reader hides its chrome until the page is tapped, and the tap has to land
    in the middle third or it turns the page instead. */
@@ -200,10 +239,14 @@ async function openChrome(p, label) {
     return null
 }
 
+const FIXTURE = join(mkdtempSync(join(tmpdir(), 'flyleaf-audit-')), 'audit-fixture.pdf')
+writeFileSync(FIXTURE, fixturePdf())
+
 const browser = await chromium.launch()
 for (const [w, h, name] of [[390, 844, 'phone'], [1280, 900, 'desktop'], [1024, 1366, 'ipad']]) {
     const ctx = await browser.newContext({ viewport: { width: w, height: h } })
     const page = await ctx.newPage()
+    pdfHref = null                                              // one import per context
     await page.goto(BASE + '/', { waitUntil: 'networkidle' })
     await page.waitForTimeout(2600)                             // splash + seed
     for (const screen of SCREENS) {
@@ -240,6 +283,7 @@ if (uncovered.length) {
 console.log(`\n=== FINDINGS: ${findings.length}`)
 for (const f of findings) console.log('  · ' + f)
 
+rmSync(FIXTURE, { force: true })
 server?.kill()
 /* Non-zero so this can gate a release rather than merely narrate one. */
 process.exit(findings.length ? 1 : 0)
