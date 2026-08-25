@@ -19,12 +19,13 @@
    somewhere near the sentence they were reading instead of on it.
    ───────────────────────────────────────────────────────────── */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, DEFAULT_SETTINGS, saveSettings, touchBook, useSettings } from '../db'
 import type { Annotation, Bookmark, HighlightColor, Settings } from '../types'
-import { percent } from '../lib'
+import { minutes, percent } from '../lib'
 import { BackIcon, BookmarkIcon, ContentsIcon, TypeIcon } from '../components/icons'
 import { readPalette, isDarkStock } from '../reader/palette'
 import { readingCss } from '../reader/readingCss'
@@ -64,6 +65,24 @@ type Readout = {
        labels that repeat and hrefs that do not. */
     href: string | null
     fraction: number
+    /* Minutes of reading left in THIS chapter, from foliate's own size-based
+       estimate (progress.js, 1600 characters to the minute). Scrolled flow
+       shows it in place of the page count, which it has no way to compute —
+       SPEC.md 5.1. Null when the book gives no size for the section. */
+    minsLeft: number | null
+}
+
+/** The three parts of the readout, in order, with the ones this book or this
+    flow cannot supply simply absent. */
+function readoutParts(r: Readout, flow: string): ReactNode[] {
+    const parts: ReactNode[] = []
+    if (flow === 'scrolled') {
+        if (r.minsLeft !== null)
+            parts.push(<span>{minutes(r.minsLeft)} left in chapter</span>)
+    } else parts.push(<span>Page {r.page} of {r.pages}</span>)
+    if (r.chapter) parts.push(<span className="reader-chapter">{r.chapter}</span>)
+    parts.push(<span>{percent(r.fraction)}%</span>)
+    return parts
 }
 
 /* The clear band at each end of the paginated page, and the reason the floating
@@ -494,7 +513,12 @@ export function Reader() {
         chapterRef.current = chapter
         pageCFIRef.current = cfi
         pagePosRef.current = at
-        setReadout({ page, pages, chapter, href, fraction: loc?.fraction ?? 0 })
+        const mins = loc?.time?.section
+        setReadout({
+            page, pages, chapter, href,
+            fraction: loc?.fraction ?? 0,
+            minsLeft: typeof mins === 'number' && isFinite(mins) ? mins : null,
+        })
         /* A menu anchored to a line that has left the page is pointing at
            nothing, so a turn closes it — but only a turn. */
         if (moved) setSel(null)
@@ -1023,15 +1047,22 @@ export function Reader() {
                             setPanelOpen(false)
                         }}
                     >
-                        {readout ? (
-                            <>
-                                <span>Page {readout.page} of {readout.pages}</span>
-                                {readout.chapter && <span className="reader-readout-sep">·</span>}
-                                {readout.chapter && <span className="reader-chapter">{readout.chapter}</span>}
-                                <span className="reader-readout-sep">·</span>
-                                <span>{percent(readout.fraction)}%</span>
-                            </>
-                        ) : <span>&nbsp;</span>}
+                        {/* A page count is a paginated idea. Scrolled flow has no
+                            pages to count, so it reads the time left in the chapter
+                            instead — SPEC.md 5.1. The per-cent is the book's either
+                            way, so switching flow never moves the number the slider
+                            below is bound to.
+
+                            Built as a list and joined, rather than as separators
+                            hung off each part: a book that reports no size for a
+                            section has no minutes to show, and hanging the dot off
+                            the part after it would open the readout with one. */}
+                        {readout ? readoutParts(readout, cfg.flow).map((part, i) => (
+                            <Fragment key={i}>
+                                {i > 0 && <span className="reader-readout-sep">·</span>}
+                                {part}
+                            </Fragment>
+                        )) : <span>&nbsp;</span>}
                     </button>
                     <button
                         type="button"

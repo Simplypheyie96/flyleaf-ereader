@@ -377,6 +377,19 @@ order. Paginated flow is untouched and still holds exactly one.
   `[13,14,15,16]` with 14 current. It is a set lookup per resident view and returns immediately
   at three or fewer.
 
+### The current section is probed at the middle of the window
+
+`#syncCurrent` originally took the last view whose top had passed the reading margin, which is
+the strictly correct reading of "the section the top of the screen is in" and the wrong answer
+for a reader. A chapter heading sits plainly on screen — often halfway up it — for most of a
+screen's worth of scrolling before its top reaches the margin, and the whole time the readout
+names the chapter before it. Reported as a stale chapter label. The probe is now
+`scrollTop + clientHeight / 2`: the name changes when the new chapter takes the larger half of
+the screen.
+
+Verified at 375x812, stepping 120px at a time through the 15/16 join: the label held at XIV
+while section 16's top was at 611 and 491, and changed to XV at 371 — `clientHeight / 2` is 406.
+
 ### Backward fill
 
 `#fillBackward` mirrors `#fillForward`, gated on one screen of lead instead of two, and

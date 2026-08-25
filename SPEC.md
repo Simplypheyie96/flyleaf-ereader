@@ -242,7 +242,7 @@ inline. A note, not a modal, and it does not appear twice for the same setting.
 | Flow | Behaviour |
 |---|---|
 | **Paginated** *(default)* | Discrete pages. The turn styles below apply |
-| **Scrolled** | One continuous column per section. Native momentum, **no scroll-snap** — snap on a reflowable book fights the finger. A hairline and the chapter name in Playfair mark each section break. The progress readout drops "page n of m" and reads `34% · 12 MIN LEFT IN CHAPTER`, because there are no pages to count. Tap zones do nothing but toggle chrome |
+| **Scrolled** | One continuous column per section. Native momentum, **no scroll-snap** — snap on a reflowable book fights the finger. A hairline and the chapter name in Playfair mark each section break. The progress readout drops "page n of m", because there are no pages to count, and reads `12 MIN LEFT IN CHAPTER · XVIII · 34%` — the readout's three slots in their usual order, with the time in the one the page count vacated. Under a minute reads `LESS THAN A MINUTE`; an hour or more breaks into `1 HR 12 MIN`. The per-cent is the **book's** in both flows, so changing flow never moves the number the jump slider is bound to. Tap zones do nothing but toggle chrome |
 
 Choosing Scrolled hides the turn control rather than greying it — there is no turn to style.
 
@@ -264,7 +264,7 @@ still holds exactly one.
 | Window | current section, plus one either side | Three iframes is enough to make a boundary invisible in both directions and cheap enough to keep on a phone |
 | Forward fill | when less than two screens of column remain below | The next section is laid out before the reader can reach it, so no fill ever happens under the finger |
 | Trim | anything outside the window is destroyed and unloaded | With `scrollTop` compensated for removals above the viewport, so trimming never moves the page |
-| Current section | the last view whose top has passed the reading margin | Drives the chapter name, the progress readout and the CFI. Recomputed on every scroll event — three `offsetTop` reads, no layout writes |
+| Current section | the last view whose top has passed the **middle of the window** | Drives the chapter name, the progress readout and the CFI. Probed at the middle rather than at the reading margin: against the margin a chapter heading sits plainly on screen, often halfway up it, while the readout still names the chapter before it — which reads as a stale label, not as a rule about top edges. Recomputed on every scroll event — three `offsetTop` reads, no layout writes |
 
 Progress stays **per section** (`34% · 12 MIN LEFT IN CHAPTER`), measured against the current
 view's own height rather than the column's, so it reads the same as it did before the sections

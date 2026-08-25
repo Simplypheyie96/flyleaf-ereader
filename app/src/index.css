@@ -1782,6 +1782,12 @@ body::before{
   display:flex; align-items:center; gap:8px;
   padding:10px 12px;
   background:none;
+  /* Not optional, for the same reason .reader-stage needs min-height:0 below:
+     a grid item defaults to min-width:auto and refuses to go under its own
+     min-content, so the bar overflowed its 375px track rather than letting the
+     readout shrink. Measured with a long chapter name at 375: bar 612px,
+     readout 484px, hanging 173px past the right edge of the window. */
+  min-width:0;
 }
 .reader-bar > *{ pointer-events:auto; }
 .reader-bar--top{ align-self:start; }
@@ -1902,7 +1908,12 @@ body::before{
 .reader-readout[aria-expanded="true"] .reader-readout-sep{ color:var(--stock-bg); }
 .reader-readout-sep{ flex:none; color:var(--ink-soft); opacity:.55; }
 .reader-readout > span{ flex:none; }
-.reader-chapter{
+/* Selector qualified by the pill, and it has to be: `.reader-readout > span`
+   above sets flex:none, and at (0,1,1) it outranks a bare `.reader-chapter`.
+   The chapter was the one part meant to give way when the readout runs out of
+   room, and it could not — measured at 375px with a long chapter name, the
+   pill grew to 484px and hung 173px past the right edge of the window. */
+.reader-readout > .reader-chapter{
   flex:0 1 auto; min-width:0;
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   text-transform:none; letter-spacing:.04em;
