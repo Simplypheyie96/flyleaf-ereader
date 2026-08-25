@@ -2098,8 +2098,18 @@ body::before{
    stock's own raised surface, the same ground .reader-goto-num beside them
    already stands on, and --rule is re-pinned by the stock too, so the ring
    comes right for free. Scoped to .reader rather than to these two buttons:
-   any ghost button that ever lands on the reading page has the same fault. */
-.reader .btn--ghost{ background:var(--lift); }
+   any ghost button that ever lands on the reading page has the same fault.
+
+   The ring is re-pinned too, and not to --rule. --lift and --rule both move
+   from the page toward the same ink, so on a lifted surface they converge and
+   the hairline disappears: 1.01 on day, 1.34 at its best on pitch. --ink-soft
+   is the stock's own soft ink, already re-pinned by [data-stock], and it holds
+   the 3:1 a non-text boundary needs on all seven -- tea 3.91 at worst, dusk
+   5.30 at best. No new token, so nothing to record in DESIGN.md. */
+.reader .btn--ghost{
+  background:var(--lift);
+  box-shadow:inset 0 0 0 1px var(--ink-soft);
+}
 
 /* In the sheet row the block is the whole sheet, so it owns the scroll the
    .sheet-body owns for the settings sheet. min-height:0 or the flex child
