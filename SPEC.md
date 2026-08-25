@@ -1697,14 +1697,31 @@ often each part moves, each part a separate Drive file with its own modified tim
 | `shelf.json` | books, collections, tombstones | a book is added, finished, edited or deleted |
 | `marks.json` | highlights, notes, bookmarks | somebody marks something |
 | `place.json` | positions and reading days | **every page turn** — and it is the smallest of the three by an order of magnitude |
-| `book-<fp>` | the book bytes | written once, never rewritten. **Opt-in** |
+| `book-<fp>` | the book bytes | written once, never rewritten. **On by default, and can be turned off** |
 
-The book files are opt-in because an appdata folder counts against the *reader's* Drive quota, not
-ours. `FILES_PER_PASS = 3` caps how many move each way in one pass, and the cap is **loud**:
+The book files **travel by default**, and can be turned off. They were opt-in, on the reasoning that
+an appdata folder counts against the *reader's* Drive quota rather than ours — which is true, and is
+still why the switch exists, but it is the wrong starting state. A sync that carries the record and
+not the file leaves the other device holding a row it cannot open and cannot even draw a cover for,
+because the cover is packed inside the file bundle and travels nowhere else; `BookDoc` strips it
+from the record deliberately, since `DESIGN.md` forbids drawing a substitute. Turning the files off
+is a decision to make with a working sync in front of you, not a wall to discover on a new device.
+
+The stored value is **three-state** — `'1'` on, `'0'` off, absent never-decided — because the old
+shape wrote `''` for off, which is indistinguishable from never having been asked. An opt-out made
+before this change therefore reads as absent and does turn back on. That is the one-time cost of the
+old shape, and what it costs is a copy of the reader's own books into the reader's own Drive.
+
+`FILES_PER_PASS = 10` caps how many move each way in one pass, and the cap is **loud**:
 `SyncResult.filesLeft` carries what did not go and Settings says so in words. Uncapped, connecting
 a phone with a forty-book library would open forty concurrent multi-megabyte uploads on somebody's
-mobile data, and the bill would be the first they heard of it. Three a pass at a ninety-second beat
-clears forty books in about twenty minutes of the app being open, and stops when it is closed.
+mobile data, and the bill would be the first they heard of it. Ten a pass at a ninety-second beat
+clears forty books in about six minutes of the app being open, and stops when it is closed.
+
+**Opening a book jumps its file to the front.** The pass above is right for a shelf and wrong for
+the book somebody has just tapped, who would otherwise sit in front of an instruction while their
+own file waited in a queue. So `fetchBookFile()` pulls that one file immediately, and the "came from
+another device" sentence is only shown when that fetch has itself failed.
 
 ### 15.3 Identity is the file, and deletions are tombstones
 

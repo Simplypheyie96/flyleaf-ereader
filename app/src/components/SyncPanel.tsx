@@ -324,9 +324,13 @@ export function SyncPanel() {
               {/* THE BOOK FILES ARE A SECOND DECISION, and it belongs to the
                   reader rather than to us: the record of a hundred books is
                   well under a megabyte, and the books themselves can be
-                  hundreds. Off by default — the bytes come out of their own
-                  Drive allowance, and most people syncing a shelf want the
-                  page they were on, not a second copy of the file. */}
+                  hundreds. But it is on by default now. It was off, and off is
+                  indefensible as a starting state: the other device gets a
+                  shelf of rows it cannot open and cannot even draw a cover
+                  for, because the cover travels inside the file bundle and
+                  nowhere else. Turning it off is a decision to make with a
+                  working sync in front of you, not a wall to find on a new
+                  device. */}
               <div className="set-switch" style={{ marginTop: 18 }}>
                 <span className="ui-p">Carry the book files too</span>
                 <button
@@ -344,7 +348,7 @@ export function SyncPanel() {
               <p className="ui-p ui-p--soft" style={{ marginTop: 8 }}>
                 {files
                   ? 'A book opened on one device can be opened on the others without finding the file again. It uses your Drive space, and a large book takes a while.'
-                  : 'Only the record travels — the shelf, where you are, and every highlight. A book that came from another device shows on the shelf and asks for its file the first time you open it.'}
+                  : 'Only the record travels — the shelf, where you are, and every highlight. On another device those books have no cover and will not open until you find the file again.'}
               </p>
               {room && (
                 <p className="mono-meta" style={{ marginTop: 12 }}>
