@@ -451,6 +451,15 @@ always handled a second search. Deleting back under the floor clears the results
 leaving the previous word's hits under a field that no longer says it. **Enter still works, and
 overrides both** — a one-letter query typed on purpose is a reader asking on purpose.
 
+**The match is banded, not just bolded.** In a result the surround drops to `--ink-soft` and the
+match keeps full ink at 600, and that weight swap alone was not enough to find at 14px in a list of
+three-line excerpts. The match now sits on a band of the stock's own ink at 30% — mixed from
+`currentColor`, so it follows all seven stocks and both chromes without a token of its own, and
+deliberately **not** one of the five highlighter tints: a coloured tint means *a reader marked
+this*, and a search hit is not a mark. 30% is the lowest value clearing the 1.70 band-against-paper
+floor in every stock (Press 1.94 · Day 1.92 · Butter 1.90 · Tea 1.80 · Coal 2.55 · Dusk 2.36 ·
+Pitch 1.79); ink on the band never falls below 5.15.
+
 ### 6.5 Look up
 
 The offline answer first: **"Look up" shows every other place that word appears in this book** —
