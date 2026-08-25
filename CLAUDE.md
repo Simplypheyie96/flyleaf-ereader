@@ -164,6 +164,44 @@ Before building a screen, name the 1–3 skills and their scope, and wait for a 
 **Never** a look pack (`book-serif-index`, `light-mode-paper-technical`, and the rest). This
 project has a look; a pack would paint over it. Say it was skipped and why.
 
+## Before shipping anything: run the measure audit
+
+```bash
+cd app && npm run audit:measure
+```
+
+**Every time, on every screen, before any deploy.** Not when a layout looks
+suspect — always. It builds the app, serves it, and walks all eleven screens at
+390 / 1024 / 1280, reporting any block of prose whose widest rendered line
+leaves more than 10% of its host box empty. It exits non-zero on a finding, so
+it can gate a release.
+
+This exists because text wrapping short of its container is the single most
+repeated complaint on this project, and the owner has caught it by eye more than
+once. It is caught by eye because a per-paragraph `max-width` reads fine in the
+source — the fault only exists in the relationship between that cap and the box
+that ended up around it, which nothing but a rendered measurement can see.
+
+The driver was written after one such round and then **never run**: it was in no
+npm script while `index.css` claimed it "fails the build". A 46ch cap on the
+install strip duly survived in the repo, leaving 48% of the card empty at 1280,
+until the owner saw it on screen. It also walked `/collections`, which is not a
+route, and never opened a book, the reader, or a sheet — so the screens with the
+most prose on them were never measured at all. All of that is fixed; the
+standing instruction is what stops it rotting again.
+
+Rules that go with it:
+
+- **The measure lives on the container, never on a paragraph inside it.** No
+  `max-width` on a `p` inside `.page-inner` or `.sheet-body`. Narrow the
+  container if a narrower measure is wanted. The long form is at the top of
+  `app/src/index.css`.
+- **Report what was not covered.** The driver names any screen it could not
+  reach (no book on the shelf, no PDF imported). Never present a run as a pass
+  for screens it skipped.
+- **A PDF is not seeded**, so `.sheet-lead` and the rest of the PDF sheet are
+  not reachable by the driver and must be measured by hand when touched.
+
 ## Guardrails (negative prompt, always on)
 
 No glass, no `backdrop-filter`, no shadows. No paper texture over the text, no drawn spine
