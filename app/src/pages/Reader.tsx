@@ -56,8 +56,20 @@ const TWO_COLUMN = '(min-width: 1180px)'
 const TEXT_FORMATS = new Set(['txt', 'markdown', 'html'])
 
 type Readout = {
-    page: number
-    pages: number
+    /* The page of the WHOLE BOOK, and how many it has. Not the renderer's
+       count: that one is pages of the current chapter, it restarts at 1 at
+       every chapter break, and it changes the moment the reader changes face,
+       size, leading or margin. This one is foliate's location counter —
+       CHARS_PER_PAGE of text to the page, reckoned off the spine — so it spans
+       the book, it is the same number in both flows, and it does not move when
+       the type does. It is not a printed page and never claims to be a
+       particular edition's; it is a fixed measure of text wearing the word
+       every reader already understands. SPEC.md 5.1.
+
+       Null when the book reports no sizes at all and there is nothing to
+       count. */
+    page: number | null
+    pages: number | null
     chapter: string | null
     /* The contents entry this page falls under, so the list can say which one
        you are in. Matched on href rather than on label, because a book that
@@ -66,71 +78,77 @@ type Readout = {
     href: string | null
     fraction: number
     /* Minutes of reading left in THIS chapter, from foliate's own size-based
-       estimate (progress.js, 1600 characters to the minute). Scrolled flow
-       shows it in place of the page count, which it has no way to compute —
-       SPEC.md 5.1. Null when the book gives no size for the section. */
+       estimate (progress.js, CHARS_PER_MINUTE). Null when the book gives no
+       size for the section. */
     minsLeft: number | null
 }
 
-/** The readout carries the three NUMBERS — where you are in the chapter, how
-    much of it is left, how far through the book you are — and nothing else.
-    The chapter's NAME is the longest and most variable thing that used to sit
-    here, and it is the one fact the card the button opens can say in full
-    without truncating; the contents list prices every chapter in minutes now,
-    so the name is reachable there too. Parts a book or a flow cannot supply
-    are simply absent. */
-function readoutParts(r: Readout, flow: string): ReactNode[] {
+/** The readout's FIGURES, in order: where you are in the book, how much of the
+    chapter is left, how far through you are. Parts a book cannot supply are
+    simply absent. The chapter's NAME is not among them — it is rendered after
+    these, because it is the one part that has to be able to take a line of its
+    own; see `.reader-chapter` in index.css.
+
+    The flow no longer changes what this says. That was the whole point of
+    counting the book rather than the render: a scrolled reader was being told
+    the pages of one chapter, or nothing at all, and what they wanted was the
+    same number a paginated reader gets. */
+function readoutParts(r: Readout): ReactNode[] {
     const parts: ReactNode[] = []
-    /* A page count is a paginated idea; scrolled flow has none to give. */
-    if (flow !== 'scrolled') parts.push(<span>Page {r.page} of {r.pages}</span>)
+    if (r.page !== null) parts.push(<span>Page {r.page} of {r.pages}</span>)
     if (r.minsLeft !== null) parts.push(<span>{minutes(r.minsLeft)} left</span>)
     parts.push(<span>{percent(r.fraction)}%</span>)
     return parts
 }
 
-/** Every contents entry priced in minutes, from the sizes of the sections it
-    spans. foliate's own estimate (progress.js) is 1600 characters to the
-    minute and it keeps its reckoning private, so this repeats the constant
-    rather than reaching into it.
-
-    An entry that resolves to the same section as the one before it gets NULL,
-    not a share: a book that puts six sub-headings in one file gives no honest
-    way to split that file between them, and a made-up sixth is worse than a
-    blank. Same rule as the readout — a fact the book cannot supply is absent,
-    never invented. */
+/* foliate's two constants, from `new SectionProgress(book.sections, 1500, 1600)`
+   in view.js. It keeps its reckoning private, so a number this app has to
+   compute for itself — the page a contents entry starts on — repeats the
+   constant rather than reaching into it. Changing either here without changing
+   it there would put the readout and the contents list in disagreement, which
+   is the one failure a reader would actually notice. */
+const CHARS_PER_PAGE = 1500
 const CHARS_PER_MINUTE = 1600
 
-function priceContents(book: FoliateBook | undefined): Map<string, number> {
+/** The page each contents entry starts on, keyed by href — the same page the
+    readout will show when the reader arrives there, reckoned the same way.
+    This is what a printed contents page gives you and a chapter length does
+    not: how far in a chapter sits, and how far apart the chapters are.
+
+    An entry that resolves to the same section as the one before it gets NO
+    page, not a repeat of that section's. Six sub-headings inside one file all
+    genuinely start in the same file, but they do not all start on the same
+    page, and printing one number against six rows twenty pages apart would be
+    a plain untruth. Same rule as the readout — a fact the book cannot supply
+    is absent, never invented. */
+function contentsPages(book: FoliateBook | undefined): Map<string, number> {
     const out = new Map<string, number>()
     if (!book?.resolveHref || !book.sections?.length) return out
-    const flat: { href: string; index: number }[] = []
+    /* Characters before each section, so an entry's page is a lookup rather
+       than a re-walk of the spine per entry. Non-linear sections count for
+       nothing, exactly as SectionProgress zeroes them. */
+    const before: number[] = []
+    let run = 0
+    for (const sec of book.sections) {
+        before.push(run)
+        run += sec?.linear === 'no' ? 0 : (sec?.size ?? 0)
+    }
+    if (run <= 0) return out
+    let prev = -1
     const walk = (items: FoliateTOCItem[]) => {
         for (const it of items) {
             if (it.href) {
                 const at = book.resolveHref!(it.href)
-                if (at && typeof at.index === 'number' && at.index >= 0)
-                    flat.push({ href: it.href, index: at.index })
+                const i = at?.index
+                if (typeof i === 'number' && i >= 0 && i < before.length && i !== prev) {
+                    out.set(it.href, Math.floor(before[i] / CHARS_PER_PAGE) + 1)
+                    prev = i
+                }
             }
             if (it.subitems?.length) walk(it.subitems)
         }
     }
     walk(book.toc ?? [])
-    for (let i = 0; i < flat.length; i++) {
-        const start = flat[i].index
-        if (i > 0 && flat[i - 1].index === start) continue
-        /* The next entry that starts in a LATER section — not simply the next
-           entry, which may be a sub-heading of this same one. */
-        let end = book.sections.length
-        for (let j = i + 1; j < flat.length; j++)
-            if (flat[j].index > start) { end = flat[j].index; break }
-        let chars = 0
-        for (let k = start; k < end; k++) {
-            const sec = book.sections[k]
-            if (sec?.linear === 'no') continue
-            chars += sec?.size ?? 0
-        }
-        if (chars > 0) out.set(flat[i].href, chars / CHARS_PER_MINUTE)
-    }
     return out
 }
 
@@ -179,9 +197,9 @@ export function Reader() {
 
     const [chrome, setChrome] = useState(false)
     const [toc, setToc] = useState<FoliateTOCItem[]>([])
-    /* Contents entries priced once when the book opens: the sizes never change,
-       and re-pricing on every relocate would walk the whole spine per page. */
-    const [tocMins, setTocMins] = useState<Map<string, number>>(() => new Map())
+    /* Reckoned once when the book opens: the section sizes never change, and
+       redoing it on every relocate would walk the whole spine per page. */
+    const [tocPages, setTocPages] = useState<Map<string, number>>(() => new Map())
     const [sheetOpen, setSheetOpen] = useState(false)
     const [readout, setReadout] = useState<Readout | null>(null)
     const [gotoOpen, setGotoOpen] = useState(false)
@@ -329,7 +347,7 @@ export function Reader() {
                 stage.append(view)
                 viewRef.current = view
                 setToc(view.book?.toc ?? [])
-                setTocMins(priceContents(view.book))
+                setTocPages(contentsPages(view.book))
 
                 /* Upstream's touch handling off, before the first frame the
                    reader could touch. PATCHES.md § 4b. */
@@ -556,8 +574,15 @@ export function Reader() {
         /* page and pages read layout, and this runs after a turn has settled
            — never while one is in flight. The two blank pages expand() adds
            are subtracted, so this counts pages of TEXT in this chapter. */
-        const pages = Math.max(1, (r?.pages ?? 3) - 2)
-        const page = Math.min(pages, Math.max(1, r?.page ?? 1))
+        /* The whole book, not this chapter: foliate's location counter, which
+           is 0-based and is read as a page by adding one. `r.page`/`r.pages`
+           from the renderer are deliberately unused — see the Readout type. */
+        const totalPages = loc?.location?.total ?? 0
+        const pages = totalPages > 0 ? totalPages : null
+        const here = loc?.location?.current
+        const page = pages !== null && typeof here === 'number' && isFinite(here)
+            ? Math.min(pages, Math.max(1, Math.floor(here) + 1))
+            : null
         const chapter = loc?.tocItem?.label?.trim() || null
         const href = loc?.tocItem?.href ?? null
         const cfi = loc?.cfi ?? null
@@ -568,7 +593,7 @@ export function Reader() {
         pagePosRef.current = at
         const mins = loc?.time?.section
         setReadout({
-            page, pages, chapter, href,
+            page, pages: page === null ? null : pages, chapter, href,
             fraction: loc?.fraction ?? 0,
             minsLeft: typeof mins === 'number' && isFinite(mins) ? mins : null,
         })
@@ -1113,13 +1138,30 @@ export function Reader() {
                             Built as a list and joined, rather than as separators
                             hung off each part: a book that reports no size for a
                             section has no minutes to show, and hanging the dot off
-                            the part after it would open the readout with one. */}
-                        {readout ? readoutParts(readout, cfg.flow).map((part, i) => (
-                            <Fragment key={i}>
-                                {i > 0 && <span className="reader-readout-sep">·</span>}
-                                {part}
-                            </Fragment>
-                        )) : <span>&nbsp;</span>}
+                            the part after it would open the readout with one.
+
+                            The chapter's NAME comes after the figures and is not
+                            one of them. Four things do not fit on one line at
+                            375px — measured, the pill caps at 247px and the name
+                            was crushed to zero width, printing two dots with
+                            nothing between them — so below 640px it takes a line
+                            of its own beneath the figures, and its separator goes
+                            away with the line break. Wider than that it sits
+                            inline as the fourth part and truncates first. */}
+                        <span className="reader-readout-figures">
+                            {readout ? readoutParts(readout).map((part, i) => (
+                                <Fragment key={i}>
+                                    {i > 0 && <span className="reader-readout-sep">·</span>}
+                                    {part}
+                                </Fragment>
+                            )) : <span>&nbsp;</span>}
+                        </span>
+                        {readout?.chapter && (
+                            <>
+                                <span className="reader-readout-sep reader-readout-sep--chapter">·</span>
+                                <span className="reader-chapter">{readout.chapter}</span>
+                            </>
+                        )}
                     </button>
                     <button
                         type="button"
@@ -1153,7 +1195,7 @@ export function Reader() {
                                         item={item}
                                         depth={0}
                                         here={readout?.href ?? null}
-                                        mins={tocMins}
+                                        pages={tocPages}
                                         onGo={href => {
                                             setPanelOpen(false)
                                             void viewRef.current?.goTo(href)
@@ -1345,20 +1387,20 @@ function clamp01(n: number): number {
     return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0
 }
 
-function TocRow({ item, depth, here, mins, onGo }: {
+function TocRow({ item, depth, here, pages, onGo }: {
     item: FoliateTOCItem
     depth: number
     /* The href of the entry the reader is inside, or null before the first
        relocate. Threaded down rather than looked up, so a nested entry marks
        itself on the same test as a top-level one. */
     here: string | null
-    /* Every entry's length in minutes, keyed by href. An entry the book gives
-       no honest length for is simply missing from the map, and prints none. */
-    mins: Map<string, number>
+    /* The page each entry starts on, keyed by href. An entry the book gives no
+       honest page for is simply missing from the map, and prints none. */
+    pages: Map<string, number>
     onGo: (href: string) => void
 }) {
     const current = here !== null && item.href === here
-    const len = item.href ? mins.get(item.href) : undefined
+    const at = item.href ? pages.get(item.href) : undefined
     /* Marking the entry is not enough on its own: a 65-chapter book opens its
        contents at the top, and chapter XVIII sits 1100px down a viewport 812px
        tall — measured, not guessed. So the entry brings itself into view as it
@@ -1384,14 +1426,14 @@ function TocRow({ item, depth, here, mins, onGo }: {
                 onClick={() => item.href && onGo(item.href)}
             >
                 <span className="reader-toc-label">{item.label?.trim() || 'Untitled'}</span>
-                {len !== undefined && (
-                    <span className="reader-toc-len">{minutes(len)}</span>
+                {at !== undefined && (
+                    <span className="reader-toc-len">p. {at}</span>
                 )}
             </button>
             {item.subitems?.length ? (
                 <ol className="reader-toc-list">
                     {item.subitems.map((sub, i) => (
-                        <TocRow key={`${sub.href ?? i}-${i}`} item={sub} depth={depth + 1} here={here} mins={mins} onGo={onGo} />
+                        <TocRow key={`${sub.href ?? i}-${i}`} item={sub} depth={depth + 1} here={here} pages={pages} onGo={onGo} />
                     ))}
                 </ol>
             ) : null}
