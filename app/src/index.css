@@ -2671,10 +2671,50 @@ body::before{
   text-wrap:pretty;
 }
 /* In a result the surround is context and the match is the point, so the two
-   swap weights. No tint behind the match: a tint means "a reader marked this",
-   and a search hit is not a mark. */
+   swap weights AND the match gets a ground under it. Weight alone was the
+   first attempt and it was not enough: at 14px, in a list of three-line
+   excerpts, a semibold word inside a soft-grey sentence is something you have
+   to look for rather than something you see.
+
+   The ground is the stock's own ink at 30%, and deliberately NOT one of the
+   five highlighter tints. That distinction is the one the old comment here
+   was protecting, and it still holds: a coloured tint means "a reader marked
+   this", and a search hit is not a mark. A neutral band means "this is the
+   word you asked for".
+
+   It is mixed from `currentColor` into `transparent` rather than from a wash
+   token, and that is not a shortcut — `--wash-2` was tried first and came out
+   a dark grey band on a light panel. This panel paints `--stock-bg` and
+   inherits the READING stock's ink, while `--wash-2` is built from the app
+   chrome's `--card-w`; on a light stock inside a dark app the two disagree by
+   the whole scale. Mixing the colour the text is already using, over whatever
+   the panel actually painted, cannot disagree with either — it follows all
+   seven stocks and both chromes with one value.
+
+   30%, because that is the lowest value that clears 1.70 in ALL SEVEN stocks
+   — the same floor `DESIGN.md` sets for a highlighter tint, and for the same
+   reason: below it a band is something you have to look for. 12% was tried
+   first and measured 1.31, a shade rather than a highlight; 26% cleared the
+   floor on six stocks and missed on Pitch at 1.60, which is exactly the kind
+   of near-miss the dark stocks always produce.
+
+   Measured on the rendered panel, band against the stock's own paper:
+   Press 1.94 · Day 1.92 · Butter 1.90 · Tea 1.80 · Coal 2.55 · Dusk 2.36 ·
+   Pitch 1.79. Ink on the band over the same seven never drops below 5.15
+   (Dusk), so the word itself stays well clear of AA. */
+
+   `box-decoration-break: clone` so a match that wraps carries its own
+   padding and radius onto the second line instead of a band with one open
+   end. The inline padding is horizontal-only: the excerpt is a clamped
+   `-webkit-box`, and vertical padding on a child of one is what pushes the
+   third line under the clamp. */
 .panel-excerpt--find{ color:var(--ink-soft); font-size:14px; line-height:1.5; }
-.panel-hit{ color:var(--ink); font-weight:600; }
+.panel-hit{
+  color:var(--ink); font-weight:600;
+  background:color-mix(in srgb, currentColor 30%, transparent);
+  padding:0 .18em; border-radius:3px;
+  -webkit-box-decoration-break:clone; box-decoration-break:clone;
+}
 
 /* The note in the reader's own hand, on its own ground. The pairing is the
    whole idea: the book's voice in the book's type, the reader's in a hand. */
