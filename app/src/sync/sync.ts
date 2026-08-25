@@ -21,7 +21,7 @@
 import { db, pruneGraves } from '../db'
 import type { Grave } from '../types'
 import { deviceName } from './device'
-import { dropAll, listFolder, quota, readBlob, readText, write as writeFile } from './drive'
+import { dropAll, listFolder, quota, readBlob, readText, remove, write as writeFile } from './drive'
 import type { DriveFile } from './drive'
 import { SYNC_EVENT, optedIn, signIn, silentToken, tokenHeld } from './google'
 import {
@@ -330,6 +330,19 @@ async function run(token: string): Promise<SyncResult> {
 
   const moved = filesIncluded() ? await moveFiles(token, folder, fileWork, device) : { files: 0, left: 0 }
 
+  /* Runs whether or not the files are being carried: turning the switch off
+     does not mean the copies already up there should stay for books that no
+     longer exist. Failures are ignored one by one — a file that will not delete
+     is a few megabytes of quota, and it will be tried again on the next sync,
+     which is not worth failing a sync that otherwise worked. */
+  for (const id of buriedFiles(folder, await db.graves.toArray())) {
+    try {
+      await remove(token, id)
+    } catch {
+      /* next pass */
+    }
+  }
+
   const after = await signatures()
   put(
     MARK_KEY,
@@ -373,6 +386,25 @@ async function filesToMove(folder: Map<string, DriveFile>): Promise<{ up: string
     else if (!mine && there) down.push(book.fp)
   }
   return { up, down }
+}
+
+/** Book files in Drive whose book has been deleted, on any device.
+
+    Nothing used to clear these. `filesToMove` only ever looks at books that
+    exist HERE, so a deleted book's bytes simply stopped being mentioned and sat
+    in the reader's Drive for good — megabytes each, against their own quota,
+    for books they had told the app to forget. "Delete" has to mean the copy
+    too, or it is a word about one device.
+
+    The stones are the authority, and they are the whole shelf's worth: this
+    device keeps every stone it has heard about (see `mergeShelf`), so a book
+    deleted on the phone is cleared out of Drive by the laptop as readily as by
+    the phone itself. */
+function buriedFiles(folder: Map<string, DriveFile>, graves: Grave[]): string[] {
+  const stoned = new Set(graves.filter((g) => g.kind === 'book').map((g) => bookFileName(g.ref)))
+  const dead: string[] = []
+  for (const [name, file] of folder) if (stoned.has(name) && ours(file)) dead.push(file.id)
+  return dead
 }
 
 async function moveFiles(

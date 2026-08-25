@@ -202,9 +202,27 @@ export async function mergeShelf(doc: ShelfDoc): Promise<{ folded: Folded; map: 
   for (const incoming of doc.books) {
     const local = byFp.get(incoming.fp)
 
-    /* Deleted on the other device. The stone has to beat this side's own last
-       edit, or a book finished here after being deleted there would vanish. */
-    if (local && buried(graves, 'book', incoming.fp, edited(local))) {
+    /* Deleted on the other device, and a deletion is the most deliberate
+       thing anybody does to a shelf, so it wins.
+
+       IT USED TO BE COMPARED AGAINST `edited(local)`, and that is the bug that
+       made deletions feel optional. `editedAt` moves on every page turn —
+       Reader.tsx stamps it with the progress tick — so a book deleted on the
+       phone and then merely OPENED on the laptop had a local timestamp newer
+       than the stone, survived, and was pushed back up. Reading a book is not
+       an argument for keeping it; nobody who taps a title is voting on a
+       deletion they made yesterday on another device.
+
+       `addedAt` is the honest comparison, and it still answers the case the
+       old rule was written for: deliberately importing the file again mints a
+       new row with a new `addedAt`, which is somebody actually saying they
+       want it back, and that beats the stone.
+
+       A SEEDED BOOK IS EXEMPT FROM EVEN THAT. Its `addedAt` is when this
+       device first booted, not when anyone chose it — a new phone seeds the
+       two included books before it has ever synced, so their `addedAt` is
+       newer than any stone that could exist and they would be immortal. */
+    if (local && buried(graves, 'book', incoming.fp, local.seeded ? 0 : local.addedAt)) {
       drop.push(local.id)
       removed += 1
       continue
