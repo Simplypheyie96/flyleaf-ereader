@@ -1704,7 +1704,16 @@ body::before{
     /* stacked, so the label sits under its icon rather than beside it */
     flex-direction:column; gap:6px;
     width:100%; min-height:0;
-    padding:12px 4px; border-radius:22px;
+    padding:12px 4px;
+    /* 30px, not 22px, and the difference is geometry rather than taste. The
+       capsule is 88px wide at border-radius:999px, so its inner corner is a
+       43px arc, and an item sits 5px inside it. A 22px corner on that item
+       crosses the capsule's arc by 1.6px at the top and bottom of the rail --
+       the active tab bulging past its own container, which is what the owner
+       saw. The item clears only at 26px or more; 30px is half its 60px height,
+       so the ends go fully round and it is the phone bar's pill rotated, which
+       is what the note above this block says this rail is. */
+    border-radius:30px;
     font-size:9.5px; letter-spacing:.09em;
   }
   /* every tab is named here, not only the current one */
