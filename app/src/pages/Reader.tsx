@@ -72,17 +72,66 @@ type Readout = {
     minsLeft: number | null
 }
 
-/** The three parts of the readout, in order, with the ones this book or this
-    flow cannot supply simply absent. */
+/** The readout carries the three NUMBERS — where you are in the chapter, how
+    much of it is left, how far through the book you are — and nothing else.
+    The chapter's NAME is the longest and most variable thing that used to sit
+    here, and it is the one fact the card the button opens can say in full
+    without truncating; the contents list prices every chapter in minutes now,
+    so the name is reachable there too. Parts a book or a flow cannot supply
+    are simply absent. */
 function readoutParts(r: Readout, flow: string): ReactNode[] {
     const parts: ReactNode[] = []
-    if (flow === 'scrolled') {
-        if (r.minsLeft !== null)
-            parts.push(<span>{minutes(r.minsLeft)} left in chapter</span>)
-    } else parts.push(<span>Page {r.page} of {r.pages}</span>)
-    if (r.chapter) parts.push(<span className="reader-chapter">{r.chapter}</span>)
+    /* A page count is a paginated idea; scrolled flow has none to give. */
+    if (flow !== 'scrolled') parts.push(<span>Page {r.page} of {r.pages}</span>)
+    if (r.minsLeft !== null) parts.push(<span>{minutes(r.minsLeft)} left</span>)
     parts.push(<span>{percent(r.fraction)}%</span>)
     return parts
+}
+
+/** Every contents entry priced in minutes, from the sizes of the sections it
+    spans. foliate's own estimate (progress.js) is 1600 characters to the
+    minute and it keeps its reckoning private, so this repeats the constant
+    rather than reaching into it.
+
+    An entry that resolves to the same section as the one before it gets NULL,
+    not a share: a book that puts six sub-headings in one file gives no honest
+    way to split that file between them, and a made-up sixth is worse than a
+    blank. Same rule as the readout — a fact the book cannot supply is absent,
+    never invented. */
+const CHARS_PER_MINUTE = 1600
+
+function priceContents(book: FoliateBook | undefined): Map<string, number> {
+    const out = new Map<string, number>()
+    if (!book?.resolveHref || !book.sections?.length) return out
+    const flat: { href: string; index: number }[] = []
+    const walk = (items: FoliateTOCItem[]) => {
+        for (const it of items) {
+            if (it.href) {
+                const at = book.resolveHref!(it.href)
+                if (at && typeof at.index === 'number' && at.index >= 0)
+                    flat.push({ href: it.href, index: at.index })
+            }
+            if (it.subitems?.length) walk(it.subitems)
+        }
+    }
+    walk(book.toc ?? [])
+    for (let i = 0; i < flat.length; i++) {
+        const start = flat[i].index
+        if (i > 0 && flat[i - 1].index === start) continue
+        /* The next entry that starts in a LATER section — not simply the next
+           entry, which may be a sub-heading of this same one. */
+        let end = book.sections.length
+        for (let j = i + 1; j < flat.length; j++)
+            if (flat[j].index > start) { end = flat[j].index; break }
+        let chars = 0
+        for (let k = start; k < end; k++) {
+            const sec = book.sections[k]
+            if (sec?.linear === 'no') continue
+            chars += sec?.size ?? 0
+        }
+        if (chars > 0) out.set(flat[i].href, chars / CHARS_PER_MINUTE)
+    }
+    return out
 }
 
 /* The clear band at each end of the paginated page, and the reason the floating
@@ -130,6 +179,9 @@ export function Reader() {
 
     const [chrome, setChrome] = useState(false)
     const [toc, setToc] = useState<FoliateTOCItem[]>([])
+    /* Contents entries priced once when the book opens: the sizes never change,
+       and re-pricing on every relocate would walk the whole spine per page. */
+    const [tocMins, setTocMins] = useState<Map<string, number>>(() => new Map())
     const [sheetOpen, setSheetOpen] = useState(false)
     const [readout, setReadout] = useState<Readout | null>(null)
     const [gotoOpen, setGotoOpen] = useState(false)
@@ -277,6 +329,7 @@ export function Reader() {
                 stage.append(view)
                 viewRef.current = view
                 setToc(view.book?.toc ?? [])
+                setTocMins(priceContents(view.book))
 
                 /* Upstream's touch handling off, before the first frame the
                    reader could touch. PATCHES.md § 4b. */
@@ -1005,6 +1058,8 @@ export function Reader() {
                 <section className="sheet" aria-label="Go to a place in the book">
                     <GoTo
                         at={readout?.fraction ?? 0}
+                        chapter={readout?.chapter ?? null}
+                        minsLeft={readout?.minsLeft ?? null}
                         onGo={f => {
                             setGotoOpen(false)
                             void viewRef.current?.goToFraction(f)
@@ -1047,11 +1102,13 @@ export function Reader() {
                             setPanelOpen(false)
                         }}
                     >
-                        {/* A page count is a paginated idea. Scrolled flow has no
-                            pages to count, so it reads the time left in the chapter
-                            instead — SPEC.md 5.1. The per-cent is the book's either
-                            way, so switching flow never moves the number the slider
-                            below is bound to.
+                        {/* All three numbers, and only numbers: page in chapter,
+                            minutes left in it, per-cent through the book. Scrolled
+                            flow drops the page count — it has no pages to count,
+                            SPEC.md 5.1 — and the other two are unchanged by flow,
+                            so switching never moves the number the slider below is
+                            bound to. The chapter's name lives in the card this
+                            button opens.
 
                             Built as a list and joined, rather than as separators
                             hung off each part: a book that reports no size for a
@@ -1096,6 +1153,7 @@ export function Reader() {
                                         item={item}
                                         depth={0}
                                         here={readout?.href ?? null}
+                                        mins={tocMins}
                                         onGo={href => {
                                             setPanelOpen(false)
                                             void viewRef.current?.goTo(href)
@@ -1168,10 +1226,16 @@ export function Reader() {
    reader's own arrival — and a control that jumps under a thumb that is
    dragging it is worse than one that is briefly stale. It is mounted with the
    panel, so opening the panel again re-seeds it. */
-function GoTo({ at, onGo, note }: {
+function GoTo({ at, onGo, note, chapter, minsLeft }: {
     at: number
     onGo: (fraction: number) => void
     note?: string
+    /* The chapter's name, moved off the readout button and into the card the
+       button opens — where it has the width to be said in full rather than
+       squeezed between two numbers. Absent on the contents tab's copy of this
+       control, which is not opened from the readout. */
+    chapter?: string | null
+    minsLeft?: number | null
 }) {
     const [pc, setPc] = useState(() => Math.round(clamp01(at) * 100))
     /* Until the reader touches the control it follows the book: the sheet can
@@ -1211,6 +1275,14 @@ function GoTo({ at, onGo, note }: {
 
     return (
         <div className="reader-goto">
+            {chapter && (
+                <p className="reader-goto-where">
+                    <span className="reader-goto-chapter">{chapter}</span>
+                    {typeof minsLeft === 'number' && (
+                        <span className="reader-goto-left">{minutes(minsLeft)} left in this chapter</span>
+                    )}
+                </p>
+            )}
             {note && <p className="ui-p ui-p--soft">{note}</p>}
             <div className="ctl">
                 <p className="ctl-head">
@@ -1273,16 +1345,20 @@ function clamp01(n: number): number {
     return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0
 }
 
-function TocRow({ item, depth, here, onGo }: {
+function TocRow({ item, depth, here, mins, onGo }: {
     item: FoliateTOCItem
     depth: number
     /* The href of the entry the reader is inside, or null before the first
        relocate. Threaded down rather than looked up, so a nested entry marks
        itself on the same test as a top-level one. */
     here: string | null
+    /* Every entry's length in minutes, keyed by href. An entry the book gives
+       no honest length for is simply missing from the map, and prints none. */
+    mins: Map<string, number>
     onGo: (href: string) => void
 }) {
     const current = here !== null && item.href === here
+    const len = item.href ? mins.get(item.href) : undefined
     /* Marking the entry is not enough on its own: a 65-chapter book opens its
        contents at the top, and chapter XVIII sits 1100px down a viewport 812px
        tall — measured, not guessed. So the entry brings itself into view as it
@@ -1307,12 +1383,15 @@ function TocRow({ item, depth, here, onGo }: {
                 aria-current={current ? 'location' : undefined}
                 onClick={() => item.href && onGo(item.href)}
             >
-                {item.label?.trim() || 'Untitled'}
+                <span className="reader-toc-label">{item.label?.trim() || 'Untitled'}</span>
+                {len !== undefined && (
+                    <span className="reader-toc-len">{minutes(len)}</span>
+                )}
             </button>
             {item.subitems?.length ? (
                 <ol className="reader-toc-list">
                     {item.subitems.map((sub, i) => (
-                        <TocRow key={`${sub.href ?? i}-${i}`} item={sub} depth={depth + 1} here={here} onGo={onGo} />
+                        <TocRow key={`${sub.href ?? i}-${i}`} item={sub} depth={depth + 1} here={here} mins={mins} onGo={onGo} />
                     ))}
                 </ol>
             ) : null}

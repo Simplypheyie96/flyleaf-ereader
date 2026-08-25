@@ -51,6 +51,11 @@ interface FoliateBook {
   dir?: string
   rendition?: { layout?: string }
   landmarks?: { type: string[]; href: string }[]
+  /** Where a contents href lands: the index of the section that holds it, and
+      the fragment inside it. Used to price each contents entry in minutes from
+      the sizes of the sections it spans — `SectionProgress` keeps its own copy
+      privately, so the reckoning has to be done outside it. */
+  resolveHref?: (href: string) => { index: number; anchor?: unknown } | null | undefined
   splitTOCHref?: (href: string) => unknown[]
   getTOCFragment?: (doc: Document, id: string) => Element | null
   getCover?: () => Promise<Blob | null>
