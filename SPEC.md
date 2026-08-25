@@ -441,6 +441,16 @@ not in IndexedDB — it is derivable, and a stale search index in a database is 
 search index. Mono count, match in context, hits ticked in the margin bar for the current
 chapter.
 
+**It searches as you type.** It used to wait for Enter, which meant a reader typed the word and
+then had to ask a second time for the thing they had just asked for — and on a phone the second
+ask is a trip down to the keyboard's own search key. Two numbers keep that affordable, because
+each search walks the whole book: the field must be still for `TYPING_SETTLE = 280ms` before a
+walk starts, and an automatic walk needs `SHORTEST_TYPED = 2` characters. A keystroke inside the
+settle cancels the pending walk; a walk already running is cancelled by the token bump that has
+always handled a second search. Deleting back under the floor clears the results rather than
+leaving the previous word's hits under a field that no longer says it. **Enter still works, and
+overrides both** — a one-letter query typed on purpose is a reader asking on purpose.
+
 ### 6.5 Look up
 
 The offline answer first: **"Look up" shows every other place that word appears in this book** —
