@@ -2,18 +2,26 @@
    Crossing a chapter in scrolled flow.
 
    foliate only ever leaves a section through next()/prev(): its own
-   scroll handler calls #afterScroll, which relocates INSIDE the section
-   and never crosses (paginator.js: 567-573, 1096-1139). In paginated
-   flow that costs nothing, because every turn already goes through
-   next(). In scrolled flow it means native scrolling stops dead at the
-   bottom of every chapter and the only way on is the arrow keys, which
-   a phone does not have.
+   scroll handler relocates INSIDE the section and never crosses
+   (paginator.js: 567-573, 1096-1139). In paginated flow that costs
+   nothing, because every turn already goes through next(). In scrolled
+   flow it means native scrolling stops dead at the bottom of every
+   chapter and the only way on is the arrow keys, which a phone does
+   not have.
 
-   So the end of a section is not a wall: keep pushing and it crosses.
-   ARRIVING at the end is not the trigger — a reader who scrolls to the
-   last paragraph and stops is reading it, not asking for what comes
-   next — the trigger is a deliberate continued pull past it, which is
-   the same gesture they were already making. Symmetric backwards.
+   Every other reader scrolls one chapter into the next with nothing in
+   between, so that is the target: when the column runs out and the
+   scroll is still going, cross. No threshold to overcome, no pause to
+   wait out, no second gesture — the boundary should not be somewhere
+   the reader has to push through, it should be somewhere they do not
+   notice.
+
+   A first pass gated this behind 72px of extra pull and a 500ms idle
+   reset, on the theory that resting at the last paragraph should not
+   carry you onward. In the hand it read as the book jamming at every
+   chapter, which is worse than the thing it was guarding against —
+   resting does nothing here either way, because resting produces no
+   scroll events at all.
 
    This lives outside the vendored tree on purpose. Everything it needs
    is public API — `scrolled`, `start`, `end`, `viewSize`, `sections`,
@@ -23,37 +31,23 @@
 
 /* FoliateRenderer is ambient — vendor/foliate-js.d.ts declares it globally. */
 
-/** Continued pull past the end, by finger. Enough that the rubber-band at
-    the bottom of a section cannot spend it on its own, short enough that it
-    reads as "keep scrolling" rather than as a second, separate gesture. */
-const TOUCH_PX = 72
-/** The same by wheel. Higher because one trackpad flick is worth far more
-    pixels than one thumb-length of screen. */
-const WHEEL_PX = 140
-/** A pause at the end spends the pull. Resting at the last paragraph and
-    then scrolling again is a fresh intent, not a continuation of the one
-    that brought you there. */
-const IDLE_MS = 500
-/** After a crossing, ignore what is left of the gesture that caused it —
-    otherwise one long swipe walks through two chapters. */
-const COOLDOWN_MS = 700
+/** After a crossing, ignore the rest of the gesture that caused it. A flick
+    carries momentum for a good while after the finger is gone, and without
+    this one flick walks through three chapters. Long enough to outlast the
+    load and the settle, short enough that a reader who wants two chapters
+    can have them. */
+const COOLDOWN_MS = 450
 
 export interface ScrollCrossHooks {
     renderer(): FoliateRenderer | null
-    /** The section the reader is in, from the last relocate. */
+    /** The section the reader is in, from the last section load. */
     index(): number
 }
 
 export class ScrollCross {
     #hooks: ScrollCrossHooks
     #docs = new Set<Document>()
-
-    /** Signed: forward is positive. One accumulator, because a pull that
-        changes its mind mid-gesture should cancel itself out rather than
-        bank both directions. */
-    #pull = 0
     #lastY = 0
-    #at = 0
     #until = 0
 
     constructor(hooks: ScrollCrossHooks) {
@@ -69,7 +63,6 @@ export class ScrollCross {
         doc.addEventListener('wheel', this.#wheel, { passive: true })
         doc.addEventListener('touchstart', this.#start, { passive: true })
         doc.addEventListener('touchmove', this.#move, { passive: true })
-        doc.addEventListener('touchend', this.#end, { passive: true })
     }
 
     detach(doc: Document) {
@@ -77,15 +70,11 @@ export class ScrollCross {
         doc.removeEventListener('wheel', this.#wheel)
         doc.removeEventListener('touchstart', this.#start)
         doc.removeEventListener('touchmove', this.#move)
-        doc.removeEventListener('touchend', this.#end)
     }
 
     destroy() {
         for (const doc of [...this.#docs]) this.detach(doc)
-        this.#pull = 0
     }
-
-    /* ── where the section ends ───────────────────────────────────────── */
 
     /** Upstream's own test for "there is nothing left to scroll", to the
         pixel: #scrollNext gives up at `viewSize - end > 2` (paginator.js:
@@ -107,45 +96,30 @@ export class ScrollCross {
         return null
     }
 
-    /* ── the gesture ──────────────────────────────────────────────────── */
-
-    #push(delta: number, threshold: number) {
+    /** One scroll event, in the direction the column has run out in, is the
+        whole trigger. */
+    #push(delta: number) {
         const r = this.#hooks.renderer()
-        if (!r?.scrolled) return
+        if (!r?.scrolled || !delta) return
         const now = Date.now()
         if (now < this.#until) return
-        /* A gap resets. So does arriving from the middle of the section:
-           the pull only counts once there is nothing left to scroll. */
-        if (now - this.#at > IDLE_MS) this.#pull = 0
-        this.#at = now
 
         const edge = this.#edge(r)
-        if (edge === 0 || Math.sign(delta) !== edge) { this.#pull = 0; return }
-        this.#pull += delta
-        if (Math.abs(this.#pull) < threshold) return
-
-        const dir = edge
+        if (edge === 0 || Math.sign(delta) !== edge) return
         /* Guarded here rather than left to upstream: in scrolled flow
            #scrollNext reports "go on" at the end of every section including
            the last, and #turnPage then calls #goTo with an undefined index
            — past the guard that goTo() applies and #turnPage does not. */
-        if (this.#adjacent(r, dir) === null) { this.#pull = 0; return }
-        this.#pull = 0
+        if (this.#adjacent(r, edge) === null) return
         this.#until = now + COOLDOWN_MS
-        void (dir === 1 ? r.next() : r.prev())
+        void (edge === 1 ? r.next() : r.prev())
     }
 
-    #wheel = (e: Event) => {
-        const w = e as WheelEvent
-        if (!w.deltaY) return
-        this.#push(w.deltaY, WHEEL_PX)
-    }
+    #wheel = (e: Event) => this.#push((e as WheelEvent).deltaY)
 
     #start = (e: Event) => {
         const t = (e as TouchEvent).touches[0]
-        if (!t) return
-        this.#lastY = t.clientY
-        this.#pull = 0
+        if (t) this.#lastY = t.clientY
     }
 
     #move = (e: Event) => {
@@ -155,8 +129,6 @@ export class ScrollCross {
            clientY — the same sign convention as wheel deltaY. */
         const dy = this.#lastY - t.clientY
         this.#lastY = t.clientY
-        this.#push(dy, TOUCH_PX)
+        this.#push(dy)
     }
-
-    #end = () => { this.#pull = 0 }
 }

@@ -103,7 +103,6 @@ export function Reader() {
     const book = useLiveQuery(() => (id ? db.books.get(id) : undefined), [id])
 
     const stageRef = useRef<HTMLDivElement | null>(null)
-    const seamRef = useRef<HTMLDivElement | null>(null)
     const viewRef = useRef<FoliateViewElement | null>(null)
     const turnRef = useRef<TurnController | null>(null)
     const crossRef = useRef<ScrollCross | null>(null)
@@ -273,7 +272,6 @@ export function Reader() {
                 const turn = new TurnController(turnConfig(), {
                     renderer: () => viewRef.current?.renderer ?? null,
                     stage: () => stageRef.current,
-                    seam: () => seamRef.current,
                     toggleChrome,
                 })
                 turnRef.current = turn
@@ -962,7 +960,6 @@ export function Reader() {
             <div className="reader-stage" ref={stageRef}>
                 {/* The 1px rule on the outgoing page's leading edge. One
                     element, one transform, on the turn's own clock. */}
-                <div className="reader-seam" ref={seamRef} aria-hidden="true" />
                 {!ready && !failed && (
                     <p className="reader-opening ui-p ui-p--soft">Opening…</p>
                 )}

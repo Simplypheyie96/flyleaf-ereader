@@ -253,17 +253,21 @@ foliate only ever leaves a section through `next()`/`prev()`; its own scroll han
 already goes through `next()`. In Scrolled flow it means native scrolling stops dead at the bottom
 of every chapter and the only way on is the arrow keys, which a phone does not have.
 
-So the end of a section is not a wall — **keep pushing and it crosses**. Arriving at the end is
-*not* the trigger: a reader who scrolls to the last paragraph and stops is reading it, not asking
-for what comes next. The trigger is a deliberate continued pull past the end, which is the same
-gesture they were already making.
+So the end of a section is not a wall and it is not a gate either — **the scroll simply carries
+on into the next chapter**, the way it does in every other reader. When the column has nothing
+left and the scroll is still going that way, it crosses. There is no distance to overcome, no
+pause to wait out, no second gesture: a chapter boundary is not somewhere the reader should have
+to push through, it is somewhere they should not notice.
+
+A first pass gated this behind 72px of extra pull and a 500ms idle reset, reasoning that resting
+at the last paragraph should not carry you onward. In the hand it read as the book jamming at
+every chapter, which is worse than the thing it guarded against — and resting is safe anyway,
+because resting produces no scroll events at all.
 
 | | Value | Why |
 |---|---|---|
-| Pull past the end, by finger | 72px | More than the bottom rubber-band can spend on its own, short enough to read as "keep scrolling" rather than a second gesture |
-| The same by wheel | 140px | One trackpad flick is worth far more pixels than one thumb-length of screen |
-| Pause that spends the pull | 500ms | Resting at the last paragraph and then scrolling again is a fresh intent, not a continuation |
-| Cooldown after a crossing | 700ms | Otherwise the tail of one long swipe walks through two chapters |
+| Threshold to cross | none | One scroll event past the end, in that direction |
+| Cooldown after a crossing | 450ms | A flick keeps firing after the finger is gone; without this one flick walks three chapters. Long enough to outlast the load, short enough that a reader who wants two chapters can have them |
 
 Forward lands at the **top** of the next chapter; backward lands at the **bottom** of the previous
 one, so a reader going back arrives where they left. Non-linear sections are skipped, and the last
@@ -273,8 +277,9 @@ of every section including the last.
 This lives at `app/src/reader/scrollCross.ts`, outside the vendored tree, against public API only —
 so foliate stays upstream source with nothing to re-apply on an update.
 
-**Done means:** at the bottom of a chapter, resting does nothing; a continued scroll crosses; the
-same backwards; the first and last chapters do not cross; and one long swipe never advances twice.
+**Done means:** scrolling off the bottom of a chapter continues into the next with nothing in the
+way; the same backwards; the first and last chapters do not cross; and one flick never advances
+twice.
 
 ### 5.2 The three turn styles
 
@@ -287,8 +292,10 @@ feel where a chapter ends. What differs is what the finger is dragging.
 | **Fade** | `opacity` only, no translate | opacity | **120ms** flat, `linear` | 2 | Free on anything. "Fast fade" |
 | **Instant** | Nothing. The page changes | threshold only | **0ms** | 1 | The e-ink cut. For readers who dislike motion and devices that cannot afford it |
 
-**Slide**, unchanged from `DESIGN.md`: the outgoing page separates by a 1px `--rule` hairline on
-its leading edge. No shadow.
+**Slide**: the outgoing page slides, and nothing is drawn between it and the incoming one. An
+earlier build put a 1px `--rule` hairline on the leading edge, as a page separating from a page.
+On screen it read as a glitch — a line parked over the text — and it was removed outright rather
+than repositioned. No hairline, no shadow, nothing in the gap.
 
 **Crossing a chapter**, which is the one turn a transform cannot finish on its own: the engine
 does not lay the next section out until the outgoing page has already scrolled off. So the turn
@@ -364,7 +371,7 @@ pages; it just does not move.
 
 | Input | Behaviour |
 |---|---|
-| **Swipe** | Tracked 1:1. Requires **8px of horizontal travel inside 200ms, or >0.15px/ms**, before it claims the gesture — below that, the touch belongs to text selection. This threshold is the difference between a reader and a thing that pages when you try to highlight |
+| **Swipe** | Tracked 1:1. Requires **8px of horizontal travel** before it claims the gesture — below that, the touch belongs to text selection. There is deliberately **no time window** on it: an earlier build only claimed inside 200ms, so a slow deliberate drag travelled its 8px, missed the window and left the page sitting still, which is what "the slide is resisting" was. A horizontal drag turns the page however long the reader takes over it. By **mouse** the threshold is **24px** and the turn stands down if a selection has actually formed — a measured fact rather than a guess at intent, and the reason a desktop drag now turns at all |
 | **Tap zones** | Left third back, right third forward, middle third toggles chrome. Setting: **Tap to turn**, default on. Off leaves the whole pane as a chrome toggle |
 | **Keyboard** | `→` `Space` `PgDn` forward · `←` `⇧Space` `PgUp` back · `Home` `End` book ends · `T` contents · `F` find · `B` bookmark · `+` `−` size. Flat 300ms on the commit curve |
 | **Edges** | At **the book's own first and last page** — not at a chapter boundary — a drag meets rubber-band resistance (Apple's constant, 0.55) and springs back over 220ms. It never turns and it never feels stuck |
@@ -720,7 +727,7 @@ finding out twice:
   what `turn.ts:147-155` already says. A driver that "corrected" it to `clientX` measured
   220px of drift on a 220px drag and called the reader broken.
 - **Drift is anchored at the claim, not at touchstart.** `turn.ts`'s hysteresis
-  (`CLAIM_PX = 8`, `CLAIM_MS = 200`, `CLAIM_SPEED = 0.15`) is what stops a tap nudging the
+  (`CLAIM_PX = 8`, `CLAIM_MOUSE_PX = 24`) is what stops a tap nudging the
   page and lets a vertical scroll win; measured from touchstart it reads as a tracking
   failure that no amount of good tracking can fix. The threshold is reported separately as
   `claimPx`, on its own budget.
@@ -1041,7 +1048,7 @@ the app exists for and the one with the most icon-only buttons.
   attribute. The reading page asserts names but **not** headings: the book supplies the headings,
   and inventing an `h1` to satisfy a checker would put a title above the text of every page.
 - **Reduced motion.** Under `prefers-reduced-motion`, the turn is `opacity` over 75ms on the
-  stage and `opacity` over 0.01ms on the seam — **and no transform, translate, scale or rotate**,
+  stage — **and no transform, translate, scale or rotate**,
   across 32 sampled frames — while the page still turns (column 359 → 718). Honouring the setting
   by breaking the feature is not honouring it, so both halves are asserted.
 

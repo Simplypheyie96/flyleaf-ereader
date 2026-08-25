@@ -1928,39 +1928,6 @@ body::before{
 .reader[data-flow="paginated"] .reader-stage{ touch-action:pinch-zoom; }
 .reader[data-flow="scrolled"]  .reader-stage{ touch-action:pan-y pinch-zoom; }
 
-/* ── the seam ─────────────────────────────────────────────────────────────
-   The 1px rule on the leading edge of the outgoing page. Without it a slide
-   between two pages of the same stock is two identical grounds moving past
-   each other with no visible boundary, and the turn reads as the text
-   twitching rather than as a page leaving.
-
-   It is a real element with a real transform, animated by the turn on the same
-   clock and easing as the page itself, because a custom property is not
-   interpolable unless it is registered and a hairline that steps is worse than
-   no hairline. Hidden except during a turn: a permanent vertical rule down the
-   middle of the page is the drawn spine gutter the guardrails ban. */
-.reader-seam{
-  position:absolute;
-  inset-block:0;
-  inset-inline-start:0;
-  width:1px;
-  background:var(--rule);
-  opacity:0;
-  pointer-events:none;
-  z-index:2;
-}
-/* A slide has a moving edge; a fade and an instant have none, so there the
-   hairline would be a stray rule down the leading margin. The edge is the
-   page's own trailing edge, and #seamAt puts it at the offset. */
-.reader[data-turn="slide"] .reader-stage[data-turning] .reader-seam{
-  opacity:1;
-  will-change:transform;
-}
-@media (prefers-reduced-motion: reduce){
-  /* Nothing slides, so there is no edge to draw. */
-  .reader-stage[data-turning] .reader-seam{ opacity:0; }
-}
-
 .reader-opening{
   position:absolute; inset:0;
   display:flex; align-items:center; justify-content:center;
@@ -2716,7 +2683,7 @@ body::before{
 .panel-tail-note .mono{ font-variant-numeric:lining-nums tabular-nums; }
 
 /* ═══ the selection menu ═══════════════════════════════════════════════════
-   Absolute over the page, above the seam and below the panel. It is the one
+   Absolute over the page and below the panel. It is the one
    surface in this app that sits ON the text, so it has to be opaque and it has
    to have an edge — with no shadow available, --lift plus a hairline is what
    separates it from the sentence underneath. */
