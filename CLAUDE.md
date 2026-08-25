@@ -206,6 +206,13 @@ Rules that go with it:
   sheets are measured like everything else — no hand measurement, and nothing
   to add to the shelf to keep it that way.
 
+## Working on this repo
+
+**Straight to `main`. No pull requests.** One person works on this, reviews it, and
+ships it, so a PR would be a branch opened and merged by the same pair of hands — a
+ceremony with no reviewer at the end of it. Commit to `main`, push, deploy. The gate
+that actually catches things here is `npm run audit:measure` above, not a merge button.
+
 ## Guardrails (negative prompt, always on)
 
 No glass, no `backdrop-filter`, no shadows. No paper texture over the text, no drawn spine

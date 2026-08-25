@@ -35,3 +35,10 @@ app/audit/fixtures/rezipped.epub
 # tsc's incremental cache. Rewritten by every build, useful to nobody but the
 # machine that wrote it.
 app/tsconfig.tsbuildinfo
+
+# Launch and demo video, rendered from the app rather than authored here. 9MB
+# of MP4 in a repo that is otherwise text is a clone tax every future checkout
+# pays, and git stores it whole on every re-render. Keep it locally, publish it
+# where video belongs.
+flyleaf-ereader-launch.mp4
+*.mp4
