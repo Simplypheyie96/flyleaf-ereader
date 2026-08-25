@@ -349,6 +349,21 @@ export async function removeBook(id: string): Promise<void> {
          has heard of it either, so the stone has nothing to match and no work
          to do. */
       await bury('book', book?.fp ?? id)
+      /* AN INCLUDED BOOK GETS A SECOND STONE, under its own stable id.
+
+         The fingerprint stone above is what the shelf merge matches on, and it
+         does its job there. It cannot do this one: seeding runs at boot, before
+         any sync, and asks only "is this seed on the shelf and not in
+         `dismissedSeeds`" — both device-local. So a new phone put the included
+         books back and then argued for them, because a row created seconds ago
+         looks newer than a stone laid yesterday.
+
+         `dismissedSeeds` cannot travel: it holds ids, and a seed's id is the
+         one thing about it that IS the same everywhere, but the list is a
+         settings field and settings stay on the device that set them by
+         design. A stone travels in the shelf, so the stone is where this
+         belongs. `seed.ts` reads it before it seeds. */
+      if (book?.seeded) await bury('book', id)
       if (book?.seeded) {
         const settings = { ...DEFAULT_SETTINGS, ...(await db.settings.get(1)), id: 1 as const }
         if (!settings.dismissedSeeds.includes(id)) {
@@ -410,6 +425,9 @@ export async function touchBook(id: string): Promise<void> {
     two paths into it is how a book gets added twice. */
 export async function clearDismissedSeeds(): Promise<void> {
   await saveSettings({ dismissedSeeds: [] })
+  /* The stones the dismissal laid are lifted by `reseed` in seed.ts, which
+     knows which ids are seeds. Doing it there also keeps this file from
+     importing that one, which imports this one. */
 }
 
 /* ── Reading history ──────────────────────────────────────────────────────

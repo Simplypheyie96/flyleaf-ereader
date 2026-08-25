@@ -1745,6 +1745,26 @@ phone walks back in from the laptop. Deletions travel as **tombstones** (`graves
 book's tombstone names its *fingerprint*, not its id — the id it had on one device means nothing on
 the other.
 
+A tombstone is beaten only by a **newer act of adding**, and "adding" means `addedAt`, never
+`editedAt`. This was the bug that made deletions feel optional: `editedAt` moves on every page
+turn, so a book deleted on the phone and then merely *opened* on the laptop looked newer than the
+stone that killed it, survived the merge, and was pushed back up — the deletion undone by reading.
+Importing the file again deliberately mints a new row with a new `addedAt`, and that still wins,
+which is the only case that should.
+
+An **included** book is exempt even from that. Its `addedAt` is the moment this device first
+booted, not the moment anyone chose it, so it would out-date any possible stone and reappear
+forever. `dismissedSeeds` cannot help — it is a settings field, and settings stay on the device
+that set them. So removing an included book lays a **second** stone under its stable seed id,
+`seedIncluded()` reads the stones before it seeds, and *Restore included books* lifts them. A
+device that also holds the stone will delete the restored copy again on its next sync; restore
+there too, or open the file by hand.
+
+Deleting a book also deletes its **file in Drive**. Nothing used to: `filesToMove` only ever looks
+at books that exist locally, so a removed book's bytes simply stopped being mentioned and sat
+against the reader's quota for good. The stones are the authority — any `book-<fp>` this app owns
+whose fingerprint is stoned is removed on the next pass, whether or not files are being carried.
+
 ### 15.4 Nobody should ever press "Sync now"
 
 Connecting once is the only thing anybody should have to do. Three triggers, because two devices

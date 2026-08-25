@@ -46,9 +46,10 @@ export const SEEDS: Seed[] = [
 export async function seedIncluded(): Promise<void> {
   const settings = { ...DEFAULT_SETTINGS, ...(await db.settings.get(1)) }
   const dismissed = new Set(settings.dismissedSeeds)
+  const buried = await stonedSeeds()
 
   for (const seed of SEEDS) {
-    if (dismissed.has(seed.id)) continue
+    if (dismissed.has(seed.id) || buried.has(seed.id)) continue
     if (await db.books.get(seed.id)) continue
 
     try {
@@ -76,11 +77,32 @@ export async function seedIncluded(): Promise<void> {
 export async function needsSeeding(): Promise<boolean> {
   const settings = { ...DEFAULT_SETTINGS, ...(await db.settings.get(1)) }
   const dismissed = new Set(settings.dismissedSeeds)
+  const buried = await stonedSeeds()
   for (const seed of SEEDS) {
-    if (dismissed.has(seed.id)) continue
+    if (dismissed.has(seed.id) || buried.has(seed.id)) continue
     if (!(await db.books.get(seed.id))) return true
   }
   return false
+}
+
+/** Which included books another device says were deleted.
+
+    `dismissedSeeds` is this device's own answer and cannot travel — it is a
+    settings field, and settings stay where they were set. The stone can, and
+    does: `removeBook` lays one under the seed's stable id precisely so that it
+    rides in `shelf.json` and lands here. Without this check a new phone seeds
+    the included books at boot, before its first sync, and then wins the
+    argument about them because a row created seconds ago outranks a stone laid
+    yesterday. */
+async function stonedSeeds(): Promise<Set<string>> {
+  const found = new Set<string>()
+  try {
+    const stones = await db.graves.bulkGet(SEEDS.map((s) => `book:${s.id}`))
+    for (const stone of stones) if (stone) found.add(stone.ref)
+  } catch {
+    /* A shelf with two extra books on it is not worth failing a boot over. */
+  }
+  return found
 }
 
 /** How many included books the reader has deleted. Drives whether Settings
@@ -117,6 +139,22 @@ export function startSeeding(): Promise<void> {
 /** Re-seed after a restore. Deliberately not `startSeeding` — that one is
     "once, ever", and Restore is the one action that means "again". */
 export async function reseed(): Promise<void> {
+  /* Lift the stones first, or Restore restores a book that this device's own
+     next boot skips and the next sync deletes again.
+
+     Only this device's copies go, and that is the honest limit of a tombstone:
+     there is no "un-delete" message in this protocol, only a newer act — and a
+     re-seeded included book is exempt from the rule that lets a newer act beat
+     a stone, because its `addedAt` is a boot rather than a choice. So a device
+     that ALSO heard about the deletion still holds its own stone and will
+     delete it here again on the next sync. Restoring on that device too, or
+     opening the file by hand, is the way out. Rare enough to document rather
+     than to build a resurrection message for. */
+  try {
+    await db.graves.bulkDelete(SEEDS.map((s) => `book:${s.id}`))
+  } catch {
+    /* Restore is still worth attempting without it. */
+  }
   run = null
   settled = false
   await startSeeding()
