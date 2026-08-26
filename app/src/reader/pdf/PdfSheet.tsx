@@ -27,11 +27,15 @@ export interface PdfSheetProps {
     zoom: number
     /** −1 out, +1 in, 0 back to the fit */
     onZoom: (dir: -1 | 0 | 1) => void
+    /** Is the pane wide enough for a real spread? The control is offered
+        either way — a reader who sets it on a phone wants it on the tablet
+        they open the same book on next — but it says which it is doing. */
+    spreadOk: boolean
     onLive: (patch: Partial<Settings>) => void
     onSet: (patch: Partial<Settings>) => void
 }
 
-export function PdfSheet({ settings: s, zoom, onZoom, onLive, onSet }: PdfSheetProps) {
+export function PdfSheet({ settings: s, zoom, spreadOk, onZoom, onLive, onSet }: PdfSheetProps) {
     const stock = STOCKS.find(k => k.id === s.stock)
     /* Press is the paper itself: its veil is 0, so the tint slider has
        nothing to move. Disabled with the reason on it rather than hidden,
@@ -53,6 +57,15 @@ export function PdfSheet({ settings: s, zoom, onZoom, onLive, onSet }: PdfSheetP
                     : 'One whole sheet per screen. Right on a tablet, small on a phone.'}>
                     <Opt on={s.pdfFit === 'width'} onClick={() => onSet({ pdfFit: 'width' })}>Width</Opt>
                     <Opt on={s.pdfFit === 'page'} onClick={() => onSet({ pdfFit: 'page' })}>Whole page</Opt>
+                </Row>
+
+                <Row label="Pages" note={s.pdfSpread === 'single'
+                    ? 'One sheet at a time.'
+                    : spreadOk
+                        ? 'Two sheets side by side — the cover alone, then facing pages, as the book was bound.'
+                        : 'Two sheets side by side. This screen is too narrow for it, so you are reading one at a time until you open the book somewhere wider.'}>
+                    <Opt on={s.pdfSpread === 'single'} onClick={() => onSet({ pdfSpread: 'single' })}>One</Opt>
+                    <Opt on={s.pdfSpread === 'double'} onClick={() => onSet({ pdfSpread: 'double' })}>Two</Opt>
                 </Row>
 
                 {/* Zoom is the view's, not the settings row's: it is a place

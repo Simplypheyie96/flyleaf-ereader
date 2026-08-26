@@ -3391,6 +3391,38 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
    one accent DESIGN.md allows on a reading page, it is measured for both
    polarities, and a rule under the words cannot swallow them the way a band
    would need a per-stock alpha to avoid. */
+/* A highlight on a fixed page. Same four tints and the same underline as the
+   reflowable reader, drawn from the same --hl-* tokens so a stock that was
+   measured once is measured for both readers — including the dark-stock
+   inversion, where the fill drops out and only the bar is left.
+
+   A <button>, not a <div>: it is the only way back to a mark's own menu once
+   the selection that made it is gone, and a fixed page has no text node to
+   hang that affordance off. Borderless and background-only, so it reads as
+   ink on paper rather than as a control sitting on top of one. It sits UNDER
+   the text layer, so a drag across it still selects the words. */
+.pdf-mark{
+  position:absolute;
+  border:0; padding:0; margin:0;
+  background:var(--hl-fill-mustard);
+  mix-blend-mode:var(--hl-blend);
+  border-radius:1px;
+  cursor:pointer;
+  -webkit-appearance:none; appearance:none;
+}
+.pdf-mark[data-tint="pink"]{ background:var(--hl-fill-pink); }
+.pdf-mark[data-tint="blue"]{ background:var(--hl-fill-blue); }
+.pdf-mark[data-tint="butter"]{ background:var(--hl-fill-butter); }
+/* The underline tint, and the margin bar every tint gets on a dark stock, are
+   the same 4px rule the reflowable reader draws — a box-shadow rather than a
+   child, so one element carries both without a pseudo-element that would then
+   inherit the blend mode. */
+.pdf-mark[data-tint="underline"]{
+  background:transparent; mix-blend-mode:normal;
+  box-shadow:inset 0 -4px 0 0 var(--hl-underline);
+}
+.pdf-mark:focus-visible{ outline:2px solid var(--ink); outline-offset:1px; }
+
 .pdf-found{
   position:absolute; height:4px;
   transform:translateY(2px);

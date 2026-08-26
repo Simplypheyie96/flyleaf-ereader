@@ -10,11 +10,19 @@
    than hidden behind a disabled control:
 
      · no type controls at all (PdfSheet.tsx says why),
-     · no highlights and no notes — a fixed page has no CFI to anchor one
-       to, so the tints and the Note action are absent from the selection
-       menu and the marks list holds bookmarks only,
+     · highlights and notes, anchored to page coordinates rather than to a
+       CFI. This used to say a fixed page had nothing to anchor a mark to,
+       which was the wrong reading of the rule: a CFI exists because a
+       reflowable book's layout moves, and a fixed page's layout is the one
+       thing about it that never does. So a mark stores the page and the run
+       of boxes the selection covered, in fractions of the page's own box,
+       and survives a change of zoom, fit, spread and screen exactly as a CFI
+       survives a change of face. Same table, same row shape, same export,
+       same sync,
      · a continuous scroll instead of a turn, because a page that cannot
-       reflow cannot be re-broken into a page that fits the screen.
+       reflow cannot be re-broken into a page that fits the screen — but two
+       sheets side by side where the pane is wide enough for it, cover alone
+       then verso facing recto, the way the book was bound.
 
    The position is `pdf:<page>:<fraction>` in the same locators row a
    CFI would use. It is the same principle, not a compromise on it: the
@@ -22,18 +30,21 @@
    move, and the pair survives a change of zoom, of fit and of screen.
    ───────────────────────────────────────────────────────────── */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, DEFAULT_SETTINGS, saveSettings, touchBook, useSettings } from '../db'
 import { fetchBookFile } from '../sync/sync'
-import type { Bookmark, Settings } from '../types'
+import type { Annotation, Bookmark, HighlightColor, Settings } from '../types'
 import { percent } from '../lib'
 import { BackIcon, BookmarkIcon, ContentsIcon, TypeIcon } from '../components/icons'
 import { readPaint } from '../reader/marks'
 import {
-    addBookmark, flatten, parsePdfFound, parsePdfLocator, removeBookmark, sortByPosition,
+    addBookmark, addHighlight, flatten, parsePdfFound, parsePdfLocator, parsePdfRects,
+    pdfMarkLocator, removeAnnotation, removeBookmark, setNote, setTint, sortByPosition,
 } from '../reader/marks'
+import type { PdfRect } from '../reader/marks'
+import { NoteEditor } from '../reader/NoteEditor'
 import { ReadingClock } from '../reader/clock'
 import { Panel } from '../reader/Panel'
 import type { PanelRequest, SearchYield } from '../reader/Panel'
@@ -42,7 +53,7 @@ import type { SelAnchor } from '../reader/SelectionMenu'
 import { ExportSheet } from '../reader/ExportSheet'
 import { PdfSheet } from '../reader/pdf/PdfSheet'
 import { PdfView } from '../reader/pdf/PdfView'
-import type { PdfFound, PdfLocation, PdfViewHandle } from '../reader/pdf/PdfView'
+import type { PdfFound, PdfLocation, PdfPaintMark, PdfViewHandle } from '../reader/pdf/PdfView'
 import { getPage, openPdf, pageText, PdfRefused, searchPage } from '../reader/pdf/engine'
 import type { PdfDoc, PdfOutlineItem } from '../reader/pdf/engine'
 
@@ -107,7 +118,15 @@ export function PdfReader() {
     const [panelOpen, setPanelOpen] = useState(false)
     const [panelTab, setPanelTab] = useState<'contents' | 'marks'>('contents')
     const [panelReq, setPanelReq] = useState<PanelRequest | null>(null)
-    const [sel, setSel] = useState<SelAnchor | null>(null)
+    /* The selection, and the mark it belongs to when the reader tapped an
+       existing highlight rather than dragging over fresh words. */
+    const [sel, setSel] = useState<{ anchor: SelAnchor; mark: Annotation | null } | null>(null)
+    const [noteFor, setNoteFor] = useState<Annotation | null>(null)
+    /* The selection's shape, in page fractions, captured at the same moment
+       as the menu's anchor. Kept in a ref because it is read by handlers, not
+       rendered, and re-rendering the reader on every pixel of a drag is the
+       one thing this file is built to avoid. */
+    const selRects = useRef<PdfRect[]>([])
     const [exportOpen, setExportOpen] = useState(false)
     const [at, setAt] = useState<PdfLocation>({ page: 1, fraction: 0 })
     /* The one search hit the reader tapped. It belongs to the search and dies
@@ -125,6 +144,18 @@ export function PdfReader() {
         if (!id) return [] as Bookmark[]
         return sortByPosition(await db.bookmarks.where('bookId').equals(id).toArray())
     }, [id]) ?? []
+
+    const annotations = useLiveQuery(async () => {
+        if (!id) return [] as Annotation[]
+        return sortByPosition(await db.annotations.where('bookId').equals(id).toArray())
+    }, [id]) ?? []
+
+    /* Reduced once per change, not once per mounted page. */
+    const painted: PdfPaintMark[] = useMemo(
+        () => annotations
+            .map(a => ({ id: a.id, color: a.color, rects: parsePdfRects(a.cfi) }))
+            .filter(m => m.rects.length > 0),
+        [annotations])
 
     const lines = doc ? flattenOutline(doc.outline) : []
     const chapter = chapterAt(lines, at.page)
@@ -224,7 +255,7 @@ export function PdfReader() {
                 updatedAt: Date.now(),
             })
             const now = Date.now()
-            void db.books.update(id, { progress: fraction, openedAt: now, editedAt: now })
+            void db.books.update(id, { progress: fraction, openedAt: now })
         }, 600)
     }, [id])
     useEffect(() => () => { if (writeTimer.current) clearTimeout(writeTimer.current) }, [])
@@ -253,10 +284,40 @@ export function PdfReader() {
                 left = Math.min(left, r.left); right = Math.max(right, r.right)
                 top = Math.min(top, r.top); bottom = Math.max(bottom, r.bottom)
             }
+            /* The shape, in fractions of each page's own box. Every mounted
+               page is measured once here rather than per rectangle, so a
+               selection running over a spread costs two reads, not two per
+               line. A rectangle is assigned to the page its CENTRE falls in:
+               a line of text at the very foot of a sheet can overlap the gap
+               below it by a pixel, and the centre never does. */
+            const pages = Array.from(stage.querySelectorAll<HTMLElement>('.pdf-page'))
+                .map(el => ({ n: Number(el.dataset.page), r: el.getBoundingClientRect() }))
+                .filter(pg => Number.isFinite(pg.n) && pg.n >= 1 && pg.r.width > 0 && pg.r.height > 0)
+            const shape: PdfRect[] = []
+            for (const r of rects) {
+                const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2
+                const pg = pages.find(q =>
+                    cx >= q.r.left && cx <= q.r.right && cy >= q.r.top && cy <= q.r.bottom)
+                if (!pg) continue
+                shape.push({
+                    page: pg.n,
+                    x: (r.left - pg.r.left) / pg.r.width,
+                    y: (r.top - pg.r.top) / pg.r.height,
+                    w: r.width / pg.r.width,
+                    h: r.height / pg.r.height,
+                })
+            }
+            selRects.current = shape
             setSel({
-                x: (left + right) / 2 - box.left,
-                top: top - box.top,
-                bottom: bottom - box.top,
+                anchor: {
+                    x: (left + right) / 2 - box.left,
+                    top: top - box.top,
+                    bottom: bottom - box.top,
+                },
+                /* A drag over fresh words is never an edit of an existing
+                   mark; tapping a painted one is, and that path sets `sel`
+                   itself. */
+                mark: null,
             })
         }
         const onChange = () => {
@@ -270,8 +331,70 @@ export function PdfReader() {
         }
     }, [doc])
 
-    const selText = () => flatten(document.getSelection()?.toString() ?? '')
-    const dropSel = () => { document.getSelection()?.removeAllRanges(); setSel(null) }
+    const selText = () => sel?.mark?.text ?? flatten(document.getSelection()?.toString() ?? '')
+    const dropSel = () => {
+        document.getSelection()?.removeAllRanges()
+        selRects.current = []
+        setSel(null)
+    }
+
+    /* ── highlights on a fixed page ───────────────────────────────────────
+       A PDF has no CFI, and for a long time that was taken to mean it could
+       have no marks either. It was the wrong conclusion: a CFI is the anchor a
+       REFLOWABLE book offers because its layout is not stable, and a fixed
+       page's layout is the one thing about it that never moves. So the anchor
+       here is what the page itself provides — the page number, and the run of
+       boxes the selection covered in fractions of that page's box. That
+       survives a change of zoom, fit, spread and screen exactly as a CFI
+       survives a change of face, which is the whole test.
+
+       The row that comes out is an ordinary Annotation, in the same table,
+       with the same fields, so the marks list, the export, the sync and the
+       tombstones all work on it without knowing it came from a PDF. */
+    const makeMark = useCallback(async (color: HighlightColor): Promise<Annotation | null> => {
+        const shape = selRects.current
+        const text = flatten(document.getSelection()?.toString() ?? '')
+        if (!id || !shape.length || !text) return null
+        const first = shape.reduce((a, b) => (b.page < a.page || (b.page === a.page && b.y < a.y) ? b : a))
+        const cfi = pdfMarkLocator(first.page, first.y, shape)
+        return addHighlight(id, cfi, text, color, chapterAt(lines, first.page))
+    }, [id, lines])
+
+    const onTint = useCallback((color: HighlightColor) => {
+        const existing = sel?.mark
+        if (existing) { void setTint(existing.id, color); dropSel(); return }
+        void makeMark(color)
+        dropSel()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sel, makeMark])
+
+    /* A note always has a highlight under it (SPEC.md § 6.1), so a note on a
+       bare selection makes the mark first, in the default tint. */
+    const onNote = useCallback(async () => {
+        const existing = sel?.mark
+        if (existing) { dropSel(); setNoteFor(existing); return }
+        const row = await makeMark('mustard')
+        dropSel()
+        if (row) setNoteFor(row)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sel, makeMark])
+
+    /* Tapping a painted mark. The menu wants somewhere to point, and the mark
+       is already on screen, so its own box is the anchor. */
+    const onMarkTap = useCallback((markId: string) => {
+        const mark = annotations.find(a => a.id === markId)
+        const stage = stageRef.current
+        if (!mark || !stage) return
+        const el = stage.querySelector<HTMLElement>(`.pdf-mark[data-mark="${CSS.escape(markId)}"]`)
+        if (!el) return
+        const r = el.getBoundingClientRect(), box = stage.getBoundingClientRect()
+        document.getSelection()?.removeAllRanges()
+        selRects.current = []
+        setSel({
+            anchor: { x: r.left + r.width / 2 - box.left, top: r.top - box.top, bottom: r.bottom - box.top },
+            mark,
+        })
+    }, [annotations])
 
     const nonce = useRef(0)
     const ask = useCallback((kind: 'find' | 'lookup', text: string) => {
@@ -412,6 +535,7 @@ export function PdfReader() {
                     <PdfView
                         doc={doc}
                         fit={cfg.pdfFit}
+                        spread={cfg.pdfSpread}
                         start={start}
                         ref={viewRef}
                         onLocate={onLocate}
@@ -419,17 +543,19 @@ export function PdfReader() {
                         onTap={toggleChrome}
                         onZoom={setZoom}
                         found={found}
+                        marks={painted}
+                        onMark={onMarkTap}
                     />
                 )}
                 {sel && (
                     <SelectionMenu
-                        anchor={sel}
+                        anchor={sel.anchor}
                         bounds={{ width: paneW, height: stageRef.current?.clientHeight ?? 0 }}
-                        tint={null}
-                        hasNote={false}
-                        marks={false}
-                        onTint={() => {}}
-                        onNote={() => {}}
+                        tint={sel.mark?.color ?? null}
+                        hasNote={Boolean(sel.mark?.note)}
+                        onTint={onTint}
+                        onNote={() => void onNote()}
+                        onRemove={sel.mark ? () => { const m = sel.mark!; dropSel(); void removeAnnotation(m.id) } : undefined}
                         onCopy={() => {
                             const text = selText()
                             if (text) void navigator.clipboard?.writeText(text).catch(() => {})
@@ -446,6 +572,7 @@ export function PdfReader() {
                 <PdfSheet
                     settings={cfg}
                     zoom={zoom}
+                    spreadOk={paneW >= 700}
                     onZoom={dir => {
                         if (dir === 0) viewRef.current?.resetZoom()
                         else viewRef.current?.zoomBy(dir > 0 ? 1.25 : 1 / 1.25)
@@ -527,10 +654,10 @@ export function PdfReader() {
                             ))}
                         </ol>
                     }
-                    annotations={[]}
+                    annotations={annotations}
                     bookmarks={bookmarks}
-                    tints={readPaint(null).solid}
-                    kinds={['bookmarks']}
+                    tints={readPaint(stageRef.current).solid}
+                    kinds={['highlights', 'notes', 'bookmarks']}
                     request={panelReq}
                     initialTab={panelTab}
                     search={runSearch}
@@ -543,11 +670,20 @@ export function PdfReader() {
                         setPanelOpen(false)
                         goToFound(cfi)
                     }}
-                    onEditNote={() => {}}
-                    onRemoveAnnotation={() => {}}
+                    onEditNote={a => { setPanelOpen(false); setNoteFor(a) }}
+                    onRemoveAnnotation={a => void removeAnnotation(a.id)}
                     onRemoveBookmark={b => void removeBookmark(b.id)}
                     onExport={() => { setPanelOpen(false); setExportOpen(true) }}
                     onClose={() => { setPanelOpen(false); stopSearch() }}
+                />
+            )}
+
+            {noteFor && (
+                <NoteEditor
+                    mark={noteFor}
+                    onChange={note => void setNote(noteFor.id, note)}
+                    onRemove={() => { const m = noteFor; setNoteFor(null); void removeAnnotation(m.id) }}
+                    onClose={() => setNoteFor(null)}
                 />
             )}
 
@@ -556,7 +692,7 @@ export function PdfReader() {
                     input={{
                         title: book?.title ?? 'Book',
                         author: book?.author ?? null,
-                        highlights: [],
+                        highlights: annotations,
                         bookmarks,
                     }}
                     onClose={() => setExportOpen(false)}

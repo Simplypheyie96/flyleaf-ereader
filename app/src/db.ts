@@ -57,6 +57,10 @@ export const DEFAULT_SETTINGS: Settings = {
      the two that is readable without a pinch on the device most reading
      happens on. */
   pdfFit: 'width',
+  /* Single. A spread is the right way to read a scanned book on an iPad and
+     the wrong way to read anything on a phone, and the default has to be the
+     one that is never wrong. */
+  pdfSpread: 'single',
   pdfVeil: 1,
   tapToTurn: true,
   sheetTab: 'text',
