@@ -19,7 +19,7 @@
    ───────────────────────────────────────────────────────────── */
 
 import type { Settings } from '../../types'
-import { Row, Opt, Slider, STOCKS } from '../Sheet'
+import { Row, Opt, Slider, STOCKS, TURNS } from '../Sheet'
 
 export interface PdfSheetProps {
     settings: Settings
@@ -35,6 +35,16 @@ export interface PdfSheetProps {
     onSet: (patch: Partial<Settings>) => void
 }
 
+/* The reflowable sheet's own notes describe a paginator this format does not
+   have -- there is no hairline between two columns of a PDF -- so the same
+   three turns are described here for what they actually do to a sheet. A
+   drag is never any of these: it always tracks the thumb. */
+const PDF_TURN: Record<Settings['turn'], string> = {
+    slide: 'The next sheet slides up under your thumb, and a tap glides to it.',
+    fade: 'The sheet is replaced behind a brief dip, with nothing travelling.',
+    instant: 'No motion at all — the next sheet is simply there.',
+}
+
 export function PdfSheet({ settings: s, zoom, spreadOk, onZoom, onLive, onSet }: PdfSheetProps) {
     const stock = STOCKS.find(k => k.id === s.stock)
     /* Press is the paper itself: its veil is 0, so the tint slider has
@@ -42,7 +52,12 @@ export function PdfSheet({ settings: s, zoom, spreadOk, onZoom, onLive, onSet }:
        because unlike Line width on a phone this one comes back the moment
        the reader picks another stock, and a control that vanishes and
        reappears reads as a bug. */
-    const noTint = s.stock === 'press'
+    const pages = s.pdfMode === 'pages'
+    /* Original stands the wash down entirely, so the slider has nothing to
+       move for the same reason Press has nothing to give. Same treatment,
+       same reason: disabled with the reason on it, because it comes straight
+       back the moment the reader turns Original off. */
+    const noTint = s.stock === 'press' || s.pdfOriginal
 
     return (
         <section className="sheet" aria-label="Page settings">
@@ -52,14 +67,38 @@ export function PdfSheet({ settings: s, zoom, spreadOk, onZoom, onLive, onSet }:
                     so there is nothing here to reflow — only the page itself.
                 </p>
 
+                <Row label="Reading" note={pages
+                    ? 'One sheet — or one spread — per screen, turned. The whole page is fitted, so there is no Fit to choose.'
+                    : 'One continuous strip of sheets, scrolled. What a fixed page is, so it is the default.'}>
+                    <Opt on={!pages} onClick={() => onSet({ pdfMode: 'scroll' })}>Scroll</Opt>
+                    <Opt on={pages} onClick={() => onSet({ pdfMode: 'pages' })}>Pages</Opt>
+                </Row>
+
+                {/* Absent in Pages, not disabled: pages mode fits the whole
+                    sheet by definition, so there is no choice left to grey
+                    out. Same rule as Line width on a phone. */}
+                {!pages && (
                 <Row label="Fit" note={s.pdfFit === 'width'
                     ? 'The sheet fills the pane and scrolls. Readable on a phone.'
                     : 'One whole sheet per screen. Right on a tablet, small on a phone.'}>
                     <Opt on={s.pdfFit === 'width'} onClick={() => onSet({ pdfFit: 'width' })}>Width</Opt>
                     <Opt on={s.pdfFit === 'page'} onClick={() => onSet({ pdfFit: 'page' })}>Whole page</Opt>
                 </Row>
+                )}
 
-                <Row label="Pages" note={s.pdfSpread === 'single'
+                {/* Only in Pages, for the same reason the reflowable sheet
+                    hides it in scrolled flow: there is no turn to style. */}
+                {pages && (
+                    <Row label="Turn" note={PDF_TURN[s.turn] ?? ''}>
+                        {TURNS.map(t => (
+                            <Opt key={t.id} on={s.turn === t.id} onClick={() => onSet({ turn: t.id })}>
+                                {t.label}
+                            </Opt>
+                        ))}
+                    </Row>
+                )}
+
+                <Row label="Spread" note={s.pdfSpread === 'single'
                     ? 'One sheet at a time.'
                     : spreadOk
                         ? 'Two sheets side by side — the cover alone, then facing pages, as the book was bound.'
@@ -95,11 +134,20 @@ export function PdfSheet({ settings: s, zoom, spreadOk, onZoom, onLive, onSet }:
                     ))}
                 </Row>
 
+                <Row label="Paper" note={s.pdfOriginal
+                    ? 'Exactly as it was made — no wash over the paper. The stock still colours the surround, which was never part of the file.'
+                    : 'The stock washes over the sheet, by as much as the tint below allows.'}>
+                    <Opt on={!s.pdfOriginal} onClick={() => onSet({ pdfOriginal: false })}>Stocked</Opt>
+                    <Opt on={s.pdfOriginal} onClick={() => onSet({ pdfOriginal: true })}>Original</Opt>
+                </Row>
+
                 <Slider
                     label="Page tint" value={s.pdfVeil} min={0} max={1} step={0.05}
                     fmt={v => (v < 0.005 ? 'None' : `${Math.round(v * 100)}%`)}
                     disabled={noTint}
-                    note={noTint
+                    note={s.pdfOriginal
+                        ? 'Original leaves the sheet alone, so there is no tint to set. Choose Stocked above to bring it back.'
+                        : noTint
                         ? 'Press has no tint to give — the page is already the paper.'
                         : 'How much of the stock washes over the sheet. The stock sets the ceiling, and the ceiling is what keeps the print legible.'}
                     onLive={v => onLive({ pdfVeil: v })}

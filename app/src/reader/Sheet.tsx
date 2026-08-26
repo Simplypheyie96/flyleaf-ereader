@@ -54,7 +54,7 @@ export const STOCKS: { id: Stock; label: string }[] = [
    was built to pass. It was cut on how it felt, not on what it cost, which is
    the one reason a control leaves a shipped app without leaving a note behind
    in its place. SPEC.md § 5.2 and reader/turn.ts carry that note. */
-const TURNS: { id: Settings['turn']; label: string; note: string }[] = [
+export const TURNS: { id: Settings['turn']; label: string; note: string }[] = [
     { id: 'slide', label: 'Slide', note: 'The page moves with your thumb, parted by a hairline.' },
     { id: 'fade', label: 'Fade', note: 'A 120ms cross-fade. Free on any device.' },
     { id: 'instant', label: 'Instant', note: 'No motion at all. The page changes.' },

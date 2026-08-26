@@ -271,6 +271,17 @@ export type Settings = {
   tapToTurn: boolean
 
   /* ---- the fixed page (PDF only) ---- */
+  /** 'scroll' is one continuous strip of sheets, which is what a fixed page
+      actually wants and so is the default. 'pages' gives a PDF the thing an
+      EPUB has: one sheet — or one spread — per screen, snapping, turned with
+      `turn` like any other book. It forces `pdfFit` to 'page', because a page
+      per screen that you still have to scroll inside is not a page. */
+  pdfMode: 'scroll' | 'pages'
+  /** Show the sheet exactly as it was authored: no wash over the paper, and
+      the tint slider stands down. NOT an eighth stock — the seven are locked
+      and this does not add to them. The stock still colours the surround,
+      which was never part of the PDF. */
+  pdfOriginal: boolean
   /** 'width' fills the pane's width and scrolls; 'page' fits the whole sheet
       so one page is one screen. Not a type control — a PDF has no type to
       control — which is why it lives here and not with `measure`. */

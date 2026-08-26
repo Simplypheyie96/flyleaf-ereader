@@ -845,7 +845,7 @@ reload; and the sheet contains **no type control at all** — absent, not disabl
 | **P1** | Import, sniffing, metadata, Dexie, Library | **+ the seed manifest, first-run seeding, `seeded`, dismiss/restore, the new first-run shelf and the reworded empty state.** Seeding *is* import, so it belongs here or it becomes a second import path later |
 | **P2** | Paginator, gesture, turn, stocks, type controls, TOC, progress, position | **+ all seven stocks, all ten type controls, all four layout controls, all three turn styles, the three-tab sheet.** Split internally: paginator → Slide → the control surface → Fade and Instant. Curl was built here last, as the cuttable one, and was cut — § 5.2.1 |
 | **P3** | Selection, highlights, notes, bookmarks, search, lookup, export | **+ the bookmark tick and ribbon, the marks list, the concordance lookup, the fifteen tint measurements** |
-| **P4** | PDF on `pdfjs-dist` | Unchanged, plus: on a PDF the **stock tints the surround only**, and the type controls are **absent, not disabled**. A fixed page has no reflow to control, and pretending otherwise is a worse answer than an honest gap. **Plus, later: highlights and notes anchored to page rectangles (§ 13.6), and a two-page spread (§ 13.3)** |
+| **P4** | PDF on `pdfjs-dist` | Unchanged, plus: on a PDF the **stock tints the surround only**, and the type controls are **absent, not disabled**. A fixed page has no reflow to control, and pretending otherwise is a worse answer than an honest gap. **Plus, later: highlights and notes anchored to page rectangles (§ 13.6), and a two-page spread (§ 13.3)**, and **Pages mode with the three turns, plus `Original` paper (§ 13.3)** |
 | **P5** | Audit, offline, update, install, backup | **+ Restore included books, storage used** |
 
 ### 11.1 The phone test, and the part of it a driver cannot do
@@ -1050,14 +1050,50 @@ compromised CFI: on a document whose pages cannot reflow, **the page number is t
 anchor**. It survives zoom, fit, rotation and screen. Measured: left on page 5 at 36%, reopened
 on page 5 at 36%, same `scrollTop` of 2101.
 
-### 13.3 The sheet — five controls
+### 13.3 The sheet — seven controls
 
-**Fit · Pages · Zoom · Stock · Page tint.** No tabs: five controls do not need three tabs. No Size, face,
+**Reading · Fit *or* Turn · Spread · Zoom · Stock · Paper · Page tint.** No tabs: seven controls do
+not need three tabs, and only six are ever on screen at once. No Size, face,
 leading, measure, word spacing, letter spacing, hyphenation, justification, margin or flow — a
 disabled Size slider on a fixed page is fifteen pixels of apology. A one-sentence lead says why,
 once, at the top of the sheet.
 
-**Pages — One · Two.** One sheet at a time, or two side by side the way a bound book falls
+**Reading — Scroll · Pages.** `scroll` is one continuous strip of sheets and is the **default**,
+because that is what a fixed page actually is: nothing was paginated for a screen, so nothing is
+gained by pretending it was. `pages` gives a PDF the thing an EPUB has — one sheet, or one spread,
+per screen, turned.
+
+Pages mode is a **snap scroller, not a second renderer**: the same strip, the same virtualisation,
+the same pinch. Every row is given a slot exactly one viewport tall, the sheet is centred inside
+it, and the snap point is the **slot**, not the sheet — the sheet carries its own offset as
+`scroll-margin-top`, or a centred page would snap its own top edge to the viewport top and throw
+the centring away. The turn therefore *is* a scroll: it tracks the thumb 1:1, carries its own
+momentum, rubber-bands at the ends, and **no JS runs while the finger is down**, which is the
+acceptance criterion this app is held to (`CLAUDE.md`).
+
+Pages mode **forces the whole page to fit**, so the `Fit` row is **absent** in it rather than
+greyed: a page per screen that you still have to scroll inside is not a page, and there is no
+choice left to disable. In its place appears **Turn — Slide · Fade · Instant**, the same three the
+reflowable reader has and the same stored setting, hidden in Scroll mode for the same reason the
+reflowable sheet hides it in scrolled flow: there is no turn to style. The turn style governs only
+the *tap and keyboard* turn — smooth scroll, an instant jump, or an instant jump behind a 90ms dip.
+A drag is never any of them; a drag always tracks the thumb. **No curl**, here as everywhere.
+
+The keyboard turns with the arrow keys, `PageUp` and `PageDown`, in Pages mode only. In Scroll mode
+the browser's own arrow-key scrolling is already right and the app stays out of its way.
+
+**Paper — Stocked · Original.** `Original` shows the sheet exactly as it was authored: no wash over
+the paper at all. It is **not an eighth stock** — the seven are locked — and the stock still colours
+the **surround**, which was never part of the PDF. It zeroes the veil *multiplier*, not the stock's
+own measured token, so the seven ceilings stay intact and turning it off restores the wash exactly
+as it was. While it is on, `Page tint` is **disabled with the reason on it** rather than hidden —
+the same treatment Press gets, for the same reason: it comes straight back on the next tap, and a
+control that vanishes and reappears reads as a bug.
+
+Both `Reading` and `Paper` persist **globally in Settings**, the way `pdfFit`, `pdfSpread` and
+`pdfVeil` already do. There is no per-book override.
+
+**Spread — One · Two.** One sheet at a time, or two side by side the way a bound book falls
 open: the **cover alone**, then verso facing recto, pairing from page two. Pairing from page one
 instead puts every recto on the left and every verso on the right, which is the one arrangement
 a printed book never has and which is obvious on any file carrying a running head.
