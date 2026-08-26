@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { DEFAULT_SETTINGS, clearDismissedSeeds, db, saveSettings, useSettings } from '../db'
 import { checkForUpdate, isIOS, promptInstall, requestPersistence, useInstall } from '../pwa'
@@ -113,6 +113,39 @@ export function SettingsPage() {
      intent for the browser's own heuristics. What the button below does is
      report the answer. */
   useEffect(() => { requestPersistence().then(setPersisted) }, [])
+
+  /* ARRIVING AT A SECTION, not at the top of a long page. The Library's "Sync"
+     link carries `#sync`, and this is what honours it.
+
+     Done here rather than left to the browser because the target does not
+     exist when the URL changes: this page reads Dexie and storage estimates
+     before it can draw, and the sync panel draws later still. The browser's
+     own hash jump runs once, finds nothing, and gives up silently -- which is
+     exactly what one requestAnimationFrame did too, measured: the panel was
+     1250px down and the page had not moved.
+
+     So it WAITS for the element, frame by frame, and stops the moment it has
+     it. Bounded at a second, because a hash naming something this page does
+     not have -- a stale link, a typo -- must end in a still page rather than a
+     loop running for as long as Settings is open.
+
+     Instant, not smooth. Somebody who pressed a link naming the thing they
+     want is not served by watching four screens of settings slide past, and
+     `scroll-margin-top` on the target keeps it clear of the top edge. */
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (!hash) return
+    const id = hash.slice(1)
+    let frame = 0
+    const giveUpAt = Date.now() + 1000
+    const look = () => {
+      const el = document.getElementById(id)
+      if (el) { el.scrollIntoView({ block: 'start' }); return }
+      if (Date.now() < giveUpAt) frame = requestAnimationFrame(look)
+    }
+    frame = requestAnimationFrame(look)
+    return () => cancelAnimationFrame(frame)
+  }, [hash])
 
   /* What the library actually costs on this device. An estimate, and named as
      one: the number the browser reports includes the app's own precache, and

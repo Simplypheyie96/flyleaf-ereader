@@ -1901,6 +1901,45 @@ before pressing *Restore included books*, because that control now lives behind 
 
 ---
 
+### 15.9 A way in, and something to watch
+
+Two faults with one cause: sync worked and nobody could tell. The feature was four screens deep in
+Settings, and a running pass said only the word "Syncing".
+
+**The way in.** The Library head now reads `2 BOOKS · SYNC`, the second half a link to
+`/settings#sync`. In the head's own mono voice, beside the count, because the shelf *is* the thing
+being synced — not on Home, which is about the book you are in. `SettingsPage` honours the hash
+itself rather than leaving it to the browser: the target does not exist when the URL changes (Dexie
+and a storage estimate resolve first, the panel draws later still), so a single
+`requestAnimationFrame` found nothing and gave up silently — measured, the page had not moved with
+`#sync` 1250px down. It now waits for the element frame by frame, bounded at one second so a stale
+or mistyped hash ends in a still page rather than a loop. Instant, not smooth: somebody who pressed
+a link naming the thing they want is not served by watching four screens slide past.
+`#sync{ scroll-margin-top:20px }` keeps it off the top edge. Absent entirely when the app was built
+with no `VITE_GOOGLE_CLIENT_ID`, on the same rule `SyncPanel` follows — a way in to a control that
+is not there is worse than no way in. The link is a **text** link, not an icon: `index.css` already
+styled `a` inside the head span, so no new glyph was drawn. It carries `color:inherit`, which is not
+cosmetic — without it the UA's own link colour beats the span's `--ink-soft` and the word rendered
+default blue at **1.94:1** on dark chrome. With it: **6.17** dark, **5.16** light, **4.98** sepia,
+and a 48.19 × 30.5px press target, padded and negative-margined so the head keeps its height.
+
+**The progress.** `sync.ts` emits a `flyleaf-ereader-sync-progress` event around the file loop, and
+`SyncPanel` draws "Moving book 3 of 7" over the shelf's existing `.bar` hairline — no new component,
+no new token. **Files, not bytes:** Drive gives a size per file, but the two directions do not cost
+the same per byte and a part-uploaded file reports nothing back, so a byte bar would be a smooth
+lie. `FILES_PER_PASS` is 10, so the total per pass is a number this code actually knows.
+**Counted by attempt, not by success** — a skipped file still advances the bar, because a bar that
+stops at 6 of 7 and then vanishes reads as a failure when the pass in fact finished; what actually
+moved is already reported by `SyncResult.files`. Cleared in a `finally`, so a thrown sync does not
+leave a bar running forever, and never drawn for a zero-file pass. Shown for automatic passes too:
+the reader did not start those either, and they are the ones that look like nothing.
+
+Not verified against a live sync — that needs a connected Google account, and this session cannot
+run an OAuth consent flow. The React wiring is type-checked; the markup and its geometry were
+measured by injection (bar 634 × 2px, fill 29% at 3 of 7, 10.25:1 against its track).
+
+---
+
 ## 16. The deploy
 
 Same shape as Press, deliberately: a static build, no server, nothing to provision, and one

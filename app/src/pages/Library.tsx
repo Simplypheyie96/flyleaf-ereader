@@ -10,6 +10,7 @@ import {
   ListIcon, PlusIcon, SearchIcon, SortIcon, TrashIcon,
 } from '../components/icons'
 import { FORMAT_LABEL, bytes, percent, remember, shortDate, stored } from '../lib'
+import { SYNC_AVAILABLE } from '../sync/google'
 import type { Book, Collection } from '../types'
 
 /* The Library — the shelf, and nothing but the shelf.
@@ -195,7 +196,21 @@ export function Library() {
       <div className="page-inner page-inner--wide">
         <header className="app-head">
           <h1><Mark size={22} />Library</h1>
-          <span>{books?.length ? countLabel(books.length) : 'Library'}</span>
+          <span>
+            {books?.length ? countLabel(books.length) : 'Library'}
+            {/* THE ONLY WAY ANYBODY FINDS OUT. Sync lives in Settings, four
+                screens deep, and a reader who never goes looking never learns
+                their shelf can travel at all -- which is the same thing as the
+                feature not existing. So the shelf itself says so, once, in the
+                head's own mono voice beside the count, and lands on the sync
+                panel rather than the top of a long page.
+
+                Here and not on Home, because this is the screen that IS the
+                thing being synced. Absent when the app was built with no
+                Google client ID, on the same rule the panel itself follows: a
+                way in to a control that is not there is worse than no way in. */}
+            {SYNC_AVAILABLE && <>{' · '}<Link to="/settings#sync">Sync</Link></>}
+          </span>
         </header>
 
         {books === undefined ? (

@@ -555,7 +555,21 @@ body::before{
   text-transform:uppercase; color:var(--ink-soft);
   flex:0 1 auto; min-width:0; text-align:right;
 }
-.app-head > span a{ white-space:nowrap; }
+/* A link in the head span -- today, the Library's way in to sync -- inherits
+   the span's mono uppercase entirely, and is underlined only so it reads as
+   the one thing up there that can be pressed. */
+.app-head > span a{
+  /* `color:inherit` is not cosmetic: without it the UA's own link colour wins
+     over the span's inherited --ink-soft, and the word rendered in default blue
+     at 1.94:1 on the dark chrome. Measured, not guessed. */
+  color:inherit;
+  white-space:nowrap; text-decoration:underline; text-underline-offset:3px;
+  /* An 11.5px line of mono is a 12.5px-tall press target, which is half of
+     what a thumb needs. The padding buys height and a leading edge; the equal
+     negative margin gives it straight back to the layout, so the head keeps
+     the height and the baseline it had with plain text there. */
+  display:inline-block; padding:9px 0 9px 10px; margin:-9px 0 -9px -10px;
+}
 
 .ui-lbl{
   font-family:var(--sans); font-size:11.5px; font-weight:500; line-height:1.2;
@@ -1177,6 +1191,15 @@ body::before{
 }
 .bar-fill{ display:block; height:100%; background:var(--accent); border-radius:1px; }
 .bar--wide{ margin-top:14px; }
+
+/* The file pass inside the sync panel: a label and the same hairline. Its own
+   rule only because the two want 8px between them and 14px above, and because
+   the panel it lands in is otherwise all prose. */
+.sync-move{ margin-top:14px; display:flex; flex-direction:column; gap:8px; }
+
+/* The sync panel is a scroll destination, so it must not land under the top
+   edge when the Library sends somebody straight to it. */
+#sync{ scroll-margin-top:20px; }
 
 /* ── the Continue row ──
    A printed card: 2px radius, no border, no shadow. Absent entirely until
