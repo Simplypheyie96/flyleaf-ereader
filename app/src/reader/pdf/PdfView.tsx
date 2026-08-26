@@ -36,7 +36,7 @@ import {
     type PdfDoc, type PdfPageHandle, type PdfPageSize, type PdfTextLayer,
 } from './engine'
 import type { PdfRect } from '../marks'
-import type { HighlightColor } from '../../types'
+import type { HighlightColor, Turn } from '../../types'
 
 export type PdfLocation = { page: number; fraction: number }
 /** The one search hit the reader tapped: which page, and the run of words on
@@ -53,6 +53,13 @@ export type PdfPaintMark = { id: string; color: HighlightColor; rects: PdfRect[]
     single column and says so in the sheet rather than rendering two unreadable
     slivers. */
 export type PdfSpread = 'single' | 'double'
+/** One continuous strip of sheets, or one sheet (one spread) per screen.
+    `pages` is a snap scroller, not a second renderer: the same strip, the same
+    virtualisation, the same pinch, with every row given a slot exactly one
+    viewport tall and a snap point at the top of it. The turn tracks the thumb
+    1:1 and lands with the browser's own momentum because it IS a scroll — no
+    JS runs while the finger is down, which is the acceptance criterion. */
+export type PdfMode = 'scroll' | 'pages'
 
 export type PdfViewHandle = {
     /** Jump to a page (1-based) and optionally a fraction down it. `centre`
@@ -66,12 +73,16 @@ export type PdfViewHandle = {
     zoomBy(k: number): void
     /** Back to the fit scale. */
     resetZoom(): void
+    /** Pages mode: one slot forward or back. A no-op in scroll mode, where the
+        strip is continuous and there is nothing to turn to. */
+    turnBy(dir: 1 | -1, turn: Turn): void
 }
 
 export interface PdfViewProps {
     doc: PdfDoc
     fit: PdfFit
     spread: PdfSpread
+    mode: PdfMode
     /** Where to open. Applied once, after the first measure. */
     start: PdfLocation | null
     ref?: RefObject<PdfViewHandle | null>
@@ -132,6 +143,12 @@ type Layout = {
         to stop on. */
     rowOf: number[]
     rowFirst: number[]
+    /** Pages mode only, and empty otherwise: how far each page sits below the
+        top of its own one-screen slot. The snap point is the SLOT, not the
+        sheet, so this is handed to the page as `scroll-margin-top` — without
+        it a centred sheet would snap its own top edge to the viewport top and
+        throw the centring away. */
+    slotOff: number[]
 }
 
 /** The whole geometry of the strip at a given box and zoom. Pure, so the pinch
@@ -144,6 +161,7 @@ function layoutFor(
     fit: PdfFit,
     zoom: number,
     spread: PdfSpread,
+    mode: PdfMode,
 ): Layout {
     let maxW = 1, maxH = 1
     for (const s of sizes) { if (s.w > maxW) maxW = s.w; if (s.h > maxH) maxH = s.h }
@@ -173,15 +191,21 @@ function layoutFor(
        not one -- computed off `maxW` rather than off the widest ROW so the
        lone cover renders at the same scale as every pair after it. */
     const cols = two ? 2 : 1
-    const fitScale = fit === 'width'
+    /* A page per screen that you still have to scroll inside is not a page, so
+       pages mode fits the whole sheet whatever the Fit row says. The row is
+       hidden rather than disabled in that mode -- SPEC.md's rule for a control
+       that has no meaning here, the same one that keeps type controls off a
+       PDF entirely. */
+    const fit2: PdfFit = mode === 'pages' ? 'page' : fit
+    const fitScale = fit2 === 'width'
         ? availW / (maxW * cols + (cols - 1) * RULE * 2)
         : Math.min(availW / (maxW * cols + (cols - 1) * RULE * 2), availH / maxH)
     const scale = fitScale * zoom
 
     const ws: number[] = [], hs: number[] = [], tops: number[] = [], lefts: number[] = []
-    const rowOf: number[] = [], rowFirst: number[] = []
+    const rowOf: number[] = [], rowFirst: number[] = [], slotOff: number[] = []
     for (const s of sizes) { ws.push(Math.round(s.w * scale)); hs.push(Math.round(s.h * scale)) }
-    for (let i = 0; i < sizes.length; i++) { tops.push(0); lefts.push(0); rowOf.push(0) }
+    for (let i = 0; i < sizes.length; i++) { tops.push(0); lefts.push(0); rowOf.push(0); slotOff.push(0) }
 
     /* The strip is as wide as the widest row can ever be, so it does not
        change width between the cover and the first pair and jog the scroller
@@ -189,6 +213,11 @@ function layoutFor(
     const rowMax = Math.round(maxW * scale) * cols + cols * RULE * 2
     const stripW = Math.max(rowMax + PAD * 2, boxW)
 
+    /* In pages mode every row gets the same slot -- exactly one viewport tall
+       -- so the snap points are evenly spaced and a turn is always the same
+       distance. In scroll mode a row is only as tall as it needs to be and the
+       strip is the sum of them. */
+    const slot = boxH
     let y = PAD
     for (let r = 0; r < rows.length; r++) {
         const row = rows[r]
@@ -201,18 +230,27 @@ function layoutFor(
            that happen to be adjacent. */
         let x = Math.round((stripW - footprint) / 2)
         let rowH = 0
+        for (const i of row) if (hs[i] > rowH) rowH = hs[i]
+        rowH += RULE * 2
+        /* Centred in its slot, which is why the sheet needs to carry the
+           offset: the snap point is the slot's top edge, not the sheet's. */
+        const off = mode === 'pages' ? Math.max(0, Math.round((slot - rowH) / 2)) : 0
+        const top = mode === 'pages' ? r * slot + off : y
         for (const i of row) {
             lefts[i] = x
-            tops[i] = y
+            tops[i] = top
             rowOf[i] = r
+            slotOff[i] = off
             x += ws[i] + RULE * 2
-            if (hs[i] > rowH) rowH = hs[i]
         }
-        y += rowH + RULE * 2 + GAP
+        y += rowH + GAP
     }
+    const total = mode === 'pages'
+        ? Math.max(rows.length * slot, boxH)
+        : Math.max(y - GAP + PAD, boxH)
     return {
-        scale, stripW, total: Math.max(y - GAP + PAD, boxH),
-        tops, lefts, ws, hs, rowOf, rowFirst,
+        scale, stripW, total,
+        tops, lefts, ws, hs, rowOf, rowFirst, slotOff,
     }
 }
 
@@ -230,6 +268,9 @@ export function PdfView(p: PdfViewProps) {
     const [box, setBox] = useState({ w: 0, h: 0 })
     const [zoom, setZoom] = useState(1)
     const [range, setRange] = useState({ lo: 1, hi: 1 })
+    /* Pages mode only: dipped to 0 for the length of a Fade turn. Never
+       animated in scroll mode, and never touched while a finger is down. */
+    const [dim, setDim] = useState(false)
 
     /* The props the handlers read. They are registered on the element itself
        and run on a pointer or a scroll, so they must not be re-registered on
@@ -239,8 +280,8 @@ export function PdfView(p: PdfViewProps) {
 
     const sizes = p.doc.sizes
     const L = useMemo(
-        () => layoutFor(sizes, box.w, box.h, p.fit, zoom, p.spread),
-        [sizes, box.w, box.h, p.fit, zoom, p.spread])
+        () => layoutFor(sizes, box.w, box.h, p.fit, zoom, p.spread, p.mode),
+        [sizes, box.w, box.h, p.fit, zoom, p.spread, p.mode])
     /* The layout the handlers read. They run outside React's render, on a
        pointer or a scroll, and must never see a stale strip. */
     const Lref = useRef(L)
@@ -356,7 +397,7 @@ export function PdfView(p: PdfViewProps) {
         const now = Lref.current
         const z = clamp(next, 1, MAX_ZOOM)
         if (Math.abs(z - zoom) < 0.0005) return
-        const after = layoutFor(sizes, box.w, box.h, p.fit, z, p.spread)
+        const after = layoutFor(sizes, box.w, box.h, p.fit, z, p.spread, p.mode)
 
         /* Anchor to the page under the fingers, not to a scroll ratio. The
            strip's own left padding changes when the pages stop being centred,
@@ -507,12 +548,34 @@ export function PdfView(p: PdfViewProps) {
         cb.current.onTap()
     }, [])
 
+    /* A turn IS a scroll, so a drag needs nothing from us: the browser tracks
+       the thumb and snaps. This is only the tap and the keyboard, and the turn
+       style governs how that jump is made -- Slide scrolls smoothly, Instant
+       jumps, Fade jumps behind a short dip. */
+    const turnBy = useCallback((dir: 1 | -1, turn: Turn) => {
+        const el = scrollRef.current
+        if (!el || cb.current.mode !== 'pages') return
+        const slot = box.h
+        if (slot <= 0) return
+        const at = Math.round(el.scrollTop / slot)
+        const to = clamp((at + dir) * slot, 0, Math.max(0, el.scrollHeight - slot))
+        if (to === el.scrollTop) return
+        if (turn === 'fade') {
+            setDim(true)
+            el.scrollTo({ top: to, behavior: 'instant' as ScrollBehavior })
+            window.setTimeout(() => setDim(false), 90)
+            return
+        }
+        el.scrollTo({ top: to, behavior: turn === 'slide' ? 'smooth' : 'instant' as ScrollBehavior })
+    }, [box.h])
+
     useImperativeHandle(p.ref, () => ({
         goTo,
         location: locate,
         zoomBy: (k: number) => commitZoom(zoom * k, box.w / 2, box.h / 2),
         resetZoom: () => commitZoom(1, box.w / 2, box.h / 2),
-    }), [goTo, locate, commitZoom, zoom, box.w, box.h])
+        turnBy,
+    }), [goTo, locate, commitZoom, zoom, box.w, box.h, turnBy])
 
     const first = useRef(false)
     const onPaint = useCallback(() => {
@@ -527,8 +590,9 @@ export function PdfView(p: PdfViewProps) {
 
     return (
         <div
-            className="pdf-scroll"
+            className={p.mode === 'pages' ? 'pdf-scroll is-pages' : 'pdf-scroll'}
             ref={scrollRef}
+            data-dim={dim ? '' : undefined}
             onScroll={onScroll}
             onClick={onClick}
             tabIndex={0}
@@ -549,6 +613,7 @@ export function PdfView(p: PdfViewProps) {
                         h={L.hs[n - 1]}
                         left={L.lefts[n - 1]}
                         top={L.tops[n - 1]}
+                        snapOff={p.mode === 'pages' ? L.slotOff[n - 1] : null}
                         found={p.found && p.found.page === n ? p.found : null}
                         marks={p.marks}
                         onMark={p.onMark}
@@ -577,6 +642,10 @@ function PdfPage(pp: {
     h: number
     left: number
     top: number
+    /** Pages mode: how far this sheet sits below the top of its own slot, so
+        the snap lands on the slot and the centring survives. Null in scroll
+        mode, where the page is not a snap target at all. */
+    snapOff: number | null
     found: PdfFound | null
     marks?: PdfPaintMark[]
     onMark?: (id: string) => void
@@ -629,7 +698,13 @@ function PdfPage(pp: {
                mapping one to a page by geometry is the only way to store a
                highlight against the page it is actually on. */
             data-page={pp.num}
-            style={{ left: pp.left, top: pp.top, width: pp.w, height: pp.h }}
+            style={{
+                left: pp.left, top: pp.top, width: pp.w, height: pp.h,
+                ...(pp.snapOff === null ? null : {
+                    scrollSnapAlign: 'start' as const,
+                    scrollMarginTop: pp.snapOff,
+                }),
+            }}
             aria-label={`Page ${pp.num}`}
         >
             <canvas className="pdf-canvas" ref={canvasRef} width={pp.w} height={pp.h} />

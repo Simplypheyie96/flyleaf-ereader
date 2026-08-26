@@ -105,6 +105,27 @@ export function PdfReader() {
 
     const stageRef = useRef<HTMLDivElement | null>(null)
     const viewRef = useRef<PdfViewHandle | null>(null)
+
+    /* Pages mode gets a keyboard turn, because a page you turn is a page you
+       turn with the arrow keys. In scroll mode the browser's own arrow-key
+       scrolling is already right and this stays out of its way. */
+    const pdfMode = cfg.pdfMode, pdfTurn = cfg.turn
+    useEffect(() => {
+        if (pdfMode !== 'pages') return
+        const onKey = (e: KeyboardEvent) => {
+            if (e.metaKey || e.ctrlKey || e.altKey) return
+            const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown'
+                ? 1
+                : e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'PageUp'
+                    ? -1
+                    : 0
+            if (!dir) return
+            e.preventDefault()
+            viewRef.current?.turnBy(dir as 1 | -1, pdfTurn)
+        }
+        window.addEventListener('keydown', onKey)
+        return () => { window.removeEventListener('keydown', onKey) }
+    }, [pdfMode, pdfTurn])
     const docRef = useRef<PdfDoc | null>(null)
     const clockRef = useRef<ReadingClock | null>(null)
 
@@ -513,7 +534,10 @@ export function PdfReader() {
             className="reader reader--pdf"
             data-stock={cfg.stock}
             data-chrome={chrome ? 'open' : 'shut'}
-            style={{ ['--pdf-veil-mul' as string]: String(cfg.pdfVeil) }}
+            /* Original zeroes the multiplier rather than the stock's own
+               token, so the seven stocks keep their measured ceilings intact
+               and turning it off restores the wash exactly as it was. */
+            style={{ ['--pdf-veil-mul' as string]: String(cfg.pdfOriginal ? 0 : cfg.pdfVeil) }}
         >
             {chrome && (
                 <header className="reader-bar reader-bar--top">
@@ -546,6 +570,7 @@ export function PdfReader() {
                         doc={doc}
                         fit={cfg.pdfFit}
                         spread={cfg.pdfSpread}
+                        mode={cfg.pdfMode}
                         start={start}
                         ref={viewRef}
                         onLocate={onLocate}

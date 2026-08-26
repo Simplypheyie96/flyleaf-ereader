@@ -3391,6 +3391,21 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
 }
 .pdf-scroll:focus-visible{ outline:2px solid var(--stock-ink); outline-offset:-2px; }
 
+/* Pages mode. Every row has a slot exactly one viewport tall and the sheet
+   carries the offset that keeps it centred inside it, so snapping to the
+   slot's top edge is snapping to the page. The turn is the browser's own
+   scroll: it tracks the thumb 1:1, carries its momentum and rubber-bands at
+   the ends, and no JS runs while the finger is down. */
+.pdf-scroll.is-pages{ scroll-snap-type:y mandatory; }
+/* The Fade turn, and only it: a short dip while the jump happens behind it.
+   Slide and Instant never set the attribute, so they never pay for this. */
+.pdf-scroll.is-pages[data-dim] .pdf-strip{ opacity:0; }
+.pdf-scroll.is-pages .pdf-strip{ transition:opacity 90ms linear; }
+@media (prefers-reduced-motion: reduce){
+  .pdf-scroll.is-pages{ scroll-behavior:auto; }
+  .pdf-scroll.is-pages .pdf-strip{ transition:none; }
+}
+
 .pdf-strip{
   position:relative;
   /* The strip is what a live pinch transforms. Nothing else moves. */

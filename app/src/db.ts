@@ -56,6 +56,12 @@ export const DEFAULT_SETTINGS: Settings = {
      body type at about 5pt; filling the width and scrolling is the only one of
      the two that is readable without a pinch on the device most reading
      happens on. */
+  /* Scroll. A PDF is a fixed page and a strip of sheets is what it wants;
+     pages is the reader's choice, not the app's assumption. */
+  pdfMode: 'scroll',
+  /* Off. The stocks are the point of this app's reading surface, and a reader
+     who wants the file untouched can say so in one tap. */
+  pdfOriginal: false,
   pdfFit: 'width',
   /* Single. A spread is the right way to read a scanned book on an iPad and
      the wrong way to read anything on a phone, and the default has to be the
