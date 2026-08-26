@@ -662,7 +662,7 @@ export function Reader() {
                 updatedAt: Date.now(),
             })
             const now = Date.now()
-            void db.books.update(id, { progress: loc.fraction ?? 0, openedAt: now, editedAt: now })
+            void db.books.update(id, { progress: loc.fraction ?? 0, openedAt: now })
         }, 600)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id])
@@ -1147,6 +1147,7 @@ export function Reader() {
                         bounds={{ width: paneW, height: stageRef.current?.clientHeight ?? 0 }}
                         tint={sel.mark?.color ?? null}
                         hasNote={Boolean(sel.mark?.note)}
+                        text={sel.mark?.text ?? flatten(selRange.current?.toString() ?? '')}
                         onTint={onTint}
                         onNote={() => void onNote()}
                         onCopy={onCopy}

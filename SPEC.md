@@ -492,15 +492,59 @@ thinner — Press/Day/Butter 2.19 · Tea 1.94 · Coal 1.91 · Dusk 1.67 · **Pit
 found rule is very nearly the colour of the plain hits' rules, so **thickness alone separates them
 there**: 4px against 2px, which is why the weight is doubled rather than nudged.
 
-### 6.5 Look up
+### 6.5 The dictionary
 
-The offline answer first: **"Look up" shows every other place that word appears in this book** —
-a concordance, which is genuinely more useful inside a novel than a dictionary definition, and
-which is really just search with a nicer face. Always available.
+**Select one word and its meaning is already there, at the top of the selection menu, with
+nothing to press.** No button, no round trip, no second gesture. The concordance and Wiktionary
+used to be the whole of this section and neither was a dictionary: a concordance answers *where
+else does this word fall in this book*, which is a different question, and Wiktionary is a
+network trip to a page of etymology and inflection tables that a reader who paused mid-sentence
+did not ask for.
 
-Beneath it, when and only when `navigator.onLine`, one labelled row that opens **Wiktionary** in
-a new tab. Labelled as leaving the app, absent when offline. It is an enhancement that degrades,
-never a feature that needs a network.
+**Why a selection and not a bare tap.** A bare single tap is already spoken for — `tapToTurn`
+gives the left and right thirds of the page to the page turn (§ 5.1), and a reader who taps to
+turn would get a definition instead. So the gesture is the platform's own word selection:
+tap-and-hold on a phone, double-click on a desktop. It is one gesture, it is the gesture every
+reader already knows means *this word*, and the answer is printed before it is asked for. The
+same rule holds in the PDF reader, over its text layer.
+
+**A selection of exactly one word gets a definition. Anything longer does not** — a passage has
+no single meaning to print, and the menu stays the four actions it was.
+
+**The data ships with the app.** WordNet 3.1, Princeton, permissive BSD-style licence, reduced
+by `app/scripts/build-dictionary.mjs` to at most three senses a word and two per part of speech,
+single-word lemmas only. 87k entries over 28 shards — one per letter plus `other` — 7.79MB raw,
+2.53MB over the wire, precached with the fonts (`globPatterns` in `vite.config.ts`), so a shard
+is fetched once and then lives on the device. A reader only ever downloads the letters they
+actually tap.
+
+*A definitions API was measured and rejected before this was built.* dictionaryapi.dev returned
+three of eight words, every cache miss hung for twenty seconds, and it indexes headwords only —
+`endeared`, `walked` and `running` all came back empty. And it needs a network, which this app's
+guardrails forbid outright.
+
+**Inflections resolve.** `app/src/reader/dict.ts` carries Morphy's detachment rules, WordNet's
+own suffix table, longest suffix first, plus an undo for the doubled final consonant
+(`running` → `runn` → `run`) and WordNet's 5940-entry irregular list. The irregulars are one
+more candidate rather than a short circuit, because `saw` is both the past of `see` and a tool
+and a reader who taps it should be shown the tool as well. Curly apostrophes fold to straight
+ones, a trailing possessive is dropped, and punctuation is stripped from both ends, so
+`handsome,` and `don’t` are the words a reader thinks they selected.
+
+Verified in the reader at 894px: `gallantry` two senses, `censuring` → **censure** with the
+selected form shown after a middot, `manners` a direct hit, `handsome,` stripped to `handsome`,
+`Lizzy` → *No entry for "lizzy"*, and a three-word selection showing no definition block at all.
+The block, the tint row and the action row all measure 475–781 inside a 468–788 menu: one
+alignment, both edges.
+
+**A dictionary that fails says it has no entry.** It never throws and never rejects — there is
+nothing a reader can do about a missing shard mid-sentence.
+
+**The concordance stays, renamed.** With a real dictionary in the menu, "Look up" was the label
+that caused the confusion. The button now says **"In this book"**, which is the question it
+answers. The Wiktionary row stays where it already was — inside that concordance panel, one
+labelled link out, absent offline (`reader/Panel.tsx`) — because it was never the problem there.
+It was the problem when it was offered *as* the dictionary, and it no longer is.
 
 ### 6.6 Going to a place in the book
 
