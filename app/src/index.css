@@ -2855,14 +2855,17 @@ body::before{
   z-index:7;
   display:flex; flex-direction:column;
   max-width:min(320px, calc(100% - 16px));
-  padding:6px;
+  /* One inset for the whole card, and every row inside it sits on that same
+     pair of edges. The rows used to carry 2-4px of their own on top of a 6px
+     card, which read as text pressed against the border on the right. */
+  padding:10px 12px 8px;
   background:var(--lift);
   border:1px solid var(--rule);
   border-radius:var(--r-md);
 }
 .selmenu-tints{
   display:flex; align-items:center; gap:6px;
-  padding:2px 2px 6px;
+  padding:0 0 8px;
   border-bottom:1px solid var(--rule);
 }
 /* The definition. It sits at the TOP of the menu because it is the answer to
@@ -2871,7 +2874,7 @@ body::before{
    it. The measure is the menu's own max-width; nothing here caps a paragraph
    of its own. */
 .selmenu-def{
-  padding:2px 4px 8px;
+  padding:0 0 10px;
   border-bottom:1px solid var(--rule);
 }
 .selmenu-word{
@@ -2928,7 +2931,12 @@ body::before{
   outline:2px solid var(--ink);
   outline-offset:2px;
 }
-.selmenu-acts{ display:flex; align-items:center; gap:2px; padding-top:4px; }
+/* Pulled out by the buttons' own 6px so their labels land on the same edge
+   as the definition above, rather than looking doubly inset. */
+.selmenu-acts{
+  display:flex; align-items:center; gap:2px;
+  margin:0 -6px; padding-top:6px;
+}
 .selmenu-act{
   flex:1 1 auto;
   display:inline-flex; flex-direction:column; align-items:center; gap:3px;
@@ -3988,3 +3996,52 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
 }
 .home-sec-foot a{ color:var(--ink-soft); text-decoration:none; border-bottom:1px solid var(--rule); }
 .home-sec-foot a:hover{ color:var(--ink); border-bottom-color:var(--ink); }
+
+
+/* ── Progress states ── */
+.anim-spin {
+  animation: spin 1s linear infinite;
+  transform-origin: center;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty.empty--loading svg {
+  width: 28px;
+  height: 28px;
+  opacity: 0.5;
+  margin-bottom: 12px;
+}
+
+.reader-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--ink-soft);
+}
+.reader-loading svg {
+  opacity: 0.5;
+}
+.reader-loading p {
+  position: relative;
+  margin: 0;
+}
+
+.drop-busy-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--ink-soft);
+}
+.drop-busy-row svg {
+  opacity: 0.7;
+}
+.drop-busy-row p {
+  margin: 0;
+}
