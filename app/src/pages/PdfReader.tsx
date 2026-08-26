@@ -563,6 +563,7 @@ export function PdfReader() {
                         bounds={{ width: paneW, height: stageRef.current?.clientHeight ?? 0 }}
                         tint={sel.mark?.color ?? null}
                         hasNote={Boolean(sel.mark?.note)}
+                        text={selText()}
                         onTint={onTint}
                         onNote={() => void onNote()}
                         onRemove={sel.mark ? () => { const m = sel.mark!; dropSel(); void removeAnnotation(m.id) } : undefined}

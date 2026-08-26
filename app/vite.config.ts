@@ -171,7 +171,7 @@ export default defineConfig({
            precached — and without the extension here the fetch would be a
            network call, which is exactly the thing this app is not allowed to
            need. Both files are under Workbox's 2 MiB per-file default. */
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2,epub}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2,epub}', 'dict/*.json'],
         /* the iOS launch images are a megabyte the app never reads — Safari
            fetches them itself at install time, so they stay out of precache.
            og.png is fetched by other people's link-preview servers, never by

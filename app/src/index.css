@@ -2865,6 +2865,36 @@ body::before{
   padding:2px 2px 6px;
   border-bottom:1px solid var(--rule);
 }
+/* The definition. It sits at the TOP of the menu because it is the answer to
+   a question the reader already asked by selecting the word -- putting it
+   under the tints would make the reader look past five coloured dots to read
+   it. The measure is the menu's own max-width; nothing here caps a paragraph
+   of its own. */
+.selmenu-def{
+  padding:2px 4px 8px;
+  border-bottom:1px solid var(--rule);
+}
+.selmenu-word{
+  margin:0 0 4px;
+  font-family:var(--sans);
+  font-size:14px; font-weight:600; line-height:1.3;
+  color:var(--ink);
+}
+.selmenu-from{ font-weight:400; color:var(--ink-soft); }
+.selmenu-sense{
+  margin:0 0 4px;
+  font-family:var(--sans);
+  font-size:13px; line-height:1.45;
+  color:var(--ink);
+}
+.selmenu-sense:last-child{ margin-bottom:0; }
+.selmenu-sense--wait{ color:var(--ink-soft); }
+/* Italic rather than a chip: four of these stack in one menu, and four chips
+   read as a toolbar rather than as a part of speech. */
+.selmenu-pos{
+  font-style:italic;
+  color:var(--ink-soft);
+}
 /* 30px so the touch target clears 44 with the gap counted, and a ring rather
    than a tick for the selected one — a tick inside a 30px pastel circle is
    four pixels of glyph on a light ground. */

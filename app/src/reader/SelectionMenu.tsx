@@ -17,6 +17,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { HighlightColor } from '../types'
 import { TINTS } from './marks'
+import { lookUp, normalise } from './dict'
+import type { Entry } from './dict'
 import { CopyIcon, FindIcon, LookUpIcon, NoteIcon, TrashIcon } from '../components/icons'
 
 /** Where the selection is, in the coordinates of the reading pane. */
@@ -36,12 +38,9 @@ export interface SelectionMenuProps {
     /** Set when the selection is an existing mark rather than fresh text. */
     tint: HighlightColor | null
     hasNote: boolean
-    /** Whether this surface can hold a mark at all. False on a PDF, where a
-        fixed page has no CFI to anchor one to — so the tints and the note are
-        ABSENT rather than present and inert, and what is left (copy, look up,
-        find) is exactly what a page of fixed text can honestly offer.
-        SPEC.md § 11, P4. */
-    marks?: boolean
+    /** The selected words. A selection of exactly one word gets its meaning
+        printed at the top of the menu, with nothing to press: SPEC.md § 6.5. */
+    text: string
     onTint: (c: HighlightColor) => void
     onNote: () => void
     onCopy: () => void
@@ -62,6 +61,23 @@ export function SelectionMenu(p: SelectionMenuProps) {
     const ref = useRef<HTMLDivElement | null>(null)
     const [box, setBox] = useState<{ w: number; h: number } | null>(null)
 
+    /* The definition. One word selected means one question — what does this
+       mean — so it is answered before it is asked; anything longer is a
+       passage, and a passage has no single meaning to print. `looking` exists
+       so the menu reserves its height on the first frame instead of growing
+       under the finger once the shard lands. */
+    const word = normalise(p.text)
+    const single = Boolean(word) && !/[^a-z']/.test(word)
+    const [entry, setEntry] = useState<Entry | null>(null)
+    const [looking, setLooking] = useState(single)
+    useEffect(() => {
+        if (!single) { setEntry(null); setLooking(false); return }
+        let live = true
+        setLooking(true)
+        void lookUp(word).then(e => { if (live) { setEntry(e); setLooking(false) } })
+        return () => { live = false }
+    }, [word, single])
+
     /* Measured before the first paint the reader sees, so the menu never
        appears in the wrong place and then jumps. One read, one write. */
     useLayoutEffect(() => {
@@ -69,7 +85,7 @@ export function SelectionMenu(p: SelectionMenuProps) {
         if (!el) return
         const r = el.getBoundingClientRect()
         setBox({ w: r.width, h: r.height })
-    }, [p.tint, p.hasNote, p.marks])
+    }, [p.tint, p.hasNote, entry, looking])
 
     /* Escape dismisses, and so does a scroll of the page underneath — a menu
        anchored to a line that has moved is pointing at nothing. */
@@ -106,7 +122,6 @@ export function SelectionMenu(p: SelectionMenuProps) {
             className="selmenu"
             role="dialog"
             aria-label={p.tint ? 'This highlight' : 'Selected text'}
-            data-marks={p.marks === false ? 'no' : 'yes'}
             style={{
                 top: `${Math.round(top)}px`,
                 left: `${Math.round(left)}px`,
@@ -114,7 +129,30 @@ export function SelectionMenu(p: SelectionMenuProps) {
                 visibility: box ? 'visible' : 'hidden',
             }}
         >
-            {p.marks !== false && (
+            {single && (looking || entry) && (
+                <div className="selmenu-def">
+                    {entry ? (
+                        <>
+                            <p className="selmenu-word">
+                                {entry.word}
+                                {entry.word !== word && <span className="selmenu-from"> · {word}</span>}
+                            </p>
+                            {entry.senses.map((s, i) => (
+                                <p key={i} className="selmenu-sense">
+                                    <span className="selmenu-pos">{s.pos}</span> {s.gloss}
+                                </p>
+                            ))}
+                        </>
+                    ) : (
+                        <p className="selmenu-sense selmenu-sense--wait">Looking up {word}…</p>
+                    )}
+                </div>
+            )}
+            {single && !looking && !entry && (
+                <div className="selmenu-def">
+                    <p className="selmenu-sense selmenu-sense--wait">No entry for “{word}”.</p>
+                </div>
+            )}
             <div className="selmenu-tints" role="group" aria-label="Highlight">
                 {TINTS.map(t => (
                     <button
@@ -138,21 +176,22 @@ export function SelectionMenu(p: SelectionMenuProps) {
                     </button>
                 )}
             </div>
-            )}
             <div className="selmenu-acts">
-                {p.marks !== false && (
                 <button type="button" className="selmenu-act" onClick={p.onNote}>
                     <NoteIcon />
                     <span>{p.hasNote ? 'Edit note' : 'Note'}</span>
                 </button>
-                )}
                 <button type="button" className="selmenu-act" onClick={p.onCopy}>
                     <CopyIcon />
                     <span>Copy</span>
                 </button>
                 <button type="button" className="selmenu-act" onClick={p.onLookUp}>
                     <LookUpIcon />
-                    <span>Look up</span>
+                    {/* Not "Look up" any more. The looking up is the block
+                        above; this opens the concordance, which answers a
+                        different question — where else this word falls in
+                        this book — and it should say so. */}
+                    <span>In this book</span>
                 </button>
                 <button type="button" className="selmenu-act" onClick={p.onFind}>
                     <FindIcon />
