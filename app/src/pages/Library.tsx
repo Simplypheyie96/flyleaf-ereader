@@ -7,7 +7,7 @@ import { Cover } from '../components/Cover'
 import { Picker } from '../components/Menu'
 import {
   BackIcon, CheckIcon, CloseIcon, CollectionsIcon, EditIcon, GridIcon,
-  ListIcon, PlusIcon, SearchIcon, SortIcon, TrashIcon,
+  ListIcon, PlusIcon, SearchIcon, SortIcon, SyncIcon, TrashIcon,
 } from '../components/icons'
 import { FORMAT_LABEL, bytes, percent, remember, shortDate, stored } from '../lib'
 import { SYNC_AVAILABLE } from '../sync/google'
@@ -196,21 +196,37 @@ export function Library() {
       <div className="page-inner page-inner--wide">
         <header className="app-head">
           <h1><Mark size={22} />Library</h1>
-          <span>
-            {books?.length ? countLabel(books.length) : 'Library'}
-            {/* THE ONLY WAY ANYBODY FINDS OUT. Sync lives in Settings, four
-                screens deep, and a reader who never goes looking never learns
-                their shelf can travel at all -- which is the same thing as the
-                feature not existing. So the shelf itself says so, once, in the
-                head's own mono voice beside the count, and lands on the sync
-                panel rather than the top of a long page.
+          {/* THE ONLY WAY ANYBODY FINDS OUT. Sync lives in Settings, four
+              screens deep, and a reader who never goes looking never learns
+              their shelf can travel at all -- which is the same thing as the
+              feature not existing. So the shelf itself says so, and lands on
+              the sync panel rather than the top of a long page.
 
-                Here and not on Home, because this is the screen that IS the
-                thing being synced. Absent when the app was built with no
-                Google client ID, on the same rule the panel itself follows: a
-                way in to a control that is not there is worse than no way in. */}
-            {SYNC_AVAILABLE && <>{' · '}<Link to="/settings#sync">Sync</Link></>}
-          </span>
+              A BUTTON, not a word in the count line. The first pass made it a
+              text link after the count, and a link that reads as part of a
+              status line is something you notice once you already know it is
+              there -- which is exactly the reader this is for failing to find
+              it. A round icon at the trailing edge is chrome: it is in the same
+              place every time the shelf is open, and it looks pressable at a
+              glance instead of on inspection.
+
+              Here and not on Home, because this is the screen that IS the thing
+              being synced. Absent when the app was built with no Google client
+              ID, on the same rule the panel itself follows: a way in to a
+              control that is not there is worse than no way in. */}
+          <div className="app-head-end">
+            <span>{books?.length ? countLabel(books.length) : 'Library'}</span>
+            {SYNC_AVAILABLE && (
+              <Link
+                to="/settings#sync"
+                className="icon-btn"
+                aria-label="Sync your books across devices"
+                title="Sync your books across devices"
+              >
+                <SyncIcon />
+              </Link>
+            )}
+          </div>
         </header>
 
         {books === undefined ? (
