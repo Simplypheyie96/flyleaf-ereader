@@ -18,6 +18,7 @@ import { useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db'
 import { Reader } from './Reader'
+import { SpinnerIcon } from '../components/icons'
 
 const PdfReader = lazy(() =>
     import('./PdfReader').then(m => ({ default: m.PdfReader })))
@@ -27,7 +28,8 @@ const PdfReader = lazy(() =>
 function Opening() {
     return (
         <main className="reader">
-            <div className="reader-stage">
+            <div className="reader-stage reader-loading">
+                <SpinnerIcon aria-hidden="true" style={{ marginTop: '-40px' }} />
                 <p className="reader-opening ui-p ui-p--soft">Opening…</p>
             </div>
         </main>

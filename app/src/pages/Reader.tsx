@@ -27,7 +27,7 @@ import { db, DEFAULT_SETTINGS, saveSettings, touchBook, useSettings } from '../d
 import { fetchBookFile } from '../sync/sync'
 import type { Annotation, Bookmark, HighlightColor, Settings } from '../types'
 import { minutes, percent } from '../lib'
-import { BackIcon, BookmarkIcon, ContentsIcon, TypeIcon } from '../components/icons'
+import { BackIcon, BookmarkIcon, ContentsIcon, SpinnerIcon, TypeIcon } from '../components/icons'
 import { readPalette, isDarkStock } from '../reader/palette'
 import { readingCss } from '../reader/readingCss'
 import { hardenBook } from '../reader/harden'
@@ -181,7 +181,7 @@ const CHROME_INSET = 64
    fetch itself fails. */
 const missing = (row: boolean) =>
     row
-        ? 'This book came from another device, and its file has not reached this one yet. Flyleaf just tried to fetch it and could not — check the connection, or that “Carry the book files too” is still on in Settings. Opening the file here again also works.'
+        ? 'This book came from another device, and its file has not reached this one yet. Flyleaf just tried to fetch it and could not — check your connection. Opening the file here again also works.'
         : 'That book is not in this library any more.'
 
 export function Reader() {
@@ -1135,7 +1135,10 @@ export function Reader() {
                 {/* The 1px rule on the outgoing page's leading edge. One
                     element, one transform, on the turn's own clock. */}
                 {!ready && !failed && (
-                    <p className="reader-opening ui-p ui-p--soft">Opening…</p>
+                    <div className="reader-loading">
+                        <SpinnerIcon aria-hidden="true" style={{ marginTop: '-40px' }} />
+                        <p className="reader-opening ui-p ui-p--soft">Opening…</p>
+                    </div>
                 )}
                 {/* The tick itself: 2px of accent on the page's trailing edge,
                     visible with the chrome hidden, which is the point of it —

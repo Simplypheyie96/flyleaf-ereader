@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, localDay, readingSince } from '../db'
 import { FORMAT_FAMILY, FORMAT_LABEL } from '../lib'
 import { DAY_MS, dayBefore, streakOf, weekStart } from '../days'
-import { StatsIcon, BackIcon } from '../components/icons'
+import { StatsIcon, BackIcon, SpinnerIcon } from '../components/icons'
 import { Cover } from '../components/Cover'
 import type { Book, ReadingDay } from '../types'
 
@@ -105,9 +105,10 @@ export function Stats() {
 
     if (!data) {
         return (
-            <main className="page">
-                <div className="page-inner">
-                    <header className="app-head"><h1>Your reading</h1></header>
+            <main className="page" aria-busy="true">
+                <div className="empty empty--loading">
+                    <SpinnerIcon aria-hidden="true" />
+                    <p className="ui-p ui-p--soft">Loading your reading stats…</p>
                 </div>
             </main>
         )

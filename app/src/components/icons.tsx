@@ -1,3 +1,5 @@
+import type { SVGProps } from 'react'
+
 /* Press's icon idiom, unchanged: hand-drawn strokes on a 24 grid, 1.8 weight,
    round caps and joins. Parts that must knock out fill with --tab-bg, which
    the nav CSS flips when a tab becomes the filled one.
@@ -561,6 +563,26 @@ export function CupIcon() {
         <path d="M5.4 9.6 H 16.8 L 15.9 18 A 2.6 2.6 0 0 1 13.3 20.3 H 8.9 A 2.6 2.6 0 0 1 6.3 18 Z" />
         <path d="M16.6 12 H 18.1 A 2.6 2.6 0 0 1 18.1 17.2 H 16.1" />
       </g>
+    </svg>
+  )
+}
+
+export function SpinnerIcon(p: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="anim-spin"
+      {...p}
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
     </svg>
   )
 }

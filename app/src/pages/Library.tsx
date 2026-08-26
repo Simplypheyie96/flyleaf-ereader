@@ -7,7 +7,7 @@ import { Cover } from '../components/Cover'
 import { Picker } from '../components/Menu'
 import {
   BackIcon, CheckIcon, CloseIcon, CollectionsIcon, EditIcon, GridIcon,
-  ListIcon, PlusIcon, SearchIcon, SortIcon, SyncIcon, TrashIcon,
+  ListIcon, PlusIcon, SearchIcon, SortIcon, SpinnerIcon, SyncIcon, TrashIcon,
 } from '../components/icons'
 import { FORMAT_LABEL, bytes, percent, remember, shortDate, stored } from '../lib'
 import { SYNC_AVAILABLE } from '../sync/google'
@@ -415,6 +415,11 @@ export function Library() {
                   )}
                 </li>
               </ul>
+            ) : books === undefined ? (
+              <div className="empty empty--loading" aria-busy="true">
+                <SpinnerIcon aria-hidden="true" />
+                <p className="ui-p ui-p--soft">Loading your library…</p>
+              </div>
             ) : shown.length === 0 ? (
               <p className="shelf-none">
                 {query

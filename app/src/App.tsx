@@ -12,6 +12,7 @@ import { ReadRoute } from './pages/ReadRoute'
 import { PrivacyPage, TermsPage } from './pages/Legal'
 import { useSettings } from './db'
 import type { Settings } from './types'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 /* The chrome theme, resolved here so exactly one place decides it. 'system'
    follows the OS and keeps following it — a matchMedia listener rather than a
@@ -97,8 +98,10 @@ export default function App() {
   useTheme(settings?.theme ?? null)
 
   return (
-    <BrowserRouter>
-      <Shell />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Shell />
+      </BrowserRouter>
+    </ErrorBoundary>
   )
 }

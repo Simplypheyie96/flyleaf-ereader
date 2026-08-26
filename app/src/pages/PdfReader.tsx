@@ -37,7 +37,7 @@ import { db, DEFAULT_SETTINGS, saveSettings, touchBook, useSettings } from '../d
 import { fetchBookFile } from '../sync/sync'
 import type { Annotation, Bookmark, HighlightColor, Settings } from '../types'
 import { percent } from '../lib'
-import { BackIcon, BookmarkIcon, ContentsIcon, TypeIcon } from '../components/icons'
+import { BackIcon, BookmarkIcon, ContentsIcon, SpinnerIcon, TypeIcon } from '../components/icons'
 import { readPaint } from '../reader/marks'
 import {
     addBookmark, addHighlight, flatten, parsePdfFound, parsePdfLocator, parsePdfRects,
@@ -563,7 +563,12 @@ export function PdfReader() {
             )}
 
             <div className="reader-stage" ref={stageRef}>
-                {!doc && !failed && <p className="reader-opening ui-p ui-p--soft">Opening…</p>}
+                {!doc && !failed && (
+                    <div className="reader-loading">
+                        <SpinnerIcon aria-hidden="true" style={{ marginTop: '-40px' }} />
+                        <p className="reader-opening ui-p ui-p--soft">Opening…</p>
+                    </div>
+                )}
                 {ticked && <span className="reader-tick" aria-hidden="true" />}
                 {doc && start && (
                     <PdfView
