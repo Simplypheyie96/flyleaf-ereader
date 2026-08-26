@@ -801,7 +801,7 @@ reload; and the sheet contains **no type control at all** — absent, not disabl
 | **P1** | Import, sniffing, metadata, Dexie, Library | **+ the seed manifest, first-run seeding, `seeded`, dismiss/restore, the new first-run shelf and the reworded empty state.** Seeding *is* import, so it belongs here or it becomes a second import path later |
 | **P2** | Paginator, gesture, turn, stocks, type controls, TOC, progress, position | **+ all seven stocks, all ten type controls, all four layout controls, all three turn styles, the three-tab sheet.** Split internally: paginator → Slide → the control surface → Fade and Instant. Curl was built here last, as the cuttable one, and was cut — § 5.2.1 |
 | **P3** | Selection, highlights, notes, bookmarks, search, lookup, export | **+ the bookmark tick and ribbon, the marks list, the concordance lookup, the fifteen tint measurements** |
-| **P4** | PDF on `pdfjs-dist` | Unchanged, plus: on a PDF the **stock tints the surround only**, and the type controls are **absent, not disabled**. A fixed page has no reflow to control, and pretending otherwise is a worse answer than an honest gap |
+| **P4** | PDF on `pdfjs-dist` | Unchanged, plus: on a PDF the **stock tints the surround only**, and the type controls are **absent, not disabled**. A fixed page has no reflow to control, and pretending otherwise is a worse answer than an honest gap. **Plus, later: highlights and notes anchored to page rectangles (§ 13.6), and a two-page spread (§ 13.3)** |
 | **P5** | Audit, offline, update, install, backup | **+ Restore included books, storage used** |
 
 ### 11.1 The phone test, and the part of it a driver cannot do
@@ -1006,12 +1006,37 @@ compromised CFI: on a document whose pages cannot reflow, **the page number is t
 anchor**. It survives zoom, fit, rotation and screen. Measured: left on page 5 at 36%, reopened
 on page 5 at 36%, same `scrollTop` of 2101.
 
-### 13.3 The sheet — four controls
+### 13.3 The sheet — five controls
 
-**Fit · Zoom · Stock · Page tint.** No tabs: four controls do not need three tabs. No Size, face,
+**Fit · Pages · Zoom · Stock · Page tint.** No tabs: five controls do not need three tabs. No Size, face,
 leading, measure, word spacing, letter spacing, hyphenation, justification, margin or flow — a
 disabled Size slider on a fixed page is fifteen pixels of apology. A one-sentence lead says why,
 once, at the top of the sheet.
+
+**Pages — One · Two.** One sheet at a time, or two side by side the way a bound book falls
+open: the **cover alone**, then verso facing recto, pairing from page two. Pairing from page one
+instead puts every recto on the left and every verso on the right, which is the one arrangement
+a printed book never has and which is obvious on any file carrying a running head.
+
+The pair is centred as **one** object and its two pages butt together at the spine, so the gutter
+is the two 1px rules meeting rather than a gap the surround shows through. The scale is taken
+from the widest page times the column count, not from the widest *row*, so the lone cover renders
+at the same size as every pair after it and the strip does not jog sideways between them.
+
+`Two` is offered at every width but honoured only at **`SPREAD_MIN` = 700px** of pane. The number
+is derived, not chosen: two A4 pages inside 700px leave each about 336px, a scale of 0.56 on a
+595pt page, so 11pt body type renders at roughly 6px. Below it the layout serves a single column
+— and **the sheet says so**, in place of the usual note: *"Two sheets side by side. This screen is
+too narrow for it, so you are reading one at a time until you open the book somewhere wider."*
+A cap the reader cannot see is a cap that reads as a bug.
+
+The default is **One**. A spread is the right way to read a scanned book on an iPad and the wrong
+way to read anything on a phone, and a default has to be the one that is never wrong.
+
+`locate()` reports the **left** page of the row, not whichever of the pair the binary search
+stopped on, so the readout, the chapter label and the saved position all name the page the reader
+is looking at first. Measured at 1280px on a six-page file: cover alone at 327–953 (symmetric),
+pages 2|3 at 14–640 and 640–1266, pages 4|5 the same, page 6 alone; readout `PAGE 2 OF 6`.
 
 ### 13.4 The veil — how a stock reaches a fixed page
 
@@ -1039,12 +1064,53 @@ The floor is 7.37:1 — AAA for body text, on the darkest stock. `DESIGN.md` →
 ### 13.5 What still works
 
 Selection (the text layer is real DOM in the host page, so one `selectionchange` listener does
-it), **Copy · Look up · Find** — and not highlight or note, because a highlight is anchored to a
-CFI and a PDF has none. Bookmarks do work: they anchor to the page, tick the top bar and appear
+it), **the four tints, the underline, Note, Copy · Look up · Find** — the same menu the
+reflowable reader has, drawn from the same `--hl-*` tokens, so the dark-stock inversion is
+already measured for both. This section used to say a PDF could have neither a highlight nor a
+note, on the grounds that a highlight anchors to a CFI and a PDF has none. That was the wrong
+reading of the rule. A CFI exists because a *reflowable* book's layout moves; a fixed page's
+layout is the one thing about it that never does. See § 13.6. Bookmarks do work: they anchor to the page, tick the top bar and appear
 in the marks list with the page's own first words as the excerpt. The outline goes where it says
 — Chapter 2 landed on page 5. Search runs page by page and yields a group per page with a real
 per-hit vertical fraction, not the top of the page: the outline jump to page 5 landed at 33%, the
 search hit on the same page at 36%.
+
+### 13.6 Highlights and notes on a fixed page
+
+A PDF mark stores what the page itself offers: the page number, and the run of rectangles the
+selection covered, each in fractions of that page's **own box**. Written into the existing `cfi`
+field as an `@`-suffix on the position locator:
+
+```
+pdf:<page>:<fraction>@<p>,<x>,<y>,<w>,<h>;<p>,<x>,<y>,<w>,<h>;…
+```
+
+Four decimal places — a tenth of a pixel on a 2000px page, and short enough to read in an export.
+A rectangle is assigned to the page its **centre** falls in, because a line of text at the foot of
+a sheet can overlap the gap below it by a pixel and a centre never does; that is also what lets a
+selection run across a spread and land two rectangles on two different pages.
+
+It is *appended*, not woven in, and `parsePdfLocator` cuts at the `@` before matching, so every
+locator written by an older build still parses byte for byte: bookmarks, sorting and the marks
+list keep working on an existing store. And because it is the same field in the same row of the
+same table, the marks list, the export, the sync and the tombstones all work on a PDF mark with
+no knowledge that it came from one — **no schema change**.
+
+The painted mark is a `<button>`, not a `<div>`: once the selection is gone it is the only way
+back to that mark's own menu. It sits **under** the text layer so the spans stay selectable and
+the ink stays the page's own, and **over** the veil so a tint on a dark stock is not itself washed
+out by the wash it is meant to sit on.
+
+The words are captured when the selection settles, not read back when a tint is pressed. The
+reflowable reader's text is inside an iframe, so its menu leaves the document selection alone; a
+PDF's text layer is real DOM in this same document, and pressing a button in it collapses the
+selection before the click handler runs.
+
+Measured at 1280px: a two-line selection on page one wrote
+`pdf:1:0.1345@1,0.1182,0.1345,0.5167,0.0154;1,0.1182,0.1622,0.5058,0.0154` and painted two bands
+at 646px and 632px wide over exactly those lines. Switching to the two-page spread halved the
+scale and the same mark re-derived to 322px and 316px over the same words. On Coal the fill flips
+from `mix-blend-mode: multiply` at full strength to `normal` at 0.4 alpha, per `--hl-blend`.
 
 Cover and metadata come from the file itself: page one rendered at 495×640, the title read from
 the Info dictionary. That is not a *generated* cover — a PDF's first page **is** its cover.
