@@ -195,7 +195,8 @@ export async function mergeShelf(doc: ShelfDoc): Promise<{ folded: Folded; map: 
   const byFp = new Map<string, Book>()
   for (const book of mine) if (book.fp) byFp.set(book.fp, book)
 
-  const graves = stones(doc.graves)
+  const localGraves = await db.graves.toArray()
+  const graves = stones([...doc.graves, ...localGraves])
   const write: Book[] = []
   const drop: string[] = []
 
@@ -228,7 +229,7 @@ export async function mergeShelf(doc: ShelfDoc): Promise<{ folded: Folded; map: 
       continue
     }
     if (!local) {
-      if (buried(graves, 'book', incoming.fp, 0)) continue
+      if (buried(graves, 'book', incoming.fp, incoming.seeded ? 0 : incoming.addedAt)) continue
       /* A book this device has never seen. It keeps the id it arrived with, so
          every mark and position pointing at it needs no rewriting, and its
          cover is null until the file is fetched — DESIGN.md forbids a generated
@@ -239,15 +240,54 @@ export async function mergeShelf(doc: ShelfDoc): Promise<{ folded: Folded; map: 
     }
 
     map.set(incoming.id, local.id)
+    let merged = { ...local }
+    let changed = false
+
     if (edited(incoming) > edited(local)) {
-      /* The later row wins WHOLE rather than field by field. Merging fields
-         from two copies of one book means a row that neither device wrote:
-         finished on one and reset on the other would come out finished at a
-         progress of zero. `cover`, `fp` and `id` are this device's — the cover
-         is bytes that did not travel, and the id is what everything here
-         points at. */
-      write.push({ ...incoming, id: local.id, fp: local.fp, cover: local.cover })
+      /* The later row wins for metadata. */
+      merged = {
+        ...merged,
+        title: incoming.title,
+        author: incoming.author,
+        format: incoming.format,
+        fileName: incoming.fileName,
+        fileSize: incoming.fileSize,
+        language: incoming.language,
+        publisher: incoming.publisher,
+        published: incoming.published,
+        subjects: incoming.subjects,
+        description: incoming.description,
+        editedAt: incoming.editedAt,
+        addedAt: incoming.addedAt,
+      }
+      changed = true
+    }
+
+    const incomingRead = Math.max(incoming.openedAt ?? 0, incoming.finishedAt ?? 0)
+    const localRead = Math.max(local.openedAt ?? 0, local.finishedAt ?? 0)
+
+    if (incomingRead > localRead) {
+      merged.progress = incoming.progress
+      merged.openedAt = incoming.openedAt
+      merged.finishedAt = incoming.finishedAt
+      changed = true
+    }
+
+    if (changed) {
+      write.push(merged)
       updated += 1
+    }
+  }
+
+  /* Sweep local books against the stones. If the other device deleted a book,
+     it is not in `doc.books` at all, so the loop above never saw it. */
+  for (const local of mine) {
+    if (!local.fp) continue
+    if (buried(graves, 'book', local.fp, local.seeded ? 0 : local.addedAt)) {
+      if (!drop.includes(local.id)) {
+        drop.push(local.id)
+        removed += 1
+      }
     }
   }
 
@@ -311,7 +351,7 @@ async function foldCollections(
       removed += 1
       continue
     }
-    if (!local && buried(graves, 'collection', row.id, 0)) continue
+    if (!local && buried(graves, 'collection', row.id, row.updatedAt)) continue
     if (local && local.updatedAt >= row.updatedAt) continue
     /* LAST WRITER WINS ON THE WHOLE ROW, membership included, and it is a real
        trade rather than an oversight. Unioning the two lists of book ids would
@@ -322,6 +362,16 @@ async function foldCollections(
        two devices is not. */
     write.push({ ...row, bookIds: row.bookIds.map((id) => through(map, id)) })
   }
+
+  for (const local of mine.values()) {
+    if (buried(graves, 'collection', local.id, local.updatedAt)) {
+      if (!drop.includes(local.id)) {
+        drop.push(local.id)
+        removed += 1
+      }
+    }
+  }
+
   return { write, drop, folded: { ...NOTHING, removed } }
 }
 
@@ -335,7 +385,8 @@ export async function exportMarks(): Promise<MarksDoc> {
   return { v: V, kind: 'marks', annotations, bookmarks }
 }
 
-export async function mergeMarks(doc: MarksDoc, map: IdMap, graves: Grave[]): Promise<Folded> {
+export async function mergeMarks(doc: MarksDoc, map: IdMap, _incomingGraves: Grave[]): Promise<Folded> {
+  const graves = await db.graves.toArray()
   const stone = stones(graves)
   const [mineA, mineB] = await Promise.all([
     db.annotations.toArray(),
@@ -355,13 +406,9 @@ export async function mergeMarks(doc: MarksDoc, map: IdMap, graves: Grave[]): Pr
 
   for (const row of doc.annotations) {
     const mark: Annotation = { ...row, bookId: through(map, row.bookId) }
-    /* A mark whose book is not here points at nothing. Dropped rather than
-       stored: it cannot be shown, cannot be searched into place, and would
-       come back to life pointing at the wrong text if a different book were
-       ever imported under that id. */
     if (!books.has(mark.bookId)) continue
     const local = haveA.get(mark.id)
-    if (buried(stone, 'annotation', mark.id, local?.updatedAt ?? 0)) {
+    if (buried(stone, 'annotation', mark.id, local?.updatedAt ?? mark.updatedAt)) {
       if (local) {
         dropA.push(mark.id)
         removed += 1
@@ -381,7 +428,7 @@ export async function mergeMarks(doc: MarksDoc, map: IdMap, graves: Grave[]): Pr
     const mark: Bookmark = { ...row, bookId: through(map, row.bookId) }
     if (!books.has(mark.bookId)) continue
     const local = haveB.get(mark.id)
-    if (buried(stone, 'bookmark', mark.id, local?.createdAt ?? 0)) {
+    if (buried(stone, 'bookmark', mark.id, local?.createdAt ?? mark.createdAt)) {
       if (local) {
         dropB.push(mark.id)
         removed += 1
@@ -393,6 +440,24 @@ export async function mergeMarks(doc: MarksDoc, map: IdMap, graves: Grave[]): Pr
     if (!local) {
       writeB.push(mark)
       gained += 1
+    }
+  }
+
+  for (const local of mineA) {
+    if (buried(stone, 'annotation', local.id, local.updatedAt)) {
+      if (!dropA.includes(local.id)) {
+        dropA.push(local.id)
+        removed += 1
+      }
+    }
+  }
+
+  for (const local of mineB) {
+    if (buried(stone, 'bookmark', local.id, local.createdAt)) {
+      if (!dropB.includes(local.id)) {
+        dropB.push(local.id)
+        removed += 1
+      }
     }
   }
 
@@ -412,7 +477,8 @@ export async function exportPlace(): Promise<PlaceDoc> {
   return { v: V, kind: 'place', locators, days }
 }
 
-export async function mergePlace(doc: PlaceDoc, map: IdMap, graves: Grave[]): Promise<Folded> {
+export async function mergePlace(doc: PlaceDoc, map: IdMap, _incomingGraves: Grave[]): Promise<Folded> {
+  const graves = await db.graves.toArray()
   const stone = stones(graves)
   const books = await db.books.toArray()
   const here = new Set(books.map((b) => b.id))
@@ -431,7 +497,7 @@ export async function mergePlace(doc: PlaceDoc, map: IdMap, graves: Grave[]): Pr
     const local = mine.get(loc.bookId)
     /* A locator's stone names the book's fingerprint, not its id — the id it
        had on the device that reset it means nothing here. */
-    if (buried(stone, 'locator', fpOf.get(loc.bookId) ?? '', local?.updatedAt ?? 0)) {
+    if (buried(stone, 'locator', fpOf.get(loc.bookId) ?? '', local?.updatedAt ?? loc.updatedAt)) {
       if (local) {
         dropL.push(loc.bookId)
         removed += 1
@@ -449,6 +515,15 @@ export async function mergePlace(doc: PlaceDoc, map: IdMap, graves: Grave[]): Pr
          up. */
       writeL.push(loc)
       updated += 1
+    }
+  }
+
+  for (const local of mine.values()) {
+    if (buried(stone, 'locator', fpOf.get(local.bookId) ?? '', local.updatedAt)) {
+      if (!dropL.includes(local.bookId)) {
+        dropL.push(local.bookId)
+        removed += 1
+      }
     }
   }
 

@@ -6,7 +6,7 @@ import { percent, remember, shortDate, stored } from '../lib'
 import { dayBefore, streakOf, weekStart } from '../days'
 import { Cover } from '../components/Cover'
 import { InstallStrip } from '../components/InstallStrip'
-import { GridIcon, HomeIcon, ListIcon, StatsIcon } from '../components/icons'
+import { GridIcon, HomeIcon, ListIcon, SpinnerIcon, StatsIcon } from '../components/icons'
 import type { Book, Locator } from '../types'
 
 /* ── Home ─────────────────────────────────────────────────────────────────
@@ -98,7 +98,16 @@ export function Home() {
     return { reading: reading.map((book, i) => ({ book, locator: locators[i] })), fresh, total, week, streak }
   })
 
-  if (!feed) return <main className="page" aria-busy="true" />
+  if (!feed) {
+    return (
+      <main className="page" aria-busy="true">
+        <div className="empty empty--loading">
+          <SpinnerIcon aria-hidden="true" />
+          <p className="ui-p ui-p--soft">Loading your books…</p>
+        </div>
+      </main>
+    )
+  }
 
   const { reading, fresh } = feed
 

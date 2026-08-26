@@ -12,10 +12,8 @@ import {
 import {
   bringTogether,
   driveRoom,
-  filesIncluded,
   forgetDrive,
   hasUnsharedWork,
-  includeFiles,
   lastSync,
   otherLibrary,
   pauseAutoSync,
@@ -89,7 +87,6 @@ export function SyncPanel() {
      out of the render entirely — so a background sync that shut the quiet path
      announced it to a panel that never redrew. */
   const [stale, setStale] = useState(needsSignIn())
-  const [files, setFiles] = useState(filesIncluded())
   const [room, setRoom] = useState<{ used: number; limit: number | null } | null>(null)
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
@@ -107,7 +104,6 @@ export function SyncPanel() {
     setWho(account())
     setAt(lastSync())
     setStale(needsSignIn())
-    setFiles(filesIncluded())
   }, [])
 
   useEffect(() => {
@@ -267,13 +263,6 @@ export function SyncPanel() {
     }
   }
 
-  const toggleFiles = () => {
-    const next = !files
-    includeFiles(next)
-    setFiles(next)
-    if (next) say('The book files will go up a few at a time while the app is open.')
-    else say('Only the record syncs now. Files already in your Drive stay there until you remove the copy.')
-  }
 
   return (
     /* The id is the destination of the Library head's "Sync" link, and
@@ -348,24 +337,8 @@ export function SyncPanel() {
                   nowhere else. Turning it off is a decision to make with a
                   working sync in front of you, not a wall to find on a new
                   device. */}
-              <div className="set-switch" style={{ marginTop: 18 }}>
-                <span className="ui-p">Carry the book files too</span>
-                <button
-                  type="button"
-                  role="switch"
-                  className="sw"
-                  aria-checked={files}
-                  aria-label="Carry the book files too"
-                  disabled={!!busy}
-                  onClick={toggleFiles}
-                >
-                  <span className="sw-knob" aria-hidden="true" />
-                </button>
-              </div>
-              <p className="ui-p ui-p--soft" style={{ marginTop: 8 }}>
-                {files
-                  ? 'A book opened on one device can be opened on the others without finding the file again. It uses your Drive space, and a large book takes a while.'
-                  : 'Only the record travels — the shelf, where you are, and every highlight. On another device those books have no cover and will not open until you find the file again.'}
+              <p className="ui-p ui-p--soft" style={{ marginTop: 18 }}>
+                A book opened on one device can be opened on the others without finding the file again. It uses your Drive space, and a large book takes a while.
               </p>
               {room && (
                 <p className="mono-meta" style={{ marginTop: 12 }}>

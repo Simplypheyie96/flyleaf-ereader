@@ -12,7 +12,7 @@ import {
 } from '../db'
 import { Cover } from '../components/Cover'
 import { useMenu } from '../components/Menu'
-import { BackIcon, CheckIcon, MoreIcon, PlusIcon, ResetIcon, TrashIcon } from '../components/icons'
+import { BackIcon, CheckIcon, MoreIcon, PlusIcon, ResetIcon, SpinnerIcon, TrashIcon } from '../components/icons'
 import { FORMAT_LABEL, bytes, percent, pubDate, shortDate, subjects } from '../lib'
 
 /* One book. SPEC.md § 7 calls it the book sheet; it is a route rather than a
@@ -107,7 +107,16 @@ export function BookDetail() {
     if (confirming) confirmRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [confirming])
 
-  if (book === undefined) return <main className="page" />
+  if (book === undefined) {
+    return (
+      <main className="page" aria-busy="true">
+        <div className="empty empty--loading">
+          <SpinnerIcon aria-hidden="true" />
+          <p className="ui-p ui-p--soft">Loading book details…</p>
+        </div>
+      </main>
+    )
+  }
   if (book === null) {
     /* A stale bookmark, or a book that was removed in another tab. Say so and
        point back, rather than rendering an empty detail page. */

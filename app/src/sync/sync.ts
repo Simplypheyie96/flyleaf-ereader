@@ -58,21 +58,7 @@ const MAP_KEY = 'flyleaf-ereader-sync-map'
     Drive has never seen is the one case where two libraries genuinely diverged
     without anybody being able to watch it happen. */
 const OFFLINE_KEY = 'flyleaf-ereader-wrote-offline'
-/** Whether the book files travel as well as the record. ON unless the reader
-    has turned it off, because a sync that carries the shelf but not the books
-    is not a sync: the other device shows a row it cannot open and a cover it
-    cannot draw, since the cover rides inside the file bundle and nowhere else.
-    The bytes do come out of the reader's own Drive allowance, which is why the
-    switch exists at all — but that is a choice to make against a working sync,
-    not a wall to discover on a new device.
 
-    THREE VALUES, NOT TWO. '1' on, '0' off, absent never-decided. The old shape
-    wrote '' for off, which read the same as absent, so the default could not be
-    changed without silently re-enabling somebody's explicit opt-out. An opt-out
-    made before this change does read as absent and does turn back on; that is
-    the one-time cost of the old shape, and it is a copy of their own books into
-    their own Drive rather than anything leaving their hands. */
-const FILES_KEY = 'flyleaf-ereader-sync-files'
 
 /** How many book files move in one pass, each way.
 
@@ -167,12 +153,7 @@ export function lastSync(): number | null {
 
 /** Are the book files themselves being carried, or only the record? */
 export function filesIncluded(): boolean {
-  return read(FILES_KEY) !== '0'
-}
-
-export function includeFiles(on: boolean) {
-  put(FILES_KEY, on ? '1' : '0')
-  window.dispatchEvent(new Event(SYNC_EVENT))
+  return true
 }
 
 /** Did anything get written on this device while it was not connected? */
@@ -311,16 +292,11 @@ async function run(token: string): Promise<SyncResult> {
     }
   }
 
-  /* The other side's tombstones. Deletions of a highlight, a bookmark and a
-     book all travel in the one list the shelf carries, because a merge is not
-     the place to go looking for a second source of them. */
-  const graves = async (): Promise<Grave[]> => (await shelf())?.graves ?? []
-
   if (held.marks !== want.marks) {
     const file = folder.get(MARKS)
     if (file) {
       const doc = JSON.parse(await readText(token, file.id)) as MarksDoc
-      const folded = await mergeMarks(doc, map, await graves())
+      const folded = await mergeMarks(doc, map, [])
       gained += folded.gained
       updated += folded.updated
       removed += folded.removed
@@ -331,7 +307,7 @@ async function run(token: string): Promise<SyncResult> {
     const file = folder.get(PLACE)
     if (file) {
       const doc = JSON.parse(await readText(token, file.id)) as PlaceDoc
-      const folded = await mergePlace(doc, map, await graves())
+      const folded = await mergePlace(doc, map, [])
       gained += folded.gained
       updated += folded.updated
       removed += folded.removed

@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { INPUT_ACCEPT, PICKER_ACCEPT, importFile, type ImportResult } from '../import'
 import { useQueuedFiles } from '../openQueue'
-import { BackIcon, OpenIcon } from '../components/icons'
+import { BackIcon, OpenIcon, SpinnerIcon } from '../components/icons'
 import { bytes } from '../lib'
 
 /* Import. The picker, the queue that drops and OS launches feed, and the honest
@@ -144,7 +144,12 @@ export function OpenBook() {
               void run(files)
             }}
           />
-          {busy && <p className="mono-meta drop-busy">{busy}</p>}
+          {busy && (
+            <div className="drop-busy-row">
+              <SpinnerIcon aria-hidden="true" style={{ width: 16, height: 16 }} />
+              <p className="mono-meta drop-busy">{busy}</p>
+            </div>
+          )}
         </section>
 
         {rows.length > 0 && (
