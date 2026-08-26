@@ -325,7 +325,47 @@ export type Sortable = { cfi: string }
    parsePdfLocator can be handed either and a bookmark still parses. */
 const PDF_LOC = /^pdf:(\d+):([0-9]*\.?[0-9]+)(?::([0-9]*\.?[0-9]+):([0-9]*\.?[0-9]+))?$/
 
+/* A PDF highlight carries its shape as well as its place: the run of boxes
+   the selection covered, in fractions of each page's own box, appended after
+   an `@`. Fractions and not pixels for exactly the reason the position is a
+   fraction — they survive a change of zoom, fit, spread and screen, which a
+   rendered rectangle does not.
+
+   Appended rather than woven in, so every locator that came before still
+   parses byte for byte: `parsePdfLocator` cuts at the `@` and hands the head
+   to the same expression it always used, which is what keeps bookmarks,
+   sorting and the whole marks list working on a store written by an older
+   build. A fixed page has no CFI, but it does have coordinates, and those are
+   the anchor a fixed page actually offers. */
+export type PdfRect = { page: number; x: number; y: number; w: number; h: number }
+
+export function pdfMarkLocator(page: number, fraction: number, rects: PdfRect[]): string {
+    const body = rects
+        .map(r => [r.page, r.x, r.y, r.w, r.h].map(n => round4(n)).join(','))
+        .join(';')
+    return `pdf:${page}:${round4(fraction)}` + (body ? `@${body}` : '')
+}
+
+/** Four places is a tenth of a pixel on a 2000px page and keeps a locator
+    short enough to read in an export. */
+function round4(n: number) { return Math.round(n * 10000) / 10000 }
+
+export function parsePdfRects(cfi: string): PdfRect[] {
+    const at = cfi.indexOf('@')
+    if (at < 0) return []
+    const out: PdfRect[] = []
+    for (const chunk of cfi.slice(at + 1).split(';')) {
+        const n = chunk.split(',').map(Number)
+        if (n.length !== 5 || n.some(v => !Number.isFinite(v))) continue
+        if (n[0] < 1 || n[3] <= 0 || n[4] <= 0) continue
+        out.push({ page: n[0], x: n[1], y: n[2], w: n[3], h: n[4] })
+    }
+    return out
+}
+
 export function parsePdfLocator(cfi: string): { page: number; fraction: number } | null {
+    const at = cfi.indexOf('@')
+    if (at >= 0) cfi = cfi.slice(0, at)
     const m = PDF_LOC.exec(cfi)
     if (!m) return null
     const page = Number(m[1]), fraction = Number(m[2])

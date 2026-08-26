@@ -275,6 +275,12 @@ export type Settings = {
       so one page is one screen. Not a type control — a PDF has no type to
       control — which is why it lives here and not with `measure`. */
   pdfFit: 'width' | 'page'
+  /** One sheet at a time, or two side by side the way a bound book falls open
+      — the cover alone, then verso facing recto. Honoured only where the pane
+      is wide enough to give both pages a readable size; on a phone the reader
+      still gets a single column, because two A4 pages inside 390px are not a
+      spread, they are a picture of one. */
+  pdfSpread: 'single' | 'double'
   /** 0–1 multiplier on the stock's own `--pdf-veil`, so a reader who wants the
       authored page exactly as printed can turn the tint off without leaving
       their stock. Capped by the stock, never above it: the ceiling is what

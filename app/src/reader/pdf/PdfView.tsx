@@ -35,12 +35,24 @@ import {
     getPage, renderPage, setLayerScale, textLayerFor,
     type PdfDoc, type PdfPageHandle, type PdfPageSize, type PdfTextLayer,
 } from './engine'
+import type { PdfRect } from '../marks'
+import type { HighlightColor } from '../../types'
 
 export type PdfLocation = { page: number; fraction: number }
 /** The one search hit the reader tapped: which page, and the run of words on
     it, in fractions of the page box so it survives every zoom and fit. */
 export type PdfFound = { page: number; fraction: number; x: number; w: number }
 export type PdfFit = 'width' | 'page'
+/** One highlight, ready to paint: which pages it covers and where on each, in
+    fractions of that page's own box. The reader's own marks arrive already
+    reduced to this so the view never touches the store. */
+export type PdfPaintMark = { id: string; color: HighlightColor; rects: PdfRect[] }
+/** One sheet at a time, or two side by side the way a bound book falls open.
+    `double` is a request, not a guarantee: below `SPREAD_MIN` there is not
+    enough width to give either page a readable size, so the layout serves a
+    single column and says so in the sheet rather than rendering two unreadable
+    slivers. */
+export type PdfSpread = 'single' | 'double'
 
 export type PdfViewHandle = {
     /** Jump to a page (1-based) and optionally a fraction down it. `centre`
@@ -59,6 +71,7 @@ export type PdfViewHandle = {
 export interface PdfViewProps {
     doc: PdfDoc
     fit: PdfFit
+    spread: PdfSpread
     /** Where to open. Applied once, after the first measure. */
     start: PdfLocation | null
     ref?: RefObject<PdfViewHandle | null>
@@ -70,6 +83,12 @@ export interface PdfViewProps {
     onZoom?: (zoom: number) => void
     /** Draw the found rule under this run. Null when there is no search. */
     found?: PdfFound | null
+    /** Every highlight in the book. Filtered per page inside, so a 900-page
+        file with three marks costs three array scans per mounted page and no
+        store access at all. */
+    marks?: PdfPaintMark[]
+    /** A painted highlight was tapped: reopen its menu. */
+    onMark?: (id: string) => void
 }
 
 /* The surround. PAD is the margin the stock shows around the paper; GAP is the
@@ -86,6 +105,13 @@ const GAP = 12
    at 1280 before this was accounted for. */
 const RULE = 1
 const MAX_ZOOM = 5
+/* The narrowest box that gets a real two-page spread. Two A4 pages side by
+   side inside 700px leave each one ~336px wide, which at a typical 595pt page
+   is a scale of 0.56 -- 11pt body type rendering at about 6px. That is the
+   floor, not a preference: below it the spread stops being a way to read and
+   starts being a way to look at a book. Measured against the fixture, not
+   picked. */
+const SPREAD_MIN = 700
 /* How far past the range a pinch may stretch before it stops following, and
    how hard it resists. A hard stop at the limit reads as a frozen app; this
    reads as "there is nothing more here". apple-design § 9. */
@@ -99,34 +125,95 @@ type Layout = {
     lefts: number[]
     ws: number[]
     hs: number[]
+    /** Which row each page landed in, and the first page (1-based) of each
+        row. In a single column these are the identity; in a spread they are
+        what lets `locate` report the LEFT page of the pair the reader is
+        looking at rather than whichever of the two the binary search happened
+        to stop on. */
+    rowOf: number[]
+    rowFirst: number[]
 }
 
 /** The whole geometry of the strip at a given box and zoom. Pure, so the pinch
     commit can compute the layout it is about to land in and set the scroll
     offsets exactly, in the same frame, instead of guessing at a ratio. */
-function layoutFor(sizes: PdfPageSize[], boxW: number, boxH: number, fit: PdfFit, zoom: number): Layout {
+function layoutFor(
+    sizes: PdfPageSize[],
+    boxW: number,
+    boxH: number,
+    fit: PdfFit,
+    zoom: number,
+    spread: PdfSpread,
+): Layout {
     let maxW = 1, maxH = 1
     for (const s of sizes) { if (s.w > maxW) maxW = s.w; if (s.h > maxH) maxH = s.h }
     const availW = Math.max(1, boxW - PAD * 2 - RULE * 2)
     const availH = Math.max(1, boxH - PAD * 2 - RULE * 2)
+
+    /* The rows. A spread opens on the cover ALONE and pairs from page two, the
+       way a bound book actually falls open -- page 2 verso facing page 3 recto.
+       Pairing from page one instead puts every recto on the left and every
+       verso on the right, which is the one arrangement a printed book never
+       has, and it is immediately obvious on any file whose pages carry a
+       running head. */
+    const two = spread === 'double' && boxW >= SPREAD_MIN && sizes.length > 1
+    const rows: number[][] = []
+    if (two) {
+        rows.push([0])
+        for (let i = 1; i < sizes.length; i += 2) {
+            rows.push(i + 1 < sizes.length ? [i, i + 1] : [i])
+        }
+    } else {
+        for (let i = 0; i < sizes.length; i++) rows.push([i])
+    }
+
     /* Every page shares one scale, off the widest and tallest page in the file,
        so a document that mixes portrait and landscape does not jump in size as
-       you scroll it. */
+       you scroll it. In a spread the width a row has to fit into is two pages,
+       not one -- computed off `maxW` rather than off the widest ROW so the
+       lone cover renders at the same scale as every pair after it. */
+    const cols = two ? 2 : 1
     const fitScale = fit === 'width'
-        ? availW / maxW
-        : Math.min(availW / maxW, availH / maxH)
+        ? availW / (maxW * cols + (cols - 1) * RULE * 2)
+        : Math.min(availW / (maxW * cols + (cols - 1) * RULE * 2), availH / maxH)
     const scale = fitScale * zoom
+
     const ws: number[] = [], hs: number[] = [], tops: number[] = [], lefts: number[] = []
+    const rowOf: number[] = [], rowFirst: number[] = []
+    for (const s of sizes) { ws.push(Math.round(s.w * scale)); hs.push(Math.round(s.h * scale)) }
+    for (let i = 0; i < sizes.length; i++) { tops.push(0); lefts.push(0); rowOf.push(0) }
+
+    /* The strip is as wide as the widest row can ever be, so it does not
+       change width between the cover and the first pair and jog the scroller
+       sideways. */
+    const rowMax = Math.round(maxW * scale) * cols + cols * RULE * 2
+    const stripW = Math.max(rowMax + PAD * 2, boxW)
+
     let y = PAD
-    for (const s of sizes) {
-        const w = Math.round(s.w * scale), h = Math.round(s.h * scale)
-        ws.push(w); hs.push(h); tops.push(y)
-        y += h + RULE * 2 + GAP
+    for (let r = 0; r < rows.length; r++) {
+        const row = rows[r]
+        rowFirst.push(row[0] + 1)
+        let footprint = 0
+        for (const i of row) footprint += ws[i] + RULE * 2
+        /* The pair is centred as ONE object and its two pages butt together at
+           the spine, so the gutter is the two 1px rules meeting -- not a gap
+           the surround shows through, which would read as two separate sheets
+           that happen to be adjacent. */
+        let x = Math.round((stripW - footprint) / 2)
+        let rowH = 0
+        for (const i of row) {
+            lefts[i] = x
+            tops[i] = y
+            rowOf[i] = r
+            x += ws[i] + RULE * 2
+            if (hs[i] > rowH) rowH = hs[i]
+        }
+        y += rowH + RULE * 2 + GAP
     }
-    const stripW = Math.max(Math.round(maxW * scale) + RULE * 2 + PAD * 2, boxW)
-    /* Centred on the border box, not the canvas. */
-    for (const w of ws) lefts.push(Math.round((stripW - (w + RULE * 2)) / 2))
-    return { scale, stripW, total: Math.max(y - GAP + PAD, boxH), tops, lefts, ws, hs }
+    return {
+        scale, stripW, total: Math.max(y - GAP + PAD, boxH),
+        tops, lefts, ws, hs, rowOf, rowFirst,
+    }
 }
 
 function clamp(v: number, lo: number, hi: number) { return v < lo ? lo : v > hi ? hi : v }
@@ -152,8 +239,8 @@ export function PdfView(p: PdfViewProps) {
 
     const sizes = p.doc.sizes
     const L = useMemo(
-        () => layoutFor(sizes, box.w, box.h, p.fit, zoom),
-        [sizes, box.w, box.h, p.fit, zoom])
+        () => layoutFor(sizes, box.w, box.h, p.fit, zoom, p.spread),
+        [sizes, box.w, box.h, p.fit, zoom, p.spread])
     /* The layout the handlers read. They run outside React's render, on a
        pointer or a scroll, and must never see a stale strip. */
     const Lref = useRef(L)
@@ -179,7 +266,7 @@ export function PdfView(p: PdfViewProps) {
     /* ── where we are, and what to mount ──────────────────────────────── */
     const locate = useCallback((): PdfLocation => {
         const el = scrollRef.current
-        const { tops, hs } = Lref.current
+        const { tops, hs, rowOf, rowFirst } = Lref.current
         if (!el || !tops.length) return { page: 1, fraction: 0 }
         const y = el.scrollTop
         let i = 0
@@ -190,7 +277,12 @@ export function PdfView(p: PdfViewProps) {
             const mid = (lo + hi) >> 1
             if (tops[mid] <= y + 1) { i = mid; lo = mid + 1 } else hi = mid - 1
         }
-        return { page: i + 1, fraction: clamp((y - tops[i]) / Math.max(1, hs[i]), 0, 1) }
+        /* The LEFT page of the row. In a spread the search above stops on
+           whichever of the pair shares the row's top, and reporting the recto
+           would make the readout, the chapter label and the saved position all
+           name the page the reader is not looking at first. */
+        const page = rowFirst[rowOf[i]]
+        return { page, fraction: clamp((y - tops[i]) / Math.max(1, hs[i]), 0, 1) }
     }, [])
 
     const sweep = useCallback(() => {
@@ -264,7 +356,7 @@ export function PdfView(p: PdfViewProps) {
         const now = Lref.current
         const z = clamp(next, 1, MAX_ZOOM)
         if (Math.abs(z - zoom) < 0.0005) return
-        const after = layoutFor(sizes, box.w, box.h, p.fit, z)
+        const after = layoutFor(sizes, box.w, box.h, p.fit, z, p.spread)
 
         /* Anchor to the page under the fingers, not to a scroll ratio. The
            strip's own left padding changes when the pages stop being centred,
@@ -281,7 +373,7 @@ export function PdfView(p: PdfViewProps) {
         }
         setZoom(z)
         cb.current.onZoom?.(z)
-    }, [zoom, sizes, box.w, box.h, p.fit])
+    }, [zoom, sizes, box.w, box.h, p.fit, p.spread])
 
     useLayoutEffect(() => {
         const el = scrollRef.current
@@ -458,6 +550,8 @@ export function PdfView(p: PdfViewProps) {
                         left={L.lefts[n - 1]}
                         top={L.tops[n - 1]}
                         found={p.found && p.found.page === n ? p.found : null}
+                        marks={p.marks}
+                        onMark={p.onMark}
                         onPaint={onPaint}
                     />
                 ))}
@@ -484,6 +578,8 @@ function PdfPage(pp: {
     left: number
     top: number
     found: PdfFound | null
+    marks?: PdfPaintMark[]
+    onMark?: (id: string) => void
     onPaint: () => void
 }) {
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -528,11 +624,36 @@ function PdfPage(pp: {
     return (
         <div
             className="pdf-page"
+            /* The page number on the element, because a selection arrives as
+               client rectangles with no idea which sheet they landed on, and
+               mapping one to a page by geometry is the only way to store a
+               highlight against the page it is actually on. */
+            data-page={pp.num}
             style={{ left: pp.left, top: pp.top, width: pp.w, height: pp.h }}
             aria-label={`Page ${pp.num}`}
         >
             <canvas className="pdf-canvas" ref={canvasRef} width={pp.w} height={pp.h} />
             <div className="pdf-veil" aria-hidden="true" />
+            {/* Under the text layer, over the veil. Under, so the spans stay
+                selectable and the ink stays the page's own ink rather than
+                something drawn on top of it; over, so a tint on a dark stock
+                is not itself washed out by the veil it is meant to sit on. */}
+            {pp.marks?.map(m => m.rects.map((r, k) => r.page !== pp.num ? null : (
+                <button
+                    key={`${m.id}:${k}`}
+                    type="button"
+                    className="pdf-mark"
+                    data-mark={m.id}
+                    data-tint={m.color}
+                    tabIndex={k === 0 ? 0 : -1}
+                    aria-label="Highlight"
+                    onClick={e => { e.stopPropagation(); pp.onMark?.(m.id) }}
+                    style={{
+                        left: `${r.x * 100}%`, top: `${r.y * 100}%`,
+                        width: `${r.w * 100}%`, height: `${r.h * 100}%`,
+                    }}
+                />
+            )))}
             <div className="pdf-text textLayer" ref={textRef} />
             {pp.found && (
                 <div
