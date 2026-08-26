@@ -126,7 +126,14 @@ export function PdfReader() {
        as the menu's anchor. Kept in a ref because it is read by handlers, not
        rendered, and re-rendering the reader on every pixel of a drag is the
        one thing this file is built to avoid. */
+    /* The selection's shape AND its words, both captured the moment it
+       settles. The words are kept rather than read back on demand because the
+       menu's buttons live in the same document as the selection here -- unlike
+       the reflowable reader, where the text is inside an iframe -- so pressing
+       one collapses the selection before the click handler ever runs. Read
+       live, the text is empty by the time a highlight is being made. */
     const selRects = useRef<PdfRect[]>([])
+    const selWords = useRef('')
     const [exportOpen, setExportOpen] = useState(false)
     const [at, setAt] = useState<PdfLocation>({ page: 1, fraction: 0 })
     /* The one search hit the reader tapped. It belongs to the search and dies
@@ -308,6 +315,7 @@ export function PdfReader() {
                 })
             }
             selRects.current = shape
+            selWords.current = flatten(s.toString())
             setSel({
                 anchor: {
                     x: (left + right) / 2 - box.left,
@@ -331,10 +339,11 @@ export function PdfReader() {
         }
     }, [doc])
 
-    const selText = () => sel?.mark?.text ?? flatten(document.getSelection()?.toString() ?? '')
+    const selText = () => sel?.mark?.text ?? selWords.current
     const dropSel = () => {
         document.getSelection()?.removeAllRanges()
         selRects.current = []
+        selWords.current = ''
         setSel(null)
     }
 
@@ -353,7 +362,7 @@ export function PdfReader() {
        tombstones all work on it without knowing it came from a PDF. */
     const makeMark = useCallback(async (color: HighlightColor): Promise<Annotation | null> => {
         const shape = selRects.current
-        const text = flatten(document.getSelection()?.toString() ?? '')
+        const text = selWords.current
         if (!id || !shape.length || !text) return null
         const first = shape.reduce((a, b) => (b.page < a.page || (b.page === a.page && b.y < a.y) ? b : a))
         const cfi = pdfMarkLocator(first.page, first.y, shape)
@@ -390,6 +399,7 @@ export function PdfReader() {
         const r = el.getBoundingClientRect(), box = stage.getBoundingClientRect()
         document.getSelection()?.removeAllRanges()
         selRects.current = []
+        selWords.current = ''
         setSel({
             anchor: { x: r.left + r.width / 2 - box.left, top: r.top - box.top, bottom: r.bottom - box.top },
             mark,
