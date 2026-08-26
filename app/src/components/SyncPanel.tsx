@@ -20,7 +20,9 @@ import {
   otherLibrary,
   pauseAutoSync,
   resumeAutoSync,
+  SYNC_PROGRESS,
   syncNow,
+  syncProgress,
 } from '../sync/sync'
 import { bytes } from '../lib'
 
@@ -94,6 +96,11 @@ export function SyncPanel() {
   const [err, setErr] = useState('')
   const [asking, setAsking] = useState<{ device: string; at: number } | null>(null)
   const [dropping, setDropping] = useState(false)
+  /* The file pass, while it is running. Book files are the only part of a
+     sync that takes long enough to need reporting, and `sync.ts` counts them
+     out; this is only the readout. Null between passes, which is most of the
+     time. */
+  const [moving, setMoving] = useState(syncProgress())
 
   const refresh = useCallback(() => {
     setOn(optedIn())
@@ -101,6 +108,13 @@ export function SyncPanel() {
     setAt(lastSync())
     setStale(needsSignIn())
     setFiles(filesIncluded())
+  }, [])
+
+  useEffect(() => {
+    if (!SYNC_AVAILABLE) return
+    const tick = () => setMoving(syncProgress())
+    window.addEventListener(SYNC_PROGRESS, tick)
+    return () => window.removeEventListener(SYNC_PROGRESS, tick)
   }, [])
 
   useEffect(() => {
@@ -262,7 +276,10 @@ export function SyncPanel() {
   }
 
   return (
-    <section className="panel">
+    /* The id is the destination of the Library head's "Sync" link, and
+       SettingsPage does the scrolling. Named for what a reader would guess
+       rather than for this component. */
+    <section className="panel" id="sync">
       <p className="ui-lbl">Google Drive sync</p>
 
       {/* STATE FIRST, and it opens with a single word, so the answer to "am I
@@ -356,6 +373,34 @@ export function SyncPanel() {
                     ? `${bytes(room.used)} used in your Drive`
                     : `${bytes(room.used)} of ${bytes(room.limit)} used in your Drive`}
                 </p>
+              )}
+
+              {/* WHAT IS ACTUALLY HAPPENING, while it happens. "Syncing" on
+                  its own cannot tell a working sync from a stuck one, and the
+                  book files are minutes of it on a phone. Shown for any pass,
+                  including the automatic ones, because the reader did not
+                  start those either and they are the ones that look like
+                  nothing. `.bar` is the shelf's own progress hairline, so this
+                  adds no new component and no new token. */}
+              {moving && (
+                <div className="sync-move" role="status" aria-live="polite">
+                  <p className="mono-meta">
+                    {`Moving book ${Math.min(moving.done + 1, moving.total)} of ${moving.total}`}
+                  </p>
+                  <span
+                    className="bar"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={moving.total}
+                    aria-valuenow={moving.done}
+                    aria-label="Book files moving"
+                  >
+                    <span
+                      className="bar-fill"
+                      style={{ width: `${Math.round((moving.done / moving.total) * 100)}%` }}
+                    />
+                  </span>
+                </div>
               )}
 
               <div className="set-acts">

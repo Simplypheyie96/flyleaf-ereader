@@ -87,6 +87,38 @@ const FILES_KEY = 'flyleaf-ereader-sync-files'
     `fetchBookFile` below pulls that one file straight away. */
 const FILES_PER_PASS = 10
 
+/* WHAT IS TAKING SO LONG, AND HOW MUCH IS LEFT.
+
+   The record is a few kilobytes and lands in one breath; the BOOK FILES are
+   megabytes each and are the whole of the wait. Ten of them a pass on a phone
+   is minutes, and until now the only thing on screen for all of it was the
+   word "Syncing", which cannot tell a stalled sync from a working one. So the
+   file loop counts itself out loud.
+
+   FILES, NOT BYTES. Drive gives a size per file, but the two directions do not
+   cost the same per byte and a part-uploaded file reports nothing back, so a
+   byte bar would be a smooth lie. "Book 3 of 7" is a number this code actually
+   knows, and it is the number a reader is waiting on anyway.
+
+   COUNTED BY ATTEMPT, not by success. A file that is skipped -- gone from
+   Drive, unreadable here -- still advances the bar, because a bar that stops
+   at 6 of 7 and then vanishes reads as a failure when the pass in fact
+   finished. What actually moved is already reported by `SyncResult.files`. */
+export const SYNC_PROGRESS = 'flyleaf-ereader-sync-progress'
+
+let progress: { done: number; total: number } | null = null
+
+/** The pass in flight, or null between passes. Read once on mount; after that
+    `SYNC_PROGRESS` says when it changed. */
+export function syncProgress(): { done: number; total: number } | null {
+  return progress
+}
+
+function report(next: { done: number; total: number } | null) {
+  progress = next
+  window.dispatchEvent(new Event(SYNC_PROGRESS))
+}
+
 export interface SyncResult {
   /** rows that came down from another device */
   gained: number
@@ -414,19 +446,36 @@ async function moveFiles(
   device: string,
 ): Promise<{ files: number; left: number }> {
   let files = 0
-  /* Down before up. A reader who has just installed the app on a new device
-     wants a book to open, and is not waiting on their other device's copy of
-     one they already have. */
-  for (const fp of work.down.slice(0, FILES_PER_PASS)) {
-    const file = folder.get(bookFileName(fp))
-    if (!file) continue
-    if (await unpackBook(await readBlob(token, file.id))) files += 1
-  }
-  for (const id of work.up.slice(0, FILES_PER_PASS)) {
-    const packed = await packBook(id)
-    if (!packed) continue
-    await writeFile(token, packed.name, packed.body, device)
-    files += 1
+  const down = work.down.slice(0, FILES_PER_PASS)
+  const up = work.up.slice(0, FILES_PER_PASS)
+  const total = down.length + up.length
+  let done = 0
+  /* Nothing to move is not a pass worth drawing. The record still synced, and
+     a bar that flashes 0 of 0 is noise on every ninety-second idle sync. */
+  if (total > 0) report({ done, total })
+  try {
+    /* Down before up. A reader who has just installed the app on a new device
+       wants a book to open, and is not waiting on their other device's copy of
+       one they already have. */
+    for (const fp of down) {
+      const file = folder.get(bookFileName(fp))
+      if (file && (await unpackBook(await readBlob(token, file.id)))) files += 1
+      done += 1
+      report({ done, total })
+    }
+    for (const id of up) {
+      const packed = await packBook(id)
+      if (packed) {
+        await writeFile(token, packed.name, packed.body, device)
+        files += 1
+      }
+      done += 1
+      report({ done, total })
+    }
+  } finally {
+    /* Cleared however this ends. A bar left on screen by a thrown sync is a
+       sync that looks like it is still running forever. */
+    if (total > 0) report(null)
   }
   const left = Math.max(0, work.down.length - FILES_PER_PASS) + Math.max(0, work.up.length - FILES_PER_PASS)
   return { files, left }
