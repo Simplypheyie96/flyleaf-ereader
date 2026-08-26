@@ -2745,9 +2745,9 @@ body::before{
    Measured on the rendered panel, band against the stock's own paper:
    Press 1.94 · Day 1.92 · Butter 1.90 · Tea 1.80 · Coal 2.55 · Dusk 2.36 ·
    Pitch 1.79. Ink on the band over the same seven never drops below 5.15
-   (Dusk), so the word itself stays well clear of AA. */
+   (Dusk), so the word itself stays well clear of AA.
 
-   `box-decoration-break: clone` so a match that wraps carries its own
+   And `box-decoration-break: clone` so a match that wraps carries its own
    padding and radius onto the second line instead of a band with one open
    end. The inline padding is horizontal-only: the excerpt is a clamped
    `-webkit-box`, and vertical padding on a child of one is what pushes the
