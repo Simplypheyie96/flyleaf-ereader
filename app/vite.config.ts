@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-import { createReadStream, cpSync, existsSync, mkdirSync } from 'node:fs'
+import { createReadStream, cpSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 
@@ -47,6 +47,26 @@ function pdfjsAssets(): Plugin {
      runs in has WebAssembly. 1.1MB of the 1.5MB `wasm` directory, skipped. */
   const skip = /(nowasm_fallback\.js|quickjs-eval\.(js|wasm))$/
   const dirs = ['standard_fonts', 'cmaps', 'wasm', 'iccs']
+  /* The worker fetches these by name and nothing enumerates them, so the one
+     thing that can warm the cache for offline use needs a list. Written at
+     build time from what was actually copied — a hand-kept list would rot the
+     first time pdfjs adds a CMap. `version` is the installed pdfjs-dist, and
+     it is what tells a warmed cache it is stale after an update. */
+  const manifest = (out: string) => {
+    const files: string[] = []
+    const walk = (dir: string, prefix: string) => {
+      for (const e of readdirSync(join(out, dir), { withFileTypes: true })) {
+        if (e.isDirectory()) walk(join(dir, e.name), `${prefix}${e.name}/`)
+        else files.push(`${prefix}${e.name}`)
+      }
+    }
+    for (const d of dirs) if (existsSync(join(out, d))) walk(d, `${d}/`)
+    files.sort()
+    writeFileSync(
+      join(out, 'manifest.json'),
+      JSON.stringify({ version: req('pdfjs-dist/package.json').version, files }),
+    )
+  }
   const copy = (out: string) => {
     for (const d of dirs) {
       const from = join(root, d)
@@ -57,6 +77,7 @@ function pdfjsAssets(): Plugin {
         filter: src => !skip.test(src),
       })
     }
+    manifest(out)
   }
   return {
     name: 'flyleaf-pdfjs-assets',
@@ -196,13 +217,14 @@ export default defineConfig({
            format many of them will never open. So it is CacheFirst instead —
            fetched at most once, kept forever after.
 
-           The honest gap this leaves, recorded in SPEC.md § 10: a PDF whose
-           fonts are neither embedded nor available on the system, or which uses
-           JBIG2, JPEG 2000, an ICC profile or a predefined CJK CMap, needs one
-           network fetch the first time it is opened. Every other PDF — anything
-           with embedded or base-14 fonts, which is the overwhelming majority —
-           needs none, because pdfjs asks for these files only when a page
-           actually references one. */
+           That left one gap: a PDF whose fonts are neither embedded nor on the
+           system, or which uses JBIG2, JPEG 2000, an ICC profile or a
+           predefined CJK CMap, needed a network fetch the first time it was
+           opened. It is closed from the other end — importing a PDF is the
+           moment we learn this reader opens PDFs, and `warmPdfData()` then
+           walks manifest.json in the background and fills this cache. So the
+           install stays PDF-free and anyone who has actually imported one is
+           covered offline. */
         runtimeCaching: [
           {
             urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/pdfjs/'),

@@ -2,6 +2,7 @@ import { addBook, db } from '../db'
 import type { Book, BookFile, Format } from '../types'
 import { plainText, readMeta, titleFromName } from './meta'
 import { MIME, sniff } from './sniff'
+import { warmPdfData } from '../reader/pdf/warm'
 
 /* Import. One function, one path, every entry point.
 
@@ -88,6 +89,10 @@ export async function importFile(file: File, options: ImportOptions = {}): Promi
 
   const bytes: BookFile = { bookId: book.id, data: file.slice(), type: sniffed.mime }
   await addBook(book, bytes)
+  /* This reader opens PDFs, so the pdfjs data files are worth having offline.
+     Deliberately not awaited: the import is done, and the warm-up is slow,
+     silent and entirely optional. */
+  if (sniffed.format === 'pdf') void warmPdfData()
   return { ok: true, book, duplicate: false }
 }
 

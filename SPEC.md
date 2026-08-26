@@ -1195,14 +1195,28 @@ from `mix-blend-mode: multiply` at full strength to `normal` at 0.4 alpha, per `
 Cover and metadata come from the file itself: page one rendered at 495×640, the title read from
 the Info dictionary. That is not a *generated* cover — a PDF's first page **is** its cover.
 
-### 13.6 The honest gap
+### 13.6 The data files, and how they get offline
 
 pdfjs *code* is precached (worker 1.19MB + API chunk 483kB, inside Press's 6MB ceiling). pdfjs
-*data* — 2.4MB of standard fonts, CMaps, ICC profiles and WASM — is `CacheFirst`, fetched only if
-a file asks for it. So: a PDF whose fonts are neither embedded nor available on the system, or
-which uses JBIG2, JPEG 2000, an ICC profile or a predefined CJK CMap, **needs one network fetch
-the first time it is opened**. Everything else, including every base-14 PDF, opens with the
-network off. Measured: zero requests to `/pdfjs/` on the fixture.
+*data* — 3.1MB of standard fonts, CMaps, ICC profiles and WASM — is **not**, and must not be:
+that is 3.1MB added to every install, most of it CJK CMaps, for a format many readers will never
+open. It stays `CacheFirst` under `/pdfjs/`.
+
+That used to leave a real gap — a PDF whose fonts are neither embedded nor on the system, or which
+uses JBIG2, JPEG 2000, an ICC profile or a predefined CJK CMap, needed one network fetch the first
+time it was opened. It is closed from the other end rather than by bulk precaching. **Importing a
+PDF is the moment the app learns this reader opens PDFs**, and `warmPdfData()`
+(`reader/pdf/warm.ts`) then fetches the lot in the background, serially, into that same cache.
+
+- The list comes from `/pdfjs/manifest.json`, written at build time by the `pdfjsAssets()` plugin
+  from what it actually copied. The worker asks for these by exact unhashed name and nothing else
+  enumerates them, so a hand-kept list would rot the first time pdfjs adds a CMap.
+- Keyed in `localStorage` by the `pdfjs-dist` version, so an upgrade warms again.
+- Never awaited, never blocking, silent on failure, skipped when `navigator.onLine` is false. If
+  it does not run, behaviour is exactly what it was before: fetched on demand.
+
+So the install stays PDF-free, and a reader who has imported one PDF opens any PDF offline.
+Measured: zero requests to `/pdfjs/` on the fixture, and zero on a second open after a warm.
 
 `.pdf` is registered in `file_handlers` alongside the book formats — one handler, because `/open`
 sniffs the file itself. `.txt`, `.md` and `.html` are deliberately **not** claimed: an ereader has
