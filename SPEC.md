@@ -1906,9 +1906,9 @@ before pressing *Restore included books*, because that control now lives behind 
 Two faults with one cause: sync worked and nobody could tell. The feature was four screens deep in
 Settings, and a running pass said only the word "Syncing".
 
-**The way in.** The Library head now reads `2 BOOKS · SYNC`, the second half a link to
-`/settings#sync`. In the head's own mono voice, beside the count, because the shelf *is* the thing
-being synced — not on Home, which is about the book you are in. `SettingsPage` honours the hash
+**The way in.** The Library head carries a round `.icon-btn` at its trailing edge, a `Link` to
+`/settings#sync` with a new `SyncIcon` in it, beside the book count. Beside the count because the
+shelf *is* the thing being synced — not on Home, which is about the book you are in. `SettingsPage` honours the hash
 itself rather than leaving it to the browser: the target does not exist when the URL changes (Dexie
 and a storage estimate resolve first, the panel draws later still), so a single
 `requestAnimationFrame` found nothing and gave up silently — measured, the page had not moved with
@@ -1917,11 +1917,24 @@ or mistyped hash ends in a still page rather than a loop. Instant, not smooth: s
 a link naming the thing they want is not served by watching four screens slide past.
 `#sync{ scroll-margin-top:20px }` keeps it off the top edge. Absent entirely when the app was built
 with no `VITE_GOOGLE_CLIENT_ID`, on the same rule `SyncPanel` follows — a way in to a control that
-is not there is worse than no way in. The link is a **text** link, not an icon: `index.css` already
-styled `a` inside the head span, so no new glyph was drawn. It carries `color:inherit`, which is not
-cosmetic — without it the UA's own link colour beats the span's `--ink-soft` and the word rendered
-default blue at **1.94:1** on dark chrome. With it: **6.17** dark, **5.16** light, **4.98** sepia,
-and a 48.19 × 30.5px press target, padded and negative-margined so the head keeps its height.
+is not there is worse than no way in.
+
+**A button, not a word in the count line.** The first pass was a text link after the count, reading
+`2 BOOKS · SYNC`. It measured fine and it was still wrong: a link inside a status line is something
+you notice *once you already know it is there*, which is precisely the reader this exists for
+failing to find it. It is now permanent chrome — same place every time the shelf is open, pressable
+at a glance rather than on inspection. The count keeps its own `<span>`; both live in a new
+`.app-head-end` flex box, and because a flex container's baseline is its first item's, the count
+still sits on the `h1`'s baseline while the 34px button centres on that line. The head grows from
+39.5px to 50.25px, which is the only cost. As a `Link` rather than a `button`, `.icon-btn` arrives
+with the UA's underline and link colour, so `.app-head-end .icon-btn` resets both — the same fault
+that made the earlier text link render default blue at **1.94:1** on dark chrome. Measured after:
+icon **13.73:1**, no underline, 34 × 34px, trailing edge flush with the container at 355 / 1024.
+
+`SyncIcon` is two 150° arcs on one radius with an arrowhead each, in Press's hand — **not** the two
+near-full circles the obvious construction gives you, which overlap into doubled rings and lose the
+gap that says "two arrows, not one circle" by the time they are 16px. Rendered at 160, 34 and 16 and
+looked at, rather than trusted as path data.
 
 **The progress.** `sync.ts` emits a `flyleaf-ereader-sync-progress` event around the file loop, and
 `SyncPanel` draws "Moving book 3 of 7" over the shelf's existing `.bar` hairline — no new component,

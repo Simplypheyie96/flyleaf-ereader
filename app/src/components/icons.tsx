@@ -522,6 +522,28 @@ export function SearchIcon() {
   )
 }
 
+export function SyncIcon() {
+  /* Two arcs chasing each other -- the one mark for "this travels between your
+     devices" that needs no label, which is the whole point of putting it in the
+     head where there is no room for one.
+
+     Drawn as two 150-degree arcs on the same radius rather than the two near-full
+     circles the obvious construction gives you: at 300 degrees each they overlap
+     into a pair of doubled rings and the gap that says "these are two arrows, not
+     one circle" closes up at 16px. 150 leaves a clean quarter of white on each
+     side. Verified by rendering at 160, 34 and 16, not by reading the path. */
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <g {...strokeProps}>
+        <path d="M5.63 10.29 A 6.6 6.6 0 0 1 18.37 10.29" />
+        <path d="M15.74 8.31 L 18.37 10.29 L 19.66 7.25" />
+        <path d="M18.37 13.71 A 6.6 6.6 0 0 1 5.63 13.71" />
+        <path d="M8.26 15.69 L 5.63 13.71 L 4.34 16.75" />
+      </g>
+    </svg>
+  )
+}
+
 export function CupIcon() {
   /* A mug with two curls of steam. Drawn rather than sourced, per the note at
      the top of this file: the tip jar's mark has to be in the same hand as the
