@@ -390,6 +390,70 @@ function esc(s: string): string {
         .replace(/"/g, '&quot;')
 }
 
+/* Pages that ship the article as data, not as markup.
+
+   Readability reads the DOM, so a page that renders its body in JavaScript
+   from an embedded payload looks empty to it \u2014 on a Substack post it finds
+   the footer, "Substack is the home for great culture", and calls that the
+   article. The words are in the page; they are just not in the markup.
+
+   Two shapes, and no more. Both are declared formats rather than guesses at a
+   site's private structure: schema.org's `articleBody`, which many publishers
+   emit for search engines, and Substack's `window._preloads`, which is one
+   named site but a large fraction of what anyone actually saves to read later.
+   Anything else that renders client-side still gets the honest 422 \u2014 better
+   than a scraper that half-works on sites nobody tested. */
+function embeddedBody(document: Document): string | null {
+    /* schema.org. `articleBody` is plain text in the wild far more often than
+       markup, so paragraphs are rebuilt from its blank lines; a body that is
+       already markup is passed through and meets the sanitiser like any other. */
+    for (const node of document.querySelectorAll('script[type="application/ld+json"]')) {
+        let data: unknown
+        try {
+            data = JSON.parse(node.textContent ?? '')
+        } catch {
+            continue
+        }
+        const queue = Array.isArray(data) ? [...data] : [data]
+        while (queue.length) {
+            const item = queue.shift()
+            if (!item || typeof item !== 'object') continue
+            const record = item as Record<string, unknown>
+            if (Array.isArray(record['@graph'])) queue.push(...record['@graph'])
+            const body = record['articleBody']
+            if (typeof body === 'string' && body.trim().length > 400) {
+                if (/<(p|div|h[1-6])[\s>]/i.test(body)) return body
+                return body
+                    .split(/\n{2,}/)
+                    .map((para) => para.trim())
+                    .filter(Boolean)
+                    .map((para) => `<p>${esc(para)}</p>`)
+                    .join('\n')
+            }
+        }
+    }
+
+    /* Substack. The payload is a JSON string inside a JSON.parse() call, so it
+       is read out of the script's own text rather than by executing anything. */
+    for (const node of document.querySelectorAll('script')) {
+        const text = node.textContent ?? ''
+        if (!text.includes('window._preloads')) continue
+        const match = /window\._preloads\s*=\s*JSON\.parse\((".*?")\)/s.exec(text)
+        if (!match) continue
+        try {
+            const payload = JSON.parse(JSON.parse(match[1]) as string) as {
+                post?: { body_html?: unknown }
+            }
+            const body = payload.post?.body_html
+            if (typeof body === 'string' && body.trim().length > 400) return body
+        } catch {
+            /* A payload shape that has moved on. Fall through to the 422. */
+        }
+    }
+
+    return null
+}
+
 export default {
     async fetch(request: Request): Promise<Response> {
         const json = (body: unknown, status = 200) =>
@@ -468,7 +532,15 @@ export default {
                 document.querySelector('meta[property="og:title"]')?.getAttribute('content')?.trim() ?? ''
 
             const parsed = new Readability(document as never, { charThreshold: 250 }).parse()
-            if (!parsed?.content) {
+
+            /* What Readability found, measured as words rather than as markup:
+               a page that renders client-side still hands back a wrapper div
+               and a stray line of chrome, which is truthy and worthless. Below
+               this, the embedded payload is tried before giving up. */
+            const foundText = (parsed?.textContent ?? '').trim()
+            const embedded = foundText.length < 600 ? embeddedBody(document as unknown as Document) : null
+
+            if (!embedded && !parsed?.content) {
                 return json(
                     { error: 'There was no article on that page — it may be a front page, a feed, or built entirely in JavaScript.' },
                     422,
@@ -477,12 +549,12 @@ export default {
 
             /* Readability hands back a string. Re-parse it so the sanitiser and
                the image inliner work on a tree rather than on a regex. */
-            const { document: out } = parseHTML(`<div id="a">${parsed.content}</div>`)
+            const { document: out } = parseHTML(`<div id="a">${embedded ?? parsed!.content}</div>`)
             const root = out.getElementById('a') as unknown as Element
             const images = await inlineImages(root, finalUrl)
             sanitise(root, out as unknown as Document)
 
-            const found = (parsed.title || finalUrl.hostname).trim()
+            const found = (parsed?.title || ogTitle || finalUrl.hostname).trim()
             /* Strictly shorter, or it is not a de-suffixing — plenty of sites
                set og:title to the identical tab title, and taking it there
                would only skip the trim below. */
@@ -493,8 +565,8 @@ export default {
                     ? ogTitle
                     : found
             const title = trimSiteSuffix(headline, siteName)
-            const byline = parsed.byline?.trim() || ''
-            const published = parsed.publishedTime?.trim() || ''
+            const byline = parsed?.byline?.trim() || ''
+            const published = parsed?.publishedTime?.trim() || ''
 
             /* A whole document, not a fragment: this is about to be written to
                disk as an .html file and opened by the same engine that opens
@@ -511,21 +583,6 @@ export default {
 <head>
 <meta charset="utf-8">
 <title>${esc(title)}</title>
-<style>
-/* The only stylesheet this document carries. Everything else \u2014 face,
-   size, measure, leading, stock \u2014 belongs to the reader\u2019s own controls
-   and must not be pre-empted here. These three rules exist because a
-   paginated column is a hard boundary: anything wider than it does not
-   scroll into view, it is simply gone off the right edge. A <pre> defaults
-   to white-space:pre, and a page scraped from the web carries width and
-   height attributes sized for a browser window, so both overflow a 340px
-   column unless told not to. Verified on overreacted.io (a clipped code
-   block) and en.wikipedia.org/wiki/Typography (eleven images, width
-   attributes intact). */
-pre{ white-space:pre-wrap; overflow-wrap:break-word; }
-img,svg,video{ max-width:100%; height:auto; }
-table{ max-width:100%; }
-</style>
 ${byline ? `<meta name="author" content="${esc(byline)}">\n` : ''}<meta name="source" content="${esc(finalUrl.toString())}">
 </head>
 <body>
@@ -546,7 +603,7 @@ ${root.innerHTML}
                 siteName,
                 published,
                 lang: docLang,
-                excerpt: parsed.excerpt?.trim() ?? '',
+                excerpt: parsed?.excerpt?.trim() ?? '',
                 imageBytes: images.used,
                 imagesDropped: images.dropped,
                 html: doc,

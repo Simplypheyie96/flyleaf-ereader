@@ -189,6 +189,18 @@ ${s.publisherFont ? '' : `
     word-spacing: normal !important;
     hyphens: manual !important;
 }
+/* A paginated column has no horizontal scroll, so a line wider than it is not
+   clipped \u2014 it is gone, with nothing on screen to say so. <pre> defaults to
+   white-space: pre, which is exactly that failure: a code sample from a web
+   page runs off the right edge and the rest of the line cannot be reached at
+   any font size. Wrapping is the lesser loss; the author's line breaks and
+   indentation still hold, only the overlong lines fold. Caught on an imported
+   article, but it was never article-specific \u2014 an EPUB with a wide listing
+   in it lost the same text. */
+pre {
+    white-space: pre-wrap !important;
+    overflow-wrap: break-word !important;
+}
 ${s.align === 'published' ? '' : `
 :is(p, li, dd, dt, blockquote, div) {
     text-align: ${s.align} !important;
