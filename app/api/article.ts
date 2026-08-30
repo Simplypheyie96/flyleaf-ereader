@@ -403,7 +403,9 @@ function esc(s: string): string {
    named site but a large fraction of what anyone actually saves to read later.
    Anything else that renders client-side still gets the honest 422 \u2014 better
    than a scraper that half-works on sites nobody tested. */
-function embeddedBody(document: Document): string | null {
+type Embedded = { html: string; title: string | null }
+
+function embeddedBody(document: Document): Embedded | null {
     /* schema.org. `articleBody` is plain text in the wild far more often than
        markup, so paragraphs are rebuilt from its blank lines; a body that is
        already markup is passed through and meets the sanitiser like any other. */
@@ -422,13 +424,16 @@ function embeddedBody(document: Document): string | null {
             if (Array.isArray(record['@graph'])) queue.push(...record['@graph'])
             const body = record['articleBody']
             if (typeof body === 'string' && body.trim().length > 400) {
-                if (/<(p|div|h[1-6])[\s>]/i.test(body)) return body
-                return body
-                    .split(/\n{2,}/)
-                    .map((para) => para.trim())
-                    .filter(Boolean)
-                    .map((para) => `<p>${esc(para)}</p>`)
-                    .join('\n')
+                const headline = typeof record['headline'] === 'string' ? (record['headline'] as string) : null
+                const html = /<(p|div|h[1-6])[\s>]/i.test(body)
+                    ? body
+                    : body
+                          .split(/\n{2,}/)
+                          .map((para) => para.trim())
+                          .filter(Boolean)
+                          .map((para) => `<p>${esc(para)}</p>`)
+                          .join('\n')
+                return { html, title: headline }
             }
         }
     }
@@ -442,10 +447,16 @@ function embeddedBody(document: Document): string | null {
         if (!match) continue
         try {
             const payload = JSON.parse(JSON.parse(match[1]) as string) as {
-                post?: { body_html?: unknown }
+                post?: { body_html?: unknown; title?: unknown }
             }
             const body = payload.post?.body_html
-            if (typeof body === 'string' && body.trim().length > 400) return body
+            if (typeof body === 'string' && body.trim().length > 400) {
+                /* Substack's <title> and og:title are both the publication's
+                   name, not the post's — the only place the piece is actually
+                   named is the payload the body came from. */
+                const name = payload.post?.title
+                return { html: body, title: typeof name === 'string' && name.trim() ? name.trim() : null }
+            }
         } catch {
             /* A payload shape that has moved on. Fall through to the 422. */
         }
@@ -554,12 +565,12 @@ export default {
 
             /* Readability hands back a string. Re-parse it so the sanitiser and
                the image inliner work on a tree rather than on a regex. */
-            const { document: out } = parseHTML(`<div id="a">${embedded ?? parsed!.content}</div>`)
+            const { document: out } = parseHTML(`<div id="a">${embedded?.html ?? parsed!.content}</div>`)
             const root = out.getElementById('a') as unknown as Element
             const images = await inlineImages(root, finalUrl)
             sanitise(root, out as unknown as Document)
 
-            const found = (parsed?.title || ogTitle || finalUrl.hostname).trim()
+            const found = (embedded?.title || parsed?.title || ogTitle || finalUrl.hostname).trim()
             /* Strictly shorter, or it is not a de-suffixing — plenty of sites
                set og:title to the identical tab title, and taking it there
                would only skip the trim below. */
