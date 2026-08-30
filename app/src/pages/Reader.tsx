@@ -808,6 +808,9 @@ export function Reader() {
             palette,
             lang: firstLang(viewRef.current?.book?.metadata?.language),
             dark: isDarkStock(palette),
+            /* Measured on the stage, never inside the section: in scrolled
+               flow the section's own frame is as tall as its content. */
+            viewport: stageRef.current?.clientHeight || window.innerHeight,
         }))
     }, [twoUp])
 
