@@ -468,3 +468,29 @@ The patch refuses the move when there is no adjacent section, and moves the unlo
 `finally` so a section that genuinely fails to load also releases the lock.
 
 Upstream shape is otherwise unchanged; re-apply by wrapping the same body.
+
+## PATCH 8 — `paginator.js`, `setImageSize()`: no block cap in scrolled flow
+
+`setImageSize` writes `max-height: ${height - margin * 2}px !important` inline on
+every `img`, `svg` and `video`, where `height` comes from `#layout`. In paginated
+flow that is the page column and the cap is right. In scrolled flow the section
+iframe is sized to its own content, so `height` is the *content* height, and the
+cap becomes a feedback loop: a full-page image shortens the frame, the shorter
+frame tightens the cap, the image shrinks again.
+
+Measured on `The_Incandescent_-_Emily_Tesh.epub` at 390×844, scrolled, before the
+patch: the section frame settled at `innerHeight` **257px**, the inline cap at
+**250.406px**, and the Calibre cover wrapper — `width="100%" height="100%"
+viewBox="0 0 1456 2200" preserveAspectRatio="none"` — was forced to
+**327.6 × 250.4** and stretched the artwork to fill it. `renderer.viewSize` came
+out **385px** against a **602px** viewport, so the section had nothing to scroll:
+"scrolling not working except for text content".
+
+The change: bind the cap to `this.#column`, which is `false` in scrolled flow, and
+pass `''` there, which removes the inline property rather than setting one.
+Scrolled flow has no page to fit an image into; the cross-axis cap belongs to the
+app's own stylesheet, which is generated outside the frame and knows the stage's
+real height (`readingCss.ts`, `viewport`).
+
+The inline-axis cap and `object-fit`, `break-inside` and `box-sizing` are
+untouched in both flows.

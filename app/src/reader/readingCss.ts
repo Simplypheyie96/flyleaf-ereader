@@ -102,6 +102,10 @@ export interface ReadingCssInput {
     lang: string | null
     /** dark stocks matte images and lighten the selection wash. */
     dark: boolean
+    /** the reading stage's own height in px. Scrolled flow's image cap: the
+        section iframe is content-sized there, so neither a percentage nor a
+        `vh` inside it means the viewport, and both feed back on themselves. */
+    viewport: number
 }
 
 /**
@@ -112,7 +116,7 @@ export interface ReadingCssInput {
  * below with broad selectors: matching `*` costs a style recalculation once
  * per relayout, which the turn does not touch.
  */
-export function readingCss({ settings: s, palette, lang, dark }: ReadingCssInput): [string, string] {
+export function readingCss({ settings: s, palette, lang, dark, viewport }: ReadingCssInput): [string, string] {
     const { css: family, variable } = faceCss(s.face)
     const weight = variable ? WEIGHT[s.weight] : STATIC_WEIGHT[s.weight]
     const tracking = letterSpacingAllowed(lang) ? s.letterSpacing : 0
@@ -215,12 +219,19 @@ p { text-indent: 0 !important; margin-block: 0.7em !important; }`}
 /* An image taller than the column is a blank page followed by a clipped
    image. Capping both axes to the column is the whole fix, and it has to be
    !important because a fixed pixel height in the publisher's CSS is common.
-   In scrolled flow the column has no definite height, so a percentage cap
-   resolves to none and a full-page plate or map renders at its natural pixel
-   size — the cap has to be viewport-relative there instead. */
+
+   Scrolled flow needs a measured number instead. The section iframe is sized
+   to its own content there, so 100%, 100vh and every other relative cap
+   resolve against the thing they are shrinking: a cover collapses the frame,
+   the shorter frame tightens the cap, and a full-page plate settles into a
+   squat strip the section is then too short to scroll. The viewport figure is
+   the stage's real height, measured outside the frame, so it cannot feed back.
+   block-size: auto keeps the aspect ratio the publisher's own — including the
+   Calibre cover wrapper, whose preserveAspectRatio="none" stretches the
+   artwork into whatever box it is handed. */
 :is(img, svg, video, canvas) {
     max-inline-size: 100% !important;
-    max-block-size: ${s.flow === 'scrolled' ? '90vh' : '100%'} !important;
+    max-block-size: ${s.flow === 'scrolled' ? Math.round(viewport) + 'px' : '100%'} !important;
     block-size: auto !important;
     object-fit: contain;
     break-inside: avoid;

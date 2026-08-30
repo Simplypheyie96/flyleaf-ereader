@@ -349,13 +349,23 @@ class View {
         const { width, height, margin } = this.#layout
         const vertical = this.#vertical
         const doc = this.document
+        /* FLYLEAF PATCH 8. In scrolled flow the section iframe is sized to its
+           own content, so `height` here is the content height, not the
+           viewport. Capping an image to it is a feedback loop: a short frame
+           caps the image, the smaller image shortens the frame again. A full
+           page cover or map settles into a squat strip -- and, with a
+           `preserveAspectRatio="none"` wrapper, a stretched one -- and the
+           section ends up shorter than the viewport, so it does not scroll.
+           Scrolled flow has no page to fit an image into: the cross-axis cap
+           belongs to the app's stylesheet, which knows the real viewport. */
+        const columnBound = this.#column
         for (const el of doc.body.querySelectorAll('img, svg, video')) {
             // preserve max size if they are already set
             const { maxHeight, maxWidth } = doc.defaultView.getComputedStyle(el)
             setStylesImportant(el, {
                 'max-height': vertical
                     ? (maxHeight !== 'none' && maxHeight !== '0px' ? maxHeight : '100%')
-                    : `${height - margin * 2}px`,
+                    : columnBound ? `${height - margin * 2}px` : '',
                 'max-width': vertical
                     ? `${width - margin * 2}px`
                     : (maxWidth !== 'none' && maxWidth !== '0px' ? maxWidth : '100%'),
