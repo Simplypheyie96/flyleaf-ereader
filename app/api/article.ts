@@ -531,6 +531,11 @@ export default {
             const ogTitle =
                 document.querySelector('meta[property="og:title"]')?.getAttribute('content')?.trim() ?? ''
 
+            /* Read before Readability, not after: `parse()` mutates the document
+               in place and strips every <script> out of it, so a fallback that
+               ran afterwards would search a DOM with the payload already gone. */
+            const carried = embeddedBody(document as unknown as Document)
+
             const parsed = new Readability(document as never, { charThreshold: 250 }).parse()
 
             /* What Readability found, measured as words rather than as markup:
@@ -538,7 +543,7 @@ export default {
                and a stray line of chrome, which is truthy and worthless. Below
                this, the embedded payload is tried before giving up. */
             const foundText = (parsed?.textContent ?? '').trim()
-            const embedded = foundText.length < 600 ? embeddedBody(document as unknown as Document) : null
+            const embedded = foundText.length < 600 ? carried : null
 
             if (!embedded && !parsed?.content) {
                 return json(
