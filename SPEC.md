@@ -2196,3 +2196,198 @@ Two deliberate omissions:
 - **Settings' outbound links do not include this app.** `OUT` in `SettingsPage.tsx` lists
   `flyleaf.cc`, `press.flyleaf.cc` and the maker's site — destinations *outside* the app. Linking
   `read.flyleaf.cc` from inside `read.flyleaf.cc` is a link to where you already are.
+
+## 17. Reading an article from a link
+
+The shelf takes files. This adds one more way in: paste a web address, and the article on the other
+end of it lands on the shelf as a book.
+
+### 17.1 Why the reading half needed nothing
+
+HTML has been a supported format since P1 — `src/import/sniff.ts` claims `.html`, `.htm` and
+`.xhtml`, and `makeBook` has a parser for it. So an article saved to disk as `.html` has always
+opened here with the seven stocks, the five faces, the three turns, highlights, notes, search and a
+CFI position. Every one of those works on an imported article for free, because the article *is* an
+HTML book by the time anything reads it.
+
+What was missing was only the front half: turning an address into that file.
+
+### 17.2 Why there is now server-side code, and what it is not
+
+A browser cannot fetch another origin's page. CORS is enforced on the *response*, and effectively no
+publisher sends a header that would let `read.flyleaf.cc` read theirs — so a URL box in a purely
+static PWA can never work, whatever it is wired to. Something has to fetch on the reader's behalf.
+
+`app/api/article.ts` is that something, and it is **the only server-side code in this project**. It
+is one Vercel function on the Node runtime, in the web-standard handler shape a non-framework
+project uses:
+
+```ts
+export default { async fetch(request: Request): Promise<Response> { … } }
+```
+
+It takes a URL, fetches the page, extracts the article with Readability, inlines the images, and
+hands back one HTML document. It **does not log, store, authenticate, or hold a secret**. Its entire
+state is the request it is currently serving, and it has no database, no queue and no env var. It is
+an extractor, not a proxy: it will not return a page it could not find an article in, and it will
+not return anything that is not HTML.
+
+Two config changes exist only so it can be reached:
+
+- `app/vercel.json` — the SPA rewrite is now `"/((?!api/).*)"`. The old `"/(.*)"` catch-all would
+  have swallowed the function and answered a POST with `index.html`, i.e. a 200 whose body starts
+  `<!doctype` and whose `JSON.parse` fails on character 1.
+- `app/vite.config.ts` — `/api/` is `NetworkOnly` in Workbox and is in `navigateFallbackDenylist`,
+  for the same reason from the other side.
+
+### 17.3 The offline rule still holds, and this is how
+
+The project rule is *no feature that needs a network to work*. Importing a link needs a network, in
+exactly the way connecting Drive does. **Reading** what came back does not, and that is the line
+that must not be crossed.
+
+So the article's images are **inlined as data URIs by the function**, not left as remote `<img src>`.
+An article that goes blank on a plane is not offline, it is merely stored. After the import the app
+never speaks to `/api/article` about that article again: the whole document is in IndexedDB, and it
+opens on a dead connection like any other book on the shelf.
+
+The budget that keeps this from being ruinous:
+
+| Cap | Value | Why |
+|---|---|---|
+| Page read | 6 MB | Past this it is not an article. Capped on bytes *read*, not on the `Content-Length` the origin claims |
+| One image | 1.5 MB | |
+| All images | 4 MB | A data URI costs ~4/3 its bytes in storage, forever, on a phone |
+| Image count | 24 | |
+| Page fetch timeout | 15 s | |
+| Image fetch timeout | 8 s | |
+| Redirects | 5 | Followed by hand — see below |
+
+Over budget, an image is **dropped**, never left pointing at the network. The count comes back as
+`imagesDropped` rather than being swallowed: no silent caps.
+
+### 17.4 The SSRF guard, and what it does not cover
+
+The function fetches whatever URL it is handed, which makes it a request forwarder living inside
+Vercel's network. The guard is a literal-address blocklist — `http`/`https` only; no `localhost`,
+`*.local`, `*.internal`, `metadata.google.internal`; no `0.*`, `10.*`, `127.*`, `169.254.*`,
+`172.16–31.*`, `192.168.*`, `100.64–127.*`, multicast; no `::1`, `fe80::`, `fc00::/fd00::`, and the
+`::ffff:10.0.0.1` form that smuggles a v4 address inside a v6 one.
+
+Crucially it is checked **on every redirect hop, not just the first**, which is why redirects are
+followed by hand with `redirect: 'manual'` instead of by `redirect: 'follow'`. A public host that
+302s to `169.254.169.254` defeats a check done once.
+
+**What it does not cover, stated plainly: DNS rebinding.** A hostname that resolves to a private
+address cannot be caught without resolving it ourselves, and the runtime's `fetch` does not expose
+that. The residual risk is accepted and bounded — the function holds no credentials, returns only
+extracted article text, and the platform metadata service is not reachable by IP literal from here.
+It is written down so the next person weighing a change to this file knows where the edge is.
+
+### 17.5 The sanitiser is hand-written, because DOMPurify does not work here
+
+DOMPurify was installed for this, tested, **found to silently do nothing**, and uninstalled.
+`createDOMPurify(window).isSupported` is `undefined` against a linkedom DOM, and `sanitize()`
+returns its input verbatim — measured with `<p onclick="x">ok</p><script>bad()</script>`, which came
+back intact, script tag and all. A sanitiser that no-ops is worse than none, because it is trusted.
+Installing `jsdom` to make it work would drag a second full DOM implementation into a function whose
+whole job is one parse.
+
+So `sanitise()` is an explicit allowlist over the linkedom tree:
+
+- **Dropped with their contents:** `script`, `style`, `iframe`, `object`, `embed`, `noscript`,
+  `template`, every form control, `svg`, `math`, `canvas`, `video`, `audio`, `link`, `meta`, `base`,
+  `frame`/`frameset`, `applet`, `portal`, `dialog`.
+- **Kept:** prose, lists, tables, figures, `img`, `a`, and the three generic wrappers.
+- **Everything else is unwrapped, not dropped** — a `<custom-element>` around three paragraphs costs
+  the wrapper, not the paragraphs.
+- **Attributes:** an allowlist per tag, plus `lang`/`dir` globally. `href` must be `http:`, `https:`,
+  `mailto:` or `#` — `javascript:` and `data:` both execute in the document that opens them. `src`
+  must already be a data URI, so a remote image that never made it through the inliner is removed
+  rather than becoming a load the reader cannot make offline, and a tracking pixel that phones home
+  on open.
+- Every surviving `<a>` gets `rel="noopener noreferrer nofollow"`. `target` is not set — that is the
+  reading surface's call, not the extractor's.
+
+Measured on the nine cases in § 17.7: no `<script>`, no `on*` attribute, no non-`data:` image `src`
+and no `javascript:` href survived any of them.
+
+### 17.6 What the reader sees
+
+**On `/open`, a second card under the file card** — not a field tucked inside it. They are two
+different asks: hand over a file you already have, or hand over an address and let us go and get it.
+Stacking them as peers says that; nesting the second under *Choose a file* would read as a variant
+of picking. The card carries `LinkIcon` (new, in Press's hand on the 24 grid at 1.8 — two chain
+links, deliberately not a globe or an arrow-leaving-a-box, both of which mean "this goes out to the
+web" when the control means the opposite: it brings the article in).
+
+- The field is `type="url"` for the iOS keyboard and the browser's own address suggestions, but the
+  form is `noValidate` — the browser's bubble rejects `theatlantic.com/…` for having no scheme,
+  which is how every reader will type it and which the function accepts and normalises to `https://`.
+- The button is disabled until the text plausibly looks like an address, and reads *Fetching…* while
+  it does.
+- On success it navigates straight into the article, exactly as a single picked file does.
+- Failures land in the same results list as an unsupported file, under a new `reason: 'link'`, and
+  the sentence is the function's own: a paywall says it may be paywalled or need a sign-in, a front
+  page says there was no article on it, a PDF link says to save it and import the file instead.
+- **Offline, it does not try.** The client checks `navigator.onLine` first and says a link needs a
+  connection, and that everything already on the shelf still opens.
+
+### 17.7 The record, and its metadata
+
+`Book` gains one optional, **unindexed** field: `sourceUrl`. Not indexed because the shelf never
+queries by it and the one lookup that does runs at import, once — so no Dexie version bump, since
+only indexed fields must be declared.
+
+It does two jobs. It is the attribution the article's own masthead points at after an export, and it
+is what makes **re-importing the same URL a duplicate rather than a second copy**. That last part is
+why article dedupe is by address and not by the usual name-and-byte-count: fetch the same page twice
+and the two files differ in whatever the page changed between them — an ad slot, a timestamp, a
+recirculation module — so a byte-count match would never fire and the shelf would fill with
+near-identical copies of one piece.
+
+`ImportOptions` gains `source`, carrying the title, byline, site, date, language and excerpt the page
+stated about itself. These win over `readMeta`, because `readMeta` would otherwise re-derive them
+from HTML this app generated a moment earlier — a guess about a fact already in hand.
+
+The document the function returns is a whole document, not a fragment: it carries its own `<title>`
+and `lang` so metadata and hyphenation are right without a second guess, and it opens with a
+three-line masthead — site · byline · date, the link, a rule. That is part of the *text*, not app
+chrome, because it has to survive an export, and because a saved article with no attribution on it
+is how a quote loses its source.
+
+**Title cleaning.** Readability drops a site suffix only when it can match the `<title>` against an
+`<h1>`, and many sites give it none, so the shelf would say *"A Chain Reaction — overreacted"*. Two
+signals fix most of it, both facts the page states rather than heuristics: `og:title` when it is
+**strictly shorter** than and a prefix of what Readability found (equal-length is not a de-suffixing,
+and plenty of sites set it identical), then a trailing separator-and-tail strip when the tail matches
+the site name we already know from `og:site_name` or the hostname.
+
+Measured on three: `A Chain Reaction — overreacted` → **`A Chain Reaction`**; `Typography` →
+unchanged, correctly. **`Announcing Rust 1.81.0 | Rust Blog` is not fixed** — its `og:site_name` is
+`Rust Blog` and its host is `blog.rust-lang.org`, which do not match, and stripping any trailing tail
+would eat real titles that contain a dash. It stays as it is rather than being guessed at.
+
+### 17.8 Measured
+
+Nine guard cases and five live pages, run against the compiled function:
+
+| Case | Result |
+|---|---|
+| `GET` | 405 |
+| `http://localhost:8080/x` | 400, refused |
+| `http://169.254.169.254/latest/meta-data/` | 400, refused |
+| `http://10.0.0.5/` | 400, refused |
+| `file:///etc/passwd` | 400, refused |
+| `not a url` | 400, refused |
+| `en.wikipedia.org/wiki/Typography` | 200 · *Typography* · 1.27 MB of images inlined, 0 dropped |
+| `example.com` (no article) | 200 · short but real |
+| `blog.rust-lang.org/…/Rust-1.81.0` (bare host, no scheme) | 200 · byline and date extracted |
+| `gutenberg.org/ebooks/1342` | 200 |
+| `overreacted.io/a-chain-reaction` | 200 · 39 KB |
+| a URL that 404s | 502 with the status in the sentence |
+
+**Not measured:** the function has not been exercised through `vite preview`, because `/api/` does
+not exist there — only a real deployment can prove the routing, so the rewrite exclusion and the
+service-worker denylist are verified by reading, not by running. First production import of a link
+is the check that closes that.

@@ -1003,6 +1003,23 @@ is byte-for-byte the label it was, and the global `:focus-visible` ring covers i
 
 ---
 
+### The link card, and `LinkIcon` — **no new tokens**
+
+The URL import on `/open` sits in a **second `.drop` card** under the file card, not as a field
+inside it. Two different asks — hand over a file you have, or hand over an address and let the app
+go and get it — read as two peers; a URL field nested under *Choose a file* reads as a variant of
+picking. Same panel, same 40/24 padding, same 16px gap between them.
+
+The field reuses what `.find input` already established and adds nothing: `--card-w` ground,
+`--rule` border going to `--ink` on focus, `--r-sm`, `--ease` on the border transition. It is
+**16px**, for the reason recorded against `.find input` and not as a size judgement — iOS Safari
+zooms the whole page on a focused field under 16px and there is no CSS that stops it.
+
+`LinkIcon` is new, drawn in Press's hand like the rest of `icons.tsx`: 24 grid, 1.8 stroke, round
+caps and joins. Two links of a chain. **Not a globe and not an arrow leaving a box** — both of those
+say *this goes out to the web*, and this control means the precise opposite: it brings the article
+in and keeps it. (Remix Icon is still not used in this file; the reason is at the top of it.)
+
 ## Banned
 
 Press's list, inherited whole, plus three of this app's own.

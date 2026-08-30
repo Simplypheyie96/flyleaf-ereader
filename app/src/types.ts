@@ -79,6 +79,14 @@ export type Book = {
       reader who never connects Drive nothing but battery. */
   fp?: string
 
+  /** Where this came from, for a book that came from a link rather than a
+      file. Kept for two reasons: it is what an article's attribution line
+      points at after export, and it is what makes re-importing the same URL a
+      duplicate rather than a second copy. Absent on everything imported from
+      disk — a file has no canonical address. Not indexed: the shelf never
+      queries by it, and the one lookup that does runs at import, once. */
+  sourceUrl?: string
+
   /** whatever the file's metadata actually carried. All optional, because most
       files carry some of it and a few carry none. */
   language?: string

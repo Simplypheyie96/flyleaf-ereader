@@ -21,6 +21,20 @@ export type ImportOptions = {
   seeded?: boolean
   /** How many zips we have already opened to get here. See the unwrap below. */
   depth?: number
+  /** Set when the "file" was built from a web page rather than picked off
+      disk. The page told us its own title, byline and date; `readMeta` would
+      otherwise re-derive them from HTML we generated ourselves, which is a
+      guess about a fact we already have. Anything absent here still falls
+      through to the normal path. */
+  source?: {
+    url: string
+    title?: string
+    author?: string
+    publisher?: string
+    published?: string
+    description?: string
+    language?: string
+  }
 }
 
 export async function importFile(file: File, options: ImportOptions = {}): Promise<ImportResult> {
@@ -54,7 +68,16 @@ export async function importFile(file: File, options: ImportOptions = {}): Promi
      is still the book you were halfway through, and merging them would mean
      guessing which position to keep. */
   const existing = await db.books
-    .filter((b) => b.fileName === file.name && b.fileSize === file.size)
+    .filter((b) =>
+      /* An article is identified by its address, not by its bytes: fetch the
+         same URL twice and the two files differ in whatever the page changed
+         between them — an ad slot, a timestamp, a recirculation module — so a
+         byte-count match would never fire and the shelf would fill with
+         near-identical copies of one piece. */
+      options.source
+        ? b.sourceUrl === options.source.url
+        : b.fileName === file.name && b.fileSize === file.size,
+    )
     .first()
   if (existing) return { ok: true, book: existing, duplicate: true }
 
@@ -66,11 +89,11 @@ export async function importFile(file: File, options: ImportOptions = {}): Promi
 
   const book: Book = {
     id: options.id ?? crypto.randomUUID(),
-    title: plainText(meta.title) || titleFromName(file.name),
+    title: plainText(options.source?.title) || plainText(meta.title) || titleFromName(file.name),
     /* Empty string, not 'Unknown'. A row that says "Unknown" three times is
        noisier than three rows that say nothing, and the shelf can lay out an
        absent author. */
-    author: plainText(meta.author) ?? '',
+    author: plainText(options.source?.author) || plainText(meta.author) || '',
     format: sniffed.format,
     addedAt: Date.now(),
     openedAt: null,
@@ -79,11 +102,12 @@ export async function importFile(file: File, options: ImportOptions = {}): Promi
     cover: meta.cover ? await shrinkCover(meta.cover) : null,
     fileName: file.name,
     fileSize: file.size,
-    language: meta.language,
-    publisher: plainText(meta.publisher),
-    published: meta.published,
+    language: options.source?.language ?? meta.language,
+    publisher: plainText(options.source?.publisher) || plainText(meta.publisher),
+    published: options.source?.published || meta.published,
     subjects: meta.subjects,
-    description: plainText(meta.description),
+    description: plainText(options.source?.description) || plainText(meta.description),
+    ...(options.source ? { sourceUrl: options.source.url } : {}),
     ...(options.seeded ? { seeded: true as const } : {}),
   }
 
