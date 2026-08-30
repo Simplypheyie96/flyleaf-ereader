@@ -511,6 +511,21 @@ export default {
 <head>
 <meta charset="utf-8">
 <title>${esc(title)}</title>
+<style>
+/* The only stylesheet this document carries. Everything else \u2014 face,
+   size, measure, leading, stock \u2014 belongs to the reader\u2019s own controls
+   and must not be pre-empted here. These three rules exist because a
+   paginated column is a hard boundary: anything wider than it does not
+   scroll into view, it is simply gone off the right edge. A <pre> defaults
+   to white-space:pre, and a page scraped from the web carries width and
+   height attributes sized for a browser window, so both overflow a 340px
+   column unless told not to. Verified on overreacted.io (a clipped code
+   block) and en.wikipedia.org/wiki/Typography (eleven images, width
+   attributes intact). */
+pre{ white-space:pre-wrap; overflow-wrap:break-word; }
+img,svg,video{ max-width:100%; height:auto; }
+table{ max-width:100%; }
+</style>
 ${byline ? `<meta name="author" content="${esc(byline)}">\n` : ''}<meta name="source" content="${esc(finalUrl.toString())}">
 </head>
 <body>
