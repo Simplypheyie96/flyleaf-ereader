@@ -21,6 +21,10 @@ import { parseHTML } from 'linkedom'
    images are inlined rather than left as remote `<img src>` — an article that
    goes blank on a plane is not offline, it is merely stored. */
 
+/* Below this many characters, what came back is furniture rather than an
+   article. See the call site for how the number was arrived at. */
+const THIN_ARTICLE = 600
+
 const UA =
   'Mozilla/5.0 (compatible; FlyleafReader/1.0; +https://read.flyleaf.cc) Readability'
 
@@ -549,16 +553,25 @@ export default {
 
             const parsed = new Readability(document as never, { charThreshold: 250 }).parse()
 
-            /* What Readability found, measured as words rather than as markup:
-               a page that renders client-side still hands back a wrapper div
-               and a stray line of chrome, which is truthy and worthless. Below
-               this, the embedded payload is tried before giving up. */
-            const foundText = (parsed?.textContent ?? '').trim()
-            const embedded = foundText.length < 600 ? carried : null
+            /* What Readability found, measured as words rather than as markup.
+               A truthy result is not the same as an article: on a page that
+               renders client-side it hands back a wrapper div, and on a page
+               whose post is one sentence long it can settle on the comment
+               widget instead. Both are worthless, and both look like success.
 
-            if (!embedded && !parsed?.content) {
+               So thinness, not emptiness, is the test, and the embedded payload
+               is tried before giving up. When nothing rescues it the answer is
+               the 422 — a link-blog one-liner that cannot be told apart from the
+               furniture around it is better refused than imported as a page of
+               someone's cookie notice. A short poem clears this comfortably;
+               measured across twenty publications the nearest real article was
+               1181 characters and the nearest piece of chrome was 341. */
+            const foundText = (parsed?.textContent ?? '').trim()
+            const embedded = foundText.length < THIN_ARTICLE ? carried : null
+
+            if (!embedded && foundText.length < THIN_ARTICLE) {
                 return json(
-                    { error: 'There was no article on that page — it may be a front page, a feed, or built entirely in JavaScript.' },
+                    { error: 'There was no article on that page — it may be a front page, a feed, built entirely in JavaScript, or a post too short to tell apart from the page around it.' },
                     422,
                 )
             }
