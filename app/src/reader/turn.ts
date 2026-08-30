@@ -856,7 +856,9 @@ export class TurnController {
         const frameLeft = frame?.getBoundingClientRect().left ?? 0
         const third = (frameLeft + e.clientX - box.left) / box.width
 
-        if (!this.#cfg.tapToTurn || (third > 1 / 3 && third < 2 / 3)) {
+        /* In scrolled flow a tap never turns — the Sheet promises exactly that,
+           and the reader scrolls with the finger instead. */
+        if (!this.#cfg.paginated || !this.#cfg.tapToTurn || (third > 1 / 3 && third < 2 / 3)) {
             this.#hooks.toggleChrome()
             return false
         }

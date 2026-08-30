@@ -451,3 +451,20 @@ keep upstream's single-view path intact for `!this.scrolled`, and re-add the win
 `app/src/reader/scrollCross.ts` implemented the discrete crossing this replaces — a
 `next()` on the first scroll event past the end, behind a 450ms cooldown. It is **deleted**, and
 its five call sites in `app/src/pages/Reader.tsx` are removed.
+
+## PATCH 7 — `paginator.js` `#turnPage`: a turn past the last section froze every later turn
+
+**File:** `paginator.js`, `#turnPage`.
+
+At the first or last linear section `#adjacentIndex(dir)` falls off the loop and returns
+`undefined`. `#turnPage` passed that straight to `#goTo`, which took the `index !== this.#index`
+branch and evaluated `this.sections[undefined].load()` — a synchronous `TypeError` thrown *before*
+the `.catch()` it was meant to land in. The rejection propagated out of the `await` in
+`#turnPage`, so `this.#locked = false` was never reached and **`#locked` stayed `true` for the
+life of the paginator**: every subsequent `next()` / `prev()` returned immediately and the book
+appeared frozen.
+
+The patch refuses the move when there is no adjacent section, and moves the unlock into a
+`finally` so a section that genuinely fails to load also releases the lock.
+
+Upstream shape is otherwise unchanged; re-apply by wrapping the same body.

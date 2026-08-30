@@ -214,10 +214,13 @@ p { text-indent: 1.2em !important; margin-block: 0 !important; }
 p { text-indent: 0 !important; margin-block: 0.7em !important; }`}
 /* An image taller than the column is a blank page followed by a clipped
    image. Capping both axes to the column is the whole fix, and it has to be
-   !important because a fixed pixel height in the publisher's CSS is common. */
+   !important because a fixed pixel height in the publisher's CSS is common.
+   In scrolled flow the column has no definite height, so a percentage cap
+   resolves to none and a full-page plate or map renders at its natural pixel
+   size — the cap has to be viewport-relative there instead. */
 :is(img, svg, video, canvas) {
     max-inline-size: 100% !important;
-    max-block-size: 100% !important;
+    max-block-size: ${s.flow === 'scrolled' ? '90vh' : '100%'} !important;
     block-size: auto !important;
     object-fit: contain;
     break-inside: avoid;

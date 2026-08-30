@@ -1453,14 +1453,21 @@ export class Paginator extends HTMLElement {
     async #turnPage(dir, distance) {
         if (this.#locked) return
         this.#locked = true
-        const prev = dir === -1
-        const shouldGo = await (prev ? this.#scrollPrev(distance) : this.#scrollNext(distance))
-        if (shouldGo) await this.#goTo({
-            index: this.#adjacentIndex(dir),
-            anchor: prev ? () => 1 : () => 0,
-        })
-        if (shouldGo || !this.hasAttribute('animated')) await wait(100)
-        this.#locked = false
+        try {
+            const prev = dir === -1
+            const shouldGo = await (prev ? this.#scrollPrev(distance) : this.#scrollNext(distance))
+            /* PATCH 7. At the first or last linear section #adjacentIndex
+               returns undefined, and #goTo would then read .load() off
+               undefined and throw -- leaving #locked true forever, so every
+               later turn was silently swallowed. Refuse the move instead, and
+               release the lock even if the section itself fails to load. */
+            const index = this.#adjacentIndex(dir)
+            const go = shouldGo && index != null
+            if (go) await this.#goTo({ index, anchor: prev ? () => 1 : () => 0 })
+            if (go || !this.hasAttribute('animated')) await wait(100)
+        } finally {
+            this.#locked = false
+        }
     }
     prev(distance) {
         return this.#turnPage(-1, distance)
