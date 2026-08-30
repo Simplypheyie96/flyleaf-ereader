@@ -225,7 +225,17 @@ export default defineConfig({
            walks manifest.json in the background and fills this cache. So the
            install stays PDF-free and anyone who has actually imported one is
            covered offline. */
+        /* /api/article is the one thing here that is genuinely a network
+           call, and it must never be answered by the service worker. Without
+           this, a POST to it under the SPA fallback would come back as
+           index.html — the shell, with a 200 on it, and JSON.parse failing on
+           `<!doctype`. */
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
+          {
+            urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/api/'),
+            handler: 'NetworkOnly',
+          },
           {
             urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/pdfjs/'),
             handler: 'CacheFirst',

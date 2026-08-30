@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { INPUT_ACCEPT, PICKER_ACCEPT, importFile, type ImportResult } from '../import'
+import { importUrl, looksLikeUrl, type ArticleResult } from '../import/article'
 import { useQueuedFiles } from '../openQueue'
-import { BackIcon, OpenIcon, SpinnerIcon } from '../components/icons'
+import { BackIcon, LinkIcon, OpenIcon, SpinnerIcon } from '../components/icons'
 import { bytes } from '../lib'
 
 /* Import. The picker, the queue that drops and OS launches feed, and the honest
@@ -12,7 +13,7 @@ import { bytes } from '../lib'
    function for a picked file, a dropped one and a double-clicked one. What this
    screen owns is what the reader is told. */
 
-type Row = { key: string; result: ImportResult; name: string }
+type Row = { key: string; result: ArticleResult; name: string }
 
 /* A file dialog needs types, not a comma-separated string, when it goes through
    the File System Access API — and the description is what the dialog's filter
@@ -29,6 +30,7 @@ export function OpenBook() {
   const input = useRef<HTMLInputElement>(null)
   const [rows, setRows] = useState<Row[]>([])
   const [busy, setBusy] = useState<string | null>(null)
+  const [link, setLink] = useState('')
 
   const run = useCallback(
     async (files: File[]) => {
@@ -62,6 +64,32 @@ export function OpenBook() {
     },
     [navigate],
   )
+
+  /* A link. Same shape as `run`, and deliberately not folded into it: what is
+     sequential there is a list of files, and this is always exactly one
+     address. Sharing the loop would mean carrying a union through it to save
+     six lines.
+
+     The fetch happens on the server — a browser cannot read another origin's
+     page, and no publisher sends a header that would let it. What comes back
+     is a whole HTML document with its pictures already inside it, and from
+     there it is a file like any other: same import, same shelf, same marks,
+     same position. */
+  const readLink = useCallback(async () => {
+    const address = link.trim()
+    if (!address || busy !== null) return
+    setBusy(address)
+    const result = await importUrl(address)
+    setBusy(null)
+    setRows((previous) => [
+      { key: `${address}-${previous.length}-${Date.now()}`, result, name: address },
+      ...previous,
+    ])
+    if (result.ok) {
+      setLink('')
+      navigate(`/book/${result.book.id}`, { replace: true })
+    }
+  }, [busy, link, navigate])
 
   /* Drops and OS launches arrive here. Both already put their files in the
      queue and navigated to this screen, so there is nothing to do but import
@@ -152,6 +180,54 @@ export function OpenBook() {
           )}
         </section>
 
+        {/* A second card rather than a second control inside the first. They
+            are two different asks — hand over a file you already have, or hand
+            over an address and let us go and get it — and the second one is
+            the only thing in this app that touches the network to add a book.
+            Stacking them says that plainly; a URL field tucked under the
+            Choose a file button would read as a variant of picking. */}
+        <section className="drop drop--link">
+          <LinkIcon />
+          <p className="ui-p drop-lead">
+            Or paste a link to an article. It is fetched once, stripped to its
+            text and pictures, and kept here — after that it opens offline like
+            any other book.
+          </p>
+          <form
+            className="link-row"
+            noValidate
+            onSubmit={(event) => {
+              event.preventDefault()
+              void readLink()
+            }}
+          >
+            <label className="sr-only" htmlFor="article-url">
+              The web address of an article to read
+            </label>
+            {/* type="url" and not type="text": it is what puts the slash and
+                the dot on an iOS keyboard, and what lets the browser offer an
+                address it already knows. Validation is NOT left to it —
+                `novalidate` is on the form, because the browser's own bubble
+                rejects "theatlantic.com/…" for having no scheme, which is how
+                every reader will type it and which the server accepts. */}
+            <input
+              id="article-url"
+              className="link-field"
+              type="url"
+              inputMode="url"
+              autoComplete="url"
+              spellCheck={false}
+              placeholder="example.com/the-article"
+              value={link}
+              disabled={busy !== null}
+              onChange={(event) => setLink(event.target.value)}
+            />
+            <button className="btn" type="submit" disabled={busy !== null || !looksLikeUrl(link)}>
+              {busy === link.trim() && busy !== null ? 'Fetching…' : 'Read it'}
+            </button>
+          </form>
+        </section>
+
         {rows.length > 0 && (
           <ul className="results">
             {rows.map(({ key, result, name }) => (
@@ -170,7 +246,9 @@ export function OpenBook() {
                   <>
                     <span className="result-title">{name}</span>
                     <span className="ui-p ui-p--soft">
-                      {result.reason === 'drm'
+                      {result.reason === 'link'
+                        ? `Nothing to read here — ${result.what}`
+                        : result.reason === 'drm'
                         ? 'This file is DRM-protected, so its text is encrypted and no reader can open it without the shop’s key. Flyleaf eReader does not support DRM and never will. A DRM-free copy of the same book will open.'
                         : `Flyleaf eReader does not read ${result.what}. Reflowable books and PDFs only — EPUB, MOBI, AZW3, FB2, TXT, Markdown, HTML, PDF.`}
                     </span>

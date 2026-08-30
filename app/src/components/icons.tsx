@@ -97,6 +97,22 @@ export function OpenIcon() {
   )
 }
 
+export function LinkIcon() {
+  /* two links of a chain, in the same hand as the rest: 24 grid, 1.8 stroke,
+     round caps. Not a globe and not an arrow leaving a box — both of those
+     mean "this goes out to the web", and this control means the opposite. It
+     brings the article in. */
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <g {...strokeProps}>
+        <path d="M9.4 14.6 L 14.6 9.4" />
+        <path d="M13.1 16.9 L 11 19 A 4.3 4.3 0 0 1 5 13 L 7.1 10.9" />
+        <path d="M10.9 7.1 L 13 5 A 4.3 4.3 0 0 1 19 11 L 16.9 13.1" />
+      </g>
+    </svg>
+  )
+}
+
 export function GridIcon() {
   /* four cover-shaped blocks, not four squares — the shelf's grid view shows
      objects with a book's proportions, and the icon should say which of the two

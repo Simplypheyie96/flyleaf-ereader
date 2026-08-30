@@ -1658,6 +1658,28 @@ body::before{
 .drop-lead{ max-width:34em; color:var(--ink-soft); }
 .drop-busy{ margin-top:-4px; }
 
+/* the link card, stacked under the file card. Same panel, same rhythm: the
+   two are peers, not a control and its option. */
+.drop--link{ margin-top:16px; }
+.link-row{
+  display:flex; align-items:center; gap:10px;
+  width:100%; max-width:34em;
+}
+/* 16px for the reason .find input is 16px: iOS Safari zooms the whole page on
+   a focused field whose text measures under it, and there is no way to switch
+   that off that does not also break pinch-zoom. See .find input above. */
+.link-field{
+  flex:1; min-width:0; height:42px; padding:0 13px;
+  background:var(--card-w); color:var(--ink);
+  border:1px solid var(--rule); border-radius:var(--r-sm);
+  font-family:var(--sans); font-size:16px;
+  transition:border-color 160ms var(--ease);
+}
+.link-field:focus{ outline:none; border-color:var(--ink); }
+.link-field::placeholder{ color:var(--ink-soft); }
+.link-field:disabled{ opacity:.55; }
+.link-row .btn{ flex:none; }
+
 .results{ list-style:none; margin:20px 0 0; padding:0; }
 .result{
   display:flex; flex-direction:column; align-items:flex-start; gap:6px;
