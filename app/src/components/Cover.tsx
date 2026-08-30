@@ -107,6 +107,43 @@ function coverUrl(shape: string, blob: Blob): string {
 const failures = new Map<string, number>()
 const undecodable = new Set<string>()
 
+/* THE SECOND FAILURE IS NOT EVIDENCE EITHER, ON WEBKIT.
+
+   An object URL is a handle onto a Blob, and a Blob that came out of IndexedDB
+   is backed by a file the browser may stop lending — WebKit in particular can
+   neuter an IDB-backed Blob some time after the transaction that produced it,
+   at which point every URL minted from it fails to load no matter how many
+   times it is re-minted. That is exactly the report: a cover that was there,
+   and later is not, on a phone, without a reload in between.
+
+   So a shape that has failed twice is not condemned; its bytes are copied into
+   memory once (`arrayBuffer` on the handle while it is still good, then a fresh
+   in-memory Blob) and the URL is minted from the copy. An in-memory Blob is not
+   file-backed and cannot be neutered. Only if THAT fails as well are the bytes
+   genuinely bad, and only then does the ghost appear. */
+const memory = new Map<string, Blob>()
+const copying = new Set<string>()
+
+function copyIntoMemory(shape: string, blob: Blob, done: () => void) {
+    if (memory.has(shape) || copying.has(shape)) return
+    copying.add(shape)
+    blob.arrayBuffer().then(
+        buf => {
+            memory.set(shape, new Blob([buf], { type: blob.type }))
+            copying.delete(shape)
+            urls.delete(shape)
+            done()
+        },
+        () => {
+            copying.delete(shape)
+            /* The handle is gone and cannot be read at all — that is a dead
+               cover, and the ghost is the honest answer. */
+            undecodable.add(shape)
+            done()
+        },
+    )
+}
+
 /* size, not just presence: a zero-byte Blob is truthy and would render as a
    broken glyph. */
 function shapeOf(book: Book): string | null {
@@ -152,7 +189,8 @@ export function Cover({ book }: Props) {
      between revoking a URL and committing the replacement. Minting is
      idempotent and cached, so a double render under StrictMode or a concurrent
      re-render returns the same URL rather than a second one. */
-  const url = shape && blob && !undecodable.has(shape) ? coverUrl(shape, blob) : null
+  const bytes = shape ? memory.get(shape) ?? blob : blob
+  const url = shape && bytes && !undecodable.has(shape) ? coverUrl(shape, bytes) : null
 
   return (
     /* data-family, not a colour: which step of the ramp a format wears is a
@@ -197,7 +235,12 @@ export function Cover({ book }: Props) {
                once per failure, on a blob that is retained by the shelf query
                anyway. */
             urls.delete(shape)
-            if (n >= 2) undecodable.add(shape)
+            /* One failure: re-mint and try again, in case the load was merely
+               interrupted. Two: copy the bytes out of the IDB-backed Blob and
+               mint from the copy. Three, with an in-memory Blob under it, is a
+               cover that really will not decode. */
+            if (n === 2 && blob) copyIntoMemory(shape, blob, () => repaint(x => x + 1))
+            else if (n >= 3) undecodable.add(shape)
             repaint((x) => x + 1)
           }}
         />
