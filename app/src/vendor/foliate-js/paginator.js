@@ -1144,6 +1144,40 @@ export class Paginator extends HTMLElement {
         comes within two screens, which on a phone is far enough ahead that
         the load and layout are finished long before the text is wanted, and
         near enough that opening a book does not parse the whole file. */
+    /* FLYLEAF PATCH 9. #fillForward is driven by the scroll handler alone,
+       which deadlocks on any section shorter than the viewport -- a
+       dedication, a half-title, the front-matter list of links. There is
+       nothing to scroll, so no scroll event fires, so nothing is ever
+       stitched below, so there is still nothing to scroll. The reader lands
+       on eighteen words and the only way on through the book is the table of
+       contents. Measured on The Incandescent: section 4 is the dedication,
+       body 22px, viewSize 250.3 in a 986px window, and start stayed 0 across
+       35 scroll attempts.
+
+       So the column is topped up when a section is displayed as well as when
+       it is scrolled, and it loops, because the section after a short one is
+       usually short too: three pages of front matter in a row is the ordinary
+       shape of a trade EPUB. It stops as soon as there is a screen of runway
+       for the scroll handler to take over from, or when there is nothing left
+       to append. The iteration cap is a backstop against a book of hundreds
+       of tiny sections, not a tuning knob -- each pass appends exactly one
+       section and re-measures. */
+    async #topUp() {
+        if (!this.scrolled) return
+        const el = this.#container
+        for (let i = 0; i < 20; i++) {
+            if (el.scrollHeight - el.clientHeight >= el.clientHeight) return
+            const views = this.#views
+            const last = views[views.length - 1]
+            await this.#fillForward()
+            const now = this.#views[this.#views.length - 1]
+            /* #fillForward trims after appending, so the view COUNT can stay
+               the same across a successful append. The last index moving is
+               what says work was done. */
+            if (!now || !last || now.index === last.index) return
+        }
+    }
+
     async #fillForward() {
         if (!this.scrolled) return
         const last = this.#views[this.#views.length - 1]
@@ -1311,9 +1345,22 @@ export class Paginator extends HTMLElement {
         const el = this.#container
         const keep = new Set([this.#index,
             this.#adjacentFrom(this.#index, -1), this.#adjacentFrom(this.#index, 1)])
+        /* FLYLEAF PATCH 9. Adjacency in the spine stopped standing in for
+           nearness on screen the moment the sections got small. Keeping the
+           current index and its two neighbours is three views, and three views
+           of front matter is 60px -- so everything the filler had just stitched
+           in below was dropped as "far", the filler put it back, and the two
+           cycled: measured on The Incandescent, sections 6, 7 and 8 loading
+           twenty times while the reader sat on the dedication. So a view is
+           near if it is near in PIXELS: anything overlapping a screen above the
+           viewport to two screens below it stays, whatever its index. */
+        const lo = el.scrollTop - el.clientHeight
+        const hi = el.scrollTop + el.clientHeight * 3
         for (const entry of [...this.#views]) {
             if (keep.has(entry.index)) continue
-            const above = entry.view.element.offsetTop < el.scrollTop
+            const elTop = entry.view.element.offsetTop
+            if (elTop + entry.view.element.offsetHeight >= lo && elTop <= hi) continue
+            const above = elTop < el.scrollTop
             const before = el.scrollHeight
             const top = el.scrollTop
             this.#views.splice(this.#views.indexOf(entry), 1)
@@ -1374,6 +1421,7 @@ export class Paginator extends HTMLElement {
             await this.scrollToAnchor((typeof anchor === 'function'
                 ? anchor(resident.view.document) : anchor) ?? 0, select)
             if (hasFocus) this.focusView()
+            void this.#topUp()
             return
         }
         /* A jump to a section the window does not reach — the TOC, a link, a
@@ -1396,6 +1444,7 @@ export class Paginator extends HTMLElement {
         await this.scrollToAnchor((typeof anchor === 'function'
             ? anchor(this.#view.document) : anchor) ?? 0, select)
         if (hasFocus) this.focusView()
+        void this.#topUp()
     }
     #canGoToIndex(index) {
         return index >= 0 && index <= this.sections.length - 1
