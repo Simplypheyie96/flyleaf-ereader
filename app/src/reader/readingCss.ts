@@ -284,7 +284,29 @@ ${dark ? `
    photographs it cannot tell apart from the drawings. A book's pictures are
    the author's, and this app does not repaint them. */
 /* Links carry the page's own ink. A blue link on Tea is the one colour on
-   the page that did not come from the stock. */
+   the page that did not come from the stock.
+
+   The subtree, not just the anchor. Measured on a light stock: a heading
+   written as \`<a><span class=...>Prologue</span></a>\` came out
+   rgb(6, 69, 173) against ink rgb(27, 25, 23), because a rule aimed at the
+   \`a\` never reaches a child that sets its own colour — and a BARE link came
+   out blue too, because \`-webkit-text-fill-color\` outranks \`color\` where a
+   book sets it. That is the bright blue underlined chapter heading in the
+   screen recording. The whole-page reset above would have caught both, but it
+   is dark-stock only, by the deliberate choice not to repaint an author's
+   colours on paper. A link is the exception: it is chrome, not picture.
+
+   The rule is written twice for the reason the reset is — the second pass
+   carries 3-ID specificity so a publisher's own \`!important\` cannot outrank
+   it. */
+a:any-link, a:any-link * {
+    color: inherit !important;
+    -webkit-text-fill-color: currentColor !important;
+}
+:is(a:any-link, a:any-link *):not(#fl9):not(#fl9):not(#fl9) {
+    color: inherit !important;
+    -webkit-text-fill-color: currentColor !important;
+}
 a:any-link {
     color: inherit !important;
     text-decoration: underline;

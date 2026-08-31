@@ -466,7 +466,11 @@ export class Paginator extends HTMLElement {
        Paginated mode is untouched and still holds exactly one.
        See PATCHES.md § 6. */
     #views = []
-    #hold = null
+    /* FLYLEAF PATCH 11. One slot element per section, created when the book
+       opens, in spine order, each standing at an estimated height until its
+       section is loaded into it. See the note on #buildSlots. */
+    #slots = []
+    #slotObserver = null
     #loadingIndex = new Set()
     #index = -1
     #anchor = 0 // anchor view to a fraction (0-1), Range, or Element
@@ -596,8 +600,7 @@ export class Paginator extends HTMLElement {
             if (!this.scrolled) return
             this.#syncCurrent()
             this.#trimWindow()
-            void this.#fillForward()
-            void this.#fillBackward()
+            void this.#fillVisible()
         }, { passive: true })
         this.#container.addEventListener('scroll', debounce(() => {
             if (this.scrolled) {
@@ -670,6 +673,24 @@ export class Paginator extends HTMLElement {
     attributeChangedCallback(name, _, value) {
         switch (name) {
             case 'flow':
+                /* FLYLEAF PATCH 11. The paginator boots paginated and the app
+                   switches it afterwards, so the slot column cannot be built
+                   from #createView alone -- by the time flow says scrolled the
+                   one view is already a direct child of the container and
+                   nothing asks for a slot again. Measured: the container held
+                   one child instead of fifty-three, scrollHeight 1060 against a
+                   986px viewport, so the whole book had 74px of travel in it.
+                   Crossing into scrolled flow rebuilds the column and puts the
+                   reader back where they were. */
+                if (this.scrolled && this.sections?.length
+                    && this.#slots.length !== this.sections.length) {
+                    const index = this.#index
+                    const anchor = this.#anchor
+                    this.#buildSlots()
+                    if (index >= 0) void this.#display(
+                        Promise.resolve({ index, src: true, anchor }))
+                    break
+                }
                 this.render()
                 break
             case 'gap':
@@ -688,6 +709,10 @@ export class Paginator extends HTMLElement {
     open(book) {
         this.bookDir = book.dir
         this.sections = book.sections
+        /* PATCH 11. A different book is a different column. */
+        this.#slotObserver?.disconnect()
+        this.#slotObserver = null
+        this.#slots = []
         book.transformTarget?.addEventListener('data', ({ detail }) => {
             if (detail.type !== 'text/css') return
             const w = innerWidth
@@ -709,6 +734,15 @@ export class Paginator extends HTMLElement {
        Scrolled inserts into the window in index order and destroys nothing. */
     #createView(index = this.#index) {
         if (!this.scrolled) {
+            /* PATCH 11. Back to paginated: the slot column is scrolled flow's
+               geometry and has no business under a paged view. */
+            if (this.#slots.length) {
+                this.#slotObserver?.disconnect()
+                this.#slotObserver = null
+                this.#slots = []
+                this.#clearViews()
+                this.#container.replaceChildren()
+            }
             this.#clearViews()
             const view = new View({
                 container: this,
@@ -719,37 +753,112 @@ export class Paginator extends HTMLElement {
             this.#view = view
             return view
         }
-        const entry = { index, view: null }
+        const entry = { index, view: null, anchoring: true }
         entry.view = new View({
             container: this,
             onExpand: () => {
-                /* A section ABOVE the reader is the whole difficulty of a
-                   continuous column. It is inserted at height 0 and grows to
-                   its full extent a frame or two later, and every pixel it
-                   grows pushes the text the reader is looking at down the
-                   screen. So each growth is cancelled by the same number of
-                   pixels of scrollTop, in the same callback that observes it:
-                   the reader's line does not move, and the column simply
-                   becomes taller above them. Scroll anchoring would do this
-                   natively, but Safari does not implement it and this is a
-                   phone-first app. */
-                if (this.#hold) {
-                    /* A section is being stitched in above the reader. Hold
-                       the line they are on, absolutely — see #holdPosition. */
-                    this.#restoreHold()
-                    return
-                }
                 /* Only the section the reader is actually in re-anchors. A
-                   neighbour finishing its layout must not yank the column. */
-                if (entry.index === this.#index) this.#scrollToAnchor(this.#anchor)
+                   neighbour finishing its layout must not yank the column.
+                   Compensation for a section growing above the reader is not
+                   done here any more — it is the slot observer's job, which
+                   sees the real pixel delta. See #buildSlots. */
+                /* ...and only while it is still settling from a jump. Once the
+               reader has the section on screen, scrollTop IS their position;
+               re-anchoring on every later expand fights their thumb. Measured
+               at the top of the book: scrollTop bounced 0, 100, 201, 174, 89
+               against a steady upward scroll. */
+            if (entry.index === this.#index && entry.anchoring) {
+                entry.anchoring = false
+                this.#scrollToAnchor(this.#anchor)
+            }
             },
         })
         let at = this.#views.findIndex(v => v.index > index)
         if (at < 0) at = this.#views.length
         this.#views.splice(at, 0, entry)
-        this.#container.insertBefore(entry.view.element,
-            this.#container.children[at] ?? null)
+        this.#slotFor(index).append(entry.view.element)
         return entry.view
+    }
+    /** FLYLEAF PATCH 11 — the column has a shape before it has content.
+
+        PATCH 6 built scrolled flow as a sliding window: a few sections
+        resident, more stitched in above and below as the reader moved. That
+        is the design the shaking came from, and it could not be tuned out of
+        it. Inserting a section ABOVE the reading line changes the offset of
+        everything below it, so the reader's position has to be corrected in
+        the same breath; every correction is a frame in which the page jumps,
+        and there is a correction for every section, every font that lands
+        late, and every view that grows after layout. Measured scrolling back
+        to the cover of The Incandescent: position walked 1060 -> 360 -> 74 and
+        then sat at 74 for fifty-seven consecutive upward scrolls, unable to
+        reach the top of the cover at all, while the reader was thrown back to
+        the prepend point each time a font resolved.
+
+        So nothing is inserted any more. Every section in the spine gets an
+        empty slot the moment the book opens, in order, standing at an
+        estimated height. The column's full extent therefore exists from the
+        first frame and its shape never changes: loading a section fills a box
+        that is already sitting in the flow, and unloading one leaves the box
+        behind, frozen at the height it actually measured. A slot only ever
+        changes height once — when its estimate is replaced by the real thing —
+        and #slotObserver adds that difference to scrollTop if and only if the
+        slot lies entirely above the reading line, which is the one case where
+        a height change would otherwise move the text under the reader's eye.
+
+        Fifty-three slots for The Incandescent, one div each, no iframe until
+        the section is near. The iframes stay windowed; it is only the geometry
+        that is complete. */
+    #buildSlots() {
+        const el = this.#container
+        this.#clearViews()
+        this.#slotObserver?.disconnect()
+        el.replaceChildren()
+        const estimate = el.clientHeight || 800
+        this.#slots = (this.sections ?? []).map(() => {
+            const slot = document.createElement('div')
+            slot.style.minHeight = estimate + 'px'
+            slot.__h = estimate
+            el.append(slot)
+            return slot
+        })
+        /* The exact pixel delta, from the element itself, rather than an
+           arithmetic guess made before the layout ran. PATCH 6 guessed, and
+           double-counted against #scrollToAnchor doing its own absolute
+           repositioning at the same moment. */
+        this.#slotObserver = new ResizeObserver(entries => {
+            for (const { target } of entries) {
+                const now = target.offsetHeight
+                const delta = now - (target.__h ?? now)
+                target.__h = now
+                if (!delta) continue
+                /* Anything whose top is above the reading line moves the
+                   reader when it changes height -- whether the reader is
+                   below it or inside it. Compensating on the top edge, not
+                   the bottom, is what keeps a section growing from its
+                   986px estimate to its real height from throwing the
+                   column. Measured before this: scrolling up walked
+                   7499 -> 6108 -> 5076, a 1400px jump for a 300px scroll. */
+                if (target.offsetTop < el.scrollTop) el.scrollTop += delta
+            }
+        })
+        for (const slot of this.#slots) this.#slotObserver.observe(slot)
+    }
+    #slotFor(index) {
+        if (this.#slots.length !== (this.sections?.length ?? 0)) this.#buildSlots()
+        return this.#slots[index]
+    }
+    /** A slot keeps the height its section actually measured, so unloading an
+        iframe costs the column nothing. */
+    #dropView(entry) {
+        const slot = this.#slots[entry.index]
+        if (slot) {
+            slot.style.minHeight = slot.offsetHeight + 'px'
+            slot.__h = slot.offsetHeight
+        }
+        this.#views.splice(this.#views.indexOf(entry), 1)
+        entry.view.destroy()
+        entry.view.element.remove()
+        this.sections[entry.index]?.unload?.()
     }
     #clearViews() {
         for (const { view } of this.#views) {
@@ -1144,164 +1253,78 @@ export class Paginator extends HTMLElement {
         comes within two screens, which on a phone is far enough ahead that
         the load and layout are finished long before the text is wanted, and
         near enough that opening a book does not parse the whole file. */
-    /* FLYLEAF PATCH 9. #fillForward is driven by the scroll handler alone,
-       which deadlocks on any section shorter than the viewport -- a
-       dedication, a half-title, the front-matter list of links. There is
-       nothing to scroll, so no scroll event fires, so nothing is ever
-       stitched below, so there is still nothing to scroll. The reader lands
-       on eighteen words and the only way on through the book is the table of
-       contents. Measured on The Incandescent: section 4 is the dedication,
-       body 22px, viewSize 250.3 in a 986px window, and start stayed 0 across
-       35 scroll attempts.
+    /** FLYLEAF PATCH 11. One filler, in place of #topUp, #fillForward and
+        #fillBackward. Direction stopped mattering the moment the slots made
+        the column's shape fixed: loading a section above the reader is now
+        exactly as cheap and exactly as invisible as loading one below, because
+        both are filling a box that was already there.
 
-       So the column is topped up when a section is displayed as well as when
-       it is scrolled, and it loops, because the section after a short one is
-       usually short too: three pages of front matter in a row is the ordinary
-       shape of a trade EPUB. It stops as soon as there is a screen of runway
-       for the scroll handler to take over from, or when there is nothing left
-       to append. The iteration cap is a backstop against a book of hundreds
-       of tiny sections, not a tuning knob -- each pass appends exactly one
-       section and re-measures. */
-    async #topUp() {
+        It also removes the deadlock PATCH 9 was written for. The old forward
+        filler ran only from the scroll handler, so a section shorter than the
+        viewport produced no scrollbar, fired no scroll event, and stitched
+        nothing below itself -- eighteen words of dedication and no way on
+        except the table of contents. Here the slots are what is scrollable, so
+        there is always runway, and the filler is driven by which slots are on
+        screen rather than by how much room is left. */
+    async #fillVisible() {
         if (!this.scrolled) return
         const el = this.#container
-        for (let i = 0; i < 20; i++) {
-            if (el.scrollHeight - el.clientHeight >= el.clientHeight) return
-            const views = this.#views
-            const last = views[views.length - 1]
-            await this.#fillForward()
-            const now = this.#views[this.#views.length - 1]
-            /* #fillForward trims after appending, so the view COUNT can stay
-               the same across a successful append. The last index moving is
-               what says work was done. */
-            if (!now || !last || now.index === last.index) return
+        if (!this.#slots.length) return
+        const lo = el.scrollTop - el.clientHeight
+        const hi = el.scrollTop + el.clientHeight * 2
+        const wanted = []
+        for (let i = 0; i < this.#slots.length; i++) {
+            if (this.sections[i]?.linear === 'no') continue
+            if (this.#viewAt(i) || this.#loadingIndex.has(i)) continue
+            const slot = this.#slots[i]
+            if (slot.offsetTop + slot.offsetHeight < lo || slot.offsetTop > hi) continue
+            wanted.push(i)
         }
+        /* Nearest to the reading line first, so the section they are about to
+           see arrives before the one two screens away. */
+        wanted.sort((a, b) => Math.abs(this.#slots[a].offsetTop - el.scrollTop)
+            - Math.abs(this.#slots[b].offsetTop - el.scrollTop))
+        for (const index of wanted) await this.#loadInto(index)
     }
-
-    async #fillForward() {
-        if (!this.scrolled) return
-        const last = this.#views[this.#views.length - 1]
-        if (!last) return
-        const next = this.#adjacentFrom(last.index, 1)
-        if (next == null || this.#loadingIndex.has(next) || this.#viewAt(next)) return
-        const el = this.#container
-        if (el.scrollHeight - (el.scrollTop + el.clientHeight) > el.clientHeight * 2) return
-        this.#loadingIndex.add(next)
+    async #loadInto(index, onLoad) {
+        if (this.#viewAt(index) || this.#loadingIndex.has(index)) return null
+        this.#loadingIndex.add(index)
         try {
-            const src = await this.sections[next].load()
-            if (typeof src !== 'string') return
-            /* Re-checked after the await: a jump through the TOC may have
-               reset the window while the file was loading, in which case this
-               section no longer belongs below anything. */
-            if (this.#views[this.#views.length - 1] !== last) return
-            const view = this.#createView(next)
+            const src = await this.sections[index].load()
+            if (typeof src !== 'string') return null
+            /* Re-checked after the await: switching flow or opening another
+               book while the file was in flight rebuilds the slots, and this
+               section no longer has a box to go in. */
+            if (!this.#slots[index]?.isConnected) return null
+            if (this.#viewAt(index)) return null
+            const view = this.#createView(index)
             await view.load(src,
-                doc => this.#afterLoad(doc, next),
+                doc => this.#afterLoad(doc, index, onLoad),
                 this.#beforeRender.bind(this))
             this.dispatchEvent(new CustomEvent('create-overlayer', {
                 detail: {
-                    doc: view.document, index: next,
+                    doc: view.document, index,
                     attach: overlayer => view.overlayer = overlayer,
                 },
             }))
             this.setStyles(this.#styles)
             this.dispatchEvent(new CustomEvent('load', {
-                detail: { doc: view.document, index: next },
+                detail: { doc: view.document, index },
             }))
-            /* The append can take the window to four, and the scroll that
-               triggered it has already been trimmed. Trim again rather than
-               leave the extra iframe resident until the reader moves. */
-            this.#trimWindow()
+            /* The slot now stands at its section's real height and must keep
+               it, so a later unload does not collapse the column. */
+            const slot = this.#slots[index]
+            if (slot) {
+                slot.style.minHeight = ''
+                slot.__h = slot.offsetHeight
+            }
+            return view
         } catch (e) {
             console.warn(e)
-            console.warn(new Error(`Failed to load section ${next}`))
+            console.warn(new Error(`Failed to load section ${index}`))
+            return null
         } finally {
-            this.#loadingIndex.delete(next)
-        }
-    }
-
-    /** Pin the reader's line while sections are stitched in ABOVE it.
-
-        The obvious approach — watch each view grow and add the same number of
-        pixels to scrollTop — double-counts, because #scrollToAnchor is doing
-        its own absolute repositioning at the same moment and the anchor is up
-        to 250ms stale. Measured: a single prepend moved the reader's
-        paragraph 3505px up the screen while the arithmetic said it had been
-        compensated exactly.
-
-        So the hold is absolute, not incremental. It remembers the current
-        view's ELEMENT and how far into it the reader is, and every time the
-        column relayouts it puts the scroll back at that same point in that
-        same element. Re-applying it is idempotent, which is what makes it
-        safe to run on every expand of every view. */
-    #holdPosition() {
-        const el = this.#container
-        const element = this.#view?.element
-        if (!element) return
-        this.#hold = { element, delta: el.scrollTop - element.offsetTop }
-    }
-    #restoreHold() {
-        if (!this.#hold) return
-        const { element, delta } = this.#hold
-        if (!element.isConnected) return this.#hold = null
-        this.#container.scrollTop = element.offsetTop + delta
-    }
-    #releaseHold() {
-        this.#restoreHold()
-        this.#hold = null
-    }
-
-    /** The mirror of #fillForward, and the harder direction: a section
-        prepended above the reading position changes the offset of everything
-        below it, so it is only safe because #createView's onExpand cancels
-        each growth against scrollTop as it happens.
-
-        Runs within one screen of the top rather than two, because backward
-        reading is the rarer motion and a chapter loaded upward is more
-        expensive than one loaded downward — it has to be compensated for the
-        whole time it is laying out. */
-    async #fillBackward() {
-        if (!this.scrolled) return
-        const first = this.#views[0]
-        if (!first) return
-        const prev = this.#adjacentFrom(first.index, -1)
-        if (prev == null || this.#loadingIndex.has(prev) || this.#viewAt(prev)) return
-        const el = this.#container
-        if (el.scrollTop > el.clientHeight) return
-        this.#loadingIndex.add(prev)
-        try {
-            const src = await this.sections[prev].load()
-            if (typeof src !== 'string') return
-            /* Re-checked after the await, as forward: a TOC jump may have
-               reset the window while the file was loading. */
-            if (this.#views[0] !== first) return
-            this.#holdPosition()
-            const view = this.#createView(prev)
-            await view.load(src,
-                doc => this.#afterLoad(doc, prev),
-                this.#beforeRender.bind(this))
-            this.dispatchEvent(new CustomEvent('create-overlayer', {
-                detail: {
-                    doc: view.document, index: prev,
-                    attach: overlayer => view.overlayer = overlayer,
-                },
-            }))
-            this.setStyles(this.#styles)
-            this.dispatchEvent(new CustomEvent('load', {
-                detail: { doc: view.document, index: prev },
-            }))
-            this.#trimWindow()
-        } catch (e) {
-            console.warn(e)
-            console.warn(new Error(`Failed to load section ${prev}`))
-        } finally {
-            this.#loadingIndex.delete(prev)
-            /* Fonts land after load and grow the section again, so the hold
-               outlives the await by a beat rather than being dropped here. */
-            const view = this.#viewAt(prev)?.view
-            const done = () => this.#releaseHold()
-            if (view?.document?.fonts?.ready) view.document.fonts.ready.then(done, done)
-            else done()
+            this.#loadingIndex.delete(index)
         }
     }
 
@@ -1331,72 +1354,24 @@ export class Paginator extends HTMLElement {
     }
 
     /** Sections outside the window are dropped so a long session does not
-        accumulate an iframe per chapter. Only ever BELOW the reading
-        position, or above it by a whole view that is already off screen and
-        whose removal is compensated in the same frame — a removal above the
-        viewport that is not compensated is the classic infinite-scroll jump. */
+        accumulate an iframe per chapter. FLYLEAF PATCH 11: no compensation is
+        needed any more, in either direction. The slot stays where it is at the
+        height its section measured, and only the iframe inside it goes, so
+        removing a view above the reader moves nothing at all. */
     #trimWindow() {
-        /* Unconditional on every scroll rather than only on a section change:
-           #fillForward appends after the trim in the same handler, so gating
-           it on a change left a fourth view resident until the next scroll
-           event — measured, ids [13,14,15,16] with 14 current. Trimming is a
-           set lookup per resident view and does nothing at three or fewer. */
         if (!this.scrolled || this.#views.length <= 3) return
         const el = this.#container
-        const keep = new Set([this.#index,
-            this.#adjacentFrom(this.#index, -1), this.#adjacentFrom(this.#index, 1)])
-        /* FLYLEAF PATCH 9. Adjacency in the spine stopped standing in for
-           nearness on screen the moment the sections got small. Keeping the
-           current index and its two neighbours is three views, and three views
-           of front matter is 60px -- so everything the filler had just stitched
-           in below was dropped as "far", the filler put it back, and the two
-           cycled: measured on The Incandescent, sections 6, 7 and 8 loading
-           twenty times while the reader sat on the dedication. So a view is
-           near if it is near in PIXELS: anything overlapping a screen above the
-           viewport to two screens below it stays, whatever its index. */
-        const lo = el.scrollTop - el.clientHeight
+        const lo = el.scrollTop - el.clientHeight * 2
         const hi = el.scrollTop + el.clientHeight * 3
         for (const entry of [...this.#views]) {
-            if (keep.has(entry.index)) continue
-            const elTop = entry.view.element.offsetTop
-            if (elTop + entry.view.element.offsetHeight >= lo && elTop <= hi) continue
-            const above = elTop < el.scrollTop
-            const before = el.scrollHeight
-            const top = el.scrollTop
-            this.#views.splice(this.#views.indexOf(entry), 1)
-            entry.view.destroy()
-            entry.view.element.remove()
-            this.sections[entry.index]?.unload?.()
-            if (above) el.scrollTop = top - (before - el.scrollHeight)
+            if (entry.index === this.#index) continue
+            const slot = this.#slots[entry.index]
+            if (!slot) continue
+            if (slot.offsetTop + slot.offsetHeight >= lo && slot.offsetTop <= hi) continue
+            this.#dropView(entry)
         }
     }
 
-    /** Everything that must happen to a freshly loaded section document,
-        shared by #display and by the continuous filler so a section appended
-        below the current one gets exactly the same treatment.
-
-        FLYLEAF PATCH: a document with no <head> used to get no style elements
-        at all, and so none of the reading CSS. Not a hypothetical — an EPUB
-        section may be an XHTML body-only fragment, in which case
-        documentElement IS the <body> and `doc.head` is null (measured; the
-        text/html parser synthesises a head, the XML parser does not). The
-        failure mode is specific and was reported from a screenshot: the stock
-        ground and ink survive, because those are set inline on documentElement
-        and body by `View`, while every rule from `reader/readingCss.ts` is
-        missing — so the section renders on the right paper in the browser's
-        default face at the browser's default measure, and
-        `a:any-link { color: inherit }` is gone, which is UA blue on a dark
-        stock.
-
-        The two elements go on documentElement instead. A <style> in the HTML
-        namespace applies wherever it sits, and prepend/append keeps the
-        cascade the pair exists for: ours first, author's in between, ours
-        last. `createElement` is right rather than createElementNS — per DOM it
-        uses the HTML namespace for an HTML document and for an
-        application/xhtml+xml one, which is every document that reaches here.
-        What it does NOT do is make `doc.head` resolve: that getter wants a
-        head child of a root <html>, so synthesising one inside a <body> root
-        would be a lie in the tree for no gain. See PATCHES.md. */
     #afterLoad(doc, index, onLoad) {
         const $head = doc.head ?? doc.documentElement
         if ($head) {
@@ -1421,13 +1396,32 @@ export class Paginator extends HTMLElement {
             await this.scrollToAnchor((typeof anchor === 'function'
                 ? anchor(resident.view.document) : anchor) ?? 0, select)
             if (hasFocus) this.focusView()
-            void this.#topUp()
+            void this.#fillVisible()
             return
         }
-        /* A jump to a section the window does not reach — the TOC, a link, a
-           restored position. The old column has nothing to do with where the
-           reader is going, so it goes. */
-        if (this.scrolled && src) this.#clearViews()
+        /* FLYLEAF PATCH 11. A jump to a section that is not loaded — the TOC,
+           a link, a restored position — no longer throws the column away. The
+           slot for that section is already in the flow at its place in the
+           book, so the jump is a scroll to it and a load into it, and
+           everything the reader scrolled past on the way in is still there to
+           scroll back through. This is what stops a book opening on its table
+           of contents with no way up to the cover. */
+        if (this.scrolled && src) {
+            const slot = this.#slotFor(index)
+            if (slot) {
+                this.#container.scrollTop = slot.offsetTop
+                const view = await this.#loadInto(index, onLoad)
+                if (view) {
+                    this.#view = view
+                    this.#container.scrollTop = slot.offsetTop
+                    await this.scrollToAnchor((typeof anchor === 'function'
+                        ? anchor(view.document) : anchor) ?? 0, select)
+                    if (hasFocus) this.focusView()
+                    void this.#fillVisible()
+                    return
+                }
+            }
+        }
         if (src) {
             const view = this.#createView(index)
             const afterLoad = doc => this.#afterLoad(doc, index, onLoad)
@@ -1444,7 +1438,7 @@ export class Paginator extends HTMLElement {
         await this.scrollToAnchor((typeof anchor === 'function'
             ? anchor(this.#view.document) : anchor) ?? 0, select)
         if (hasFocus) this.focusView()
-        void this.#topUp()
+        void this.#fillVisible()
     }
     #canGoToIndex(index) {
         return index >= 0 && index <= this.sections.length - 1
