@@ -494,3 +494,53 @@ real height (`readingCss.ts`, `viewport`).
 
 The inline-axis cap and `object-fit`, `break-inside` and `box-sizing` are
 untouched in both flows.
+
+---
+
+## PATCH 9 — `paginator.js` — the continuous column stops dead-ending on short sections
+
+`#display` gained `void this.#topUp()` at both of its exits, `#topUp()` is new, and
+`#trimWindow`'s keep rule became geometric.
+
+**The bug, as reported:** "i can only navigate to the content using th table of
+content", "scrolling not working except for text content", and then, after the
+image fixes landed, "local host still getting stuch here … instead of scrolling
+all content like kindle or apple books would" — with a screenshot of the Tor
+front-matter page.
+
+**Cause one — nothing calls the filler.** `#fillForward` is invoked only from the
+container's `scroll` listener. A section shorter than the viewport produces no
+scrollbar, so no scroll event ever fires, so nothing is stitched in below, so
+there is still nothing to scroll. Measured on `The_Incandescent_-_Emily_Tesh.epub`
+at a 986px viewport, section 4 is the dedication: `viewSize` **250.297**,
+`start` **0**, and `start` stayed 0 across **35** `scrollBy` attempts. Inside the
+frame: `bodyScrollHeight` **22px**, `textLength` **18** — "For A. K. Larkwood",
+no images. The section is genuinely that small. The only way onward was the TOC,
+exactly as reported.
+
+`#topUp` tops the column up when a section is *displayed* as well as when it is
+scrolled, and loops, because the section after a short one is usually short too —
+three pages of front matter in a row is the ordinary shape of a trade EPUB. It
+stops as soon as there is a screen of runway for the scroll handler to take over
+from, or when there is nothing left to append. Its 20-pass cap is a backstop
+against a book of hundreds of tiny sections, not a tuning knob: each pass appends
+exactly one section and re-measures.
+
+**Cause two — the window was counted in views.** `#trimWindow` kept `#index` and
+its two spine neighbours. Adjacency stands in for nearness only while sections are
+chapter-sized; three views of front matter is about 60px. So everything `#topUp`
+had just stitched in below was dropped as "far", `#topUp` put it back, and the two
+cycled: measured, sections 5, 6, 7 and 8 loading **20 times** in a 30-step scroll
+while the reader sat on the dedication.
+
+The keep rule is now pixels. A view survives if it overlaps the band from one
+screen above the viewport to two screens below it, whatever its index; `#index`
+and its neighbours are still kept unconditionally. The count guard
+(`#views.length <= 3`) and the compensated-removal-above logic are untouched.
+
+**After, same book, same viewport:** from section 4, four loads total — 5, 6, 7, 8,
+each once, no repeats — and the reader scrolls through the front matter into
+"chapter one RISK ASSESSMENT". From section 0 it walks cover → "Begin Reading /
+Table of Contents" → the Tor page continuously. Paginated is unaffected: `scrolled`
+`false`, `v.next()` ×4 from section 8 moves "chapter one" → "chapter two",
+`size` **1223.99**, `start` **1224**.
