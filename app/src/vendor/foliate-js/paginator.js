@@ -470,7 +470,12 @@ export class Paginator extends HTMLElement {
        opens, in spine order, each standing at an estimated height until its
        section is loaded into it. See the note on #buildSlots. */
     #slots = []
-    #slotObserver = null
+    /* True only while #display is building the view it was asked to jump to.
+       A view the reader simply scrolled into must never re-anchor: measured on
+       the cover of The Incandescent, a freshly loaded section 0 anchored on
+       every expand and pinned the top of the book at 129, 274, 208, 116, 370
+       against a steady upward scroll. */
+    #displaying = false
     #loadingIndex = new Set()
     #index = -1
     #anchor = 0 // anchor view to a fraction (0-1), Range, or Element
@@ -710,8 +715,6 @@ export class Paginator extends HTMLElement {
         this.bookDir = book.dir
         this.sections = book.sections
         /* PATCH 11. A different book is a different column. */
-        this.#slotObserver?.disconnect()
-        this.#slotObserver = null
         this.#slots = []
         book.transformTarget?.addEventListener('data', ({ detail }) => {
             if (detail.type !== 'text/css') return
@@ -737,8 +740,6 @@ export class Paginator extends HTMLElement {
             /* PATCH 11. Back to paginated: the slot column is scrolled flow's
                geometry and has no business under a paged view. */
             if (this.#slots.length) {
-                this.#slotObserver?.disconnect()
-                this.#slotObserver = null
                 this.#slots = []
                 this.#clearViews()
                 this.#container.replaceChildren()
@@ -753,7 +754,7 @@ export class Paginator extends HTMLElement {
             this.#view = view
             return view
         }
-        const entry = { index, view: null, anchoring: true }
+        const entry = { index, view: null, anchoring: this.#displaying }
         entry.view = new View({
             container: this,
             onExpand: () => {
@@ -762,15 +763,9 @@ export class Paginator extends HTMLElement {
                    Compensation for a section growing above the reader is not
                    done here any more — it is the slot observer's job, which
                    sees the real pixel delta. See #buildSlots. */
-                /* ...and only while it is still settling from a jump. Once the
-               reader has the section on screen, scrollTop IS their position;
-               re-anchoring on every later expand fights their thumb. Measured
-               at the top of the book: scrollTop bounced 0, 100, 201, 174, 89
-               against a steady upward scroll. */
-            if (entry.index === this.#index && entry.anchoring) {
-                entry.anchoring = false
-                this.#scrollToAnchor(this.#anchor)
-            }
+                /* Nothing. In scrolled flow scrollTop IS the reader's position,
+               so a section finishing its layout has nothing to say about it.
+               Every re-anchor here was a write fighting the reader's thumb. */
             },
         })
         let at = this.#views.findIndex(v => v.index > index)
@@ -800,10 +795,16 @@ export class Paginator extends HTMLElement {
         first frame and its shape never changes: loading a section fills a box
         that is already sitting in the flow, and unloading one leaves the box
         behind, frozen at the height it actually measured. A slot only ever
-        changes height once — when its estimate is replaced by the real thing —
-        and #slotObserver adds that difference to scrollTop if and only if the
-        slot lies entirely above the reading line, which is the one case where
-        a height change would otherwise move the text under the reader's eye.
+        changes height once — when its estimate is replaced by the real thing.
+
+        Nothing compensates for that one change, and nothing re-anchors after
+        it. Every attempt to correct scrollTop while sections settled was a
+        write fighting the reader's thumb: measured on the first pass up
+        through this book, twenty-seven scrolls landed somewhere other than
+        where they were aimed, all of them inside the cover, while a second
+        pass over the same sections — already loaded, nothing left to correct —
+        was flawless. So the corrections are gone. In scrolled flow scrollTop
+        is the reader's position, full stop.
 
         Fifty-three slots for The Incandescent, one div each, no iframe until
         the section is near. The iframes stay windowed; it is only the geometry
@@ -811,7 +812,6 @@ export class Paginator extends HTMLElement {
     #buildSlots() {
         const el = this.#container
         this.#clearViews()
-        this.#slotObserver?.disconnect()
         el.replaceChildren()
         const estimate = el.clientHeight || 800
         this.#slots = (this.sections ?? []).map(() => {
@@ -821,27 +821,6 @@ export class Paginator extends HTMLElement {
             el.append(slot)
             return slot
         })
-        /* The exact pixel delta, from the element itself, rather than an
-           arithmetic guess made before the layout ran. PATCH 6 guessed, and
-           double-counted against #scrollToAnchor doing its own absolute
-           repositioning at the same moment. */
-        this.#slotObserver = new ResizeObserver(entries => {
-            for (const { target } of entries) {
-                const now = target.offsetHeight
-                const delta = now - (target.__h ?? now)
-                target.__h = now
-                if (!delta) continue
-                /* Anything whose top is above the reading line moves the
-                   reader when it changes height -- whether the reader is
-                   below it or inside it. Compensating on the top edge, not
-                   the bottom, is what keeps a section growing from its
-                   986px estimate to its real height from throwing the
-                   column. Measured before this: scrolling up walked
-                   7499 -> 6108 -> 5076, a 1400px jump for a 300px scroll. */
-                if (target.offsetTop < el.scrollTop) el.scrollTop += delta
-            }
-        })
-        for (const slot of this.#slots) this.#slotObserver.observe(slot)
     }
     #slotFor(index) {
         if (this.#slots.length !== (this.sections?.length ?? 0)) this.#buildSlots()
@@ -1410,7 +1389,10 @@ export class Paginator extends HTMLElement {
             const slot = this.#slotFor(index)
             if (slot) {
                 this.#container.scrollTop = slot.offsetTop
-                const view = await this.#loadInto(index, onLoad)
+                this.#displaying = true
+                let view
+                try { view = await this.#loadInto(index, onLoad) }
+                finally { this.#displaying = false }
                 if (view) {
                     this.#view = view
                     this.#container.scrollTop = slot.offsetTop
