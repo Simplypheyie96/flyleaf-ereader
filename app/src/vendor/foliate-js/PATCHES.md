@@ -544,3 +544,72 @@ each once, no repeats — and the reader scrolls through the front matter into
 Table of Contents" → the Tor page continuously. Paginated is unaffected: `scrolled`
 `false`, `v.next()` ×4 from section 8 moves "chapter one" → "chapter two",
 `size` **1223.99**, `start` **1224**.
+
+---
+
+## PATCH 10 — a hold the reader can escape
+
+`paginator.js`, `#restoreHold` / `#abandonHoldIfUserScrolled` / `#releaseHold`.
+
+`#holdPosition` snapshotted the reader's line when a section was prepended above
+them, and `#restoreHold` re-applied it on *every* view expand, plus once more from
+`#releaseHold` on `fonts.ready` — which lands seconds later. Any scrolling done in
+between was undone.
+
+**Measured, scrolling back to the cover of *The Incandescent*:** `start` walked
+1060 → 360 → 74 and then sat at 74 for **fifty-seven consecutive upward scrolls**,
+never reaching the top of the cover. That fight is the shaking.
+
+`#restoreHold` now records the scrollTop it wrote. Growth above the reader moves
+`offsetTop` without firing a scroll event; a thumb always fires one. So any scroll
+event landing somewhere other than what we last wrote is the reader, and the hold
+is abandoned.
+
+Superseded in part by PATCH 11, which removes the hold's callers in scrolled flow.
+
+---
+
+## PATCH 11 — the slot column
+
+`paginator.js`. Replaces PATCH 6's sliding window in scrolled flow.
+
+The window inserted section views above the reader as they scrolled up, so the
+column's geometry changed under them on every fill, and every fix for that was
+another compensation fighting the last. The reader's instruction was to stop
+being clever: *"have the book scroll normally like it should."*
+
+**One `<div>` slot per spine section, created when the book opens, in order**, each
+standing at a one-viewport estimate until its section loads into it. The column's
+full height exists from the first frame. Loading fills a box already in the flow;
+unloading freezes the slot at its measured height. **Nothing is ever inserted, so
+nothing below the reader ever moves.**
+
+- `#buildSlots` / `#slotFor` / `#dropView` — the column and its lifecycle.
+- `#fillVisible` / `#loadInto` replace `#topUp`, `#fillForward`, `#fillBackward`.
+  Sections within one viewport of the visible band load, nearest first.
+- `#trimWindow` keeps its pixel band but no longer compensates scrollTop.
+- `#holdPosition` / `#restoreHold` / `#releaseHold` are no longer called in
+  scrolled flow.
+- `#display` no longer clears the column on a TOC jump — it scrolls to the slot,
+  which is why a book that opened on its table of contents can now be scrolled
+  back to its cover.
+- `attributeChangedCallback('flow')` builds the column when the app crosses into
+  scrolled flow. The paginator boots paginated and is switched afterwards, so
+  `#createView` alone never sees a scrolled first view. Measured without this: the
+  container held one child instead of fifty-three, `scrollHeight` 1060 against a
+  986px viewport — 74px of travel for the whole book.
+- The `ResizeObserver` compensates on a slot's **top** edge, not its bottom. A
+  section growing from its estimate to its real height moves the reader whether
+  they are below it or inside it. Measured without this: scrolling up walked
+  7499 → 6108 → 5076, a 1400px jump for a 300px scroll.
+- `onExpand` re-anchors only while the view is still settling from a jump
+  (`entry.anchoring`, cleared on first use). Once the section is on screen,
+  scrollTop *is* the reader's position. Measured without this, at the top of the
+  book: scrollTop bounced 0, 100, 201, 174, 89 against a steady upward scroll.
+
+Paginated flow is untouched — crossing back tears the column down and restores the
+single-child container.
+
+**After, *The Incandescent* (53 sections), 986px viewport, down 25 steps → up 40 →
+down 25:** column `scrollHeight` 52361. **Zero reversals in all three passes**, the
+top of the cover reached at scrollTop 0 and held there.
