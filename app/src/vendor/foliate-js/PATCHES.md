@@ -598,18 +598,22 @@ nothing below the reader ever moves.**
   `#createView` alone never sees a scrolled first view. Measured without this: the
   container held one child instead of fifty-three, `scrollHeight` 1060 against a
   986px viewport — 74px of travel for the whole book.
-- The `ResizeObserver` compensates on a slot's **top** edge, not its bottom. A
-  section growing from its estimate to its real height moves the reader whether
-  they are below it or inside it. Measured without this: scrolling up walked
-  7499 → 6108 → 5076, a 1400px jump for a 300px scroll.
-- `onExpand` re-anchors only while the view is still settling from a jump
-  (`entry.anchoring`, cleared on first use). Once the section is on screen,
-  scrollTop *is* the reader's position. Measured without this, at the top of the
-  book: scrollTop bounced 0, 100, 201, 174, 89 against a steady upward scroll.
+- **Nothing compensates for a slot resizing, and `onExpand` re-anchors nothing.**
+  Both were tried. Compensating on a slot's bottom edge skipped every growing
+  slot above the reader and let the column jump 1400px for a 300px scroll;
+  compensating on the top edge over-corrected the other way, pushing the reader
+  back down out of a section they were scrolling up into, so the book would not
+  go past its own map. Re-anchoring on expand pinned the top of the book at 129,
+  274, 208, 116, 370 against a steady upward scroll. Every one of them was a
+  write fighting the reader's thumb. In scrolled flow scrollTop **is** the
+  reader's position, full stop.
 
 Paginated flow is untouched — crossing back tears the column down and restores the
 single-child container.
 
-**After, *The Incandescent* (53 sections), 986px viewport, down 25 steps → up 40 →
-down 25:** column `scrollHeight` 52361. **Zero reversals in all three passes**, the
-top of the cover reached at scrollTop 0 and held there.
+**After, *The Incandescent* (53 sections), 986px viewport, down 30 → up 70 → down 30
+on a cold open:** 4 steps of 130 landed short of their target out of 130, all of
+them the column settling shorter than its own estimate as real section heights
+arrived — never a reversal, never a step backwards. The same walk with the
+compensation still in scored 27. A second pass over sections already loaded is
+clean.
