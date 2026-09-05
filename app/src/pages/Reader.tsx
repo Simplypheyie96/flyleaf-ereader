@@ -438,6 +438,35 @@ export function Reader() {
         liveDoc.current = doc
         doc.addEventListener('selectionchange', onSelectionChange)
         doc.addEventListener('keydown', onDocKey)
+        doc.addEventListener('copy', onDocCopy)
+    }, [])
+
+    /* ── copy ─────────────────────────────────────────────────────────────
+       A section is an iframe whose src is a `blob:` URL, and that is a fact
+       the clipboard can see. Copy from it with the platform's own menu and
+       the OS writes the flavours it would write for any document — including
+       a file reference naming the blob — so the paste on the other side is a
+       FILE called `ca6e96eac…`, not the sentence that was selected. Reported
+       from a phone, reproduced from the source: nothing in this app had ever
+       said what a copy of a book is.
+
+       So it says it here, once, for both menus. The event fires on the
+       document that owns the words whichever menu asked for it — the app's
+       Copy goes through the clipboard API and never reaches this, the
+       platform's callout does — and writing plain text and preventing the
+       default leaves exactly one flavour on the pasteboard.
+
+       Flattened, so the two Copy paths cannot disagree: `marks.flatten` is
+       already what a highlight stores and what an export contains, and a
+       passage that crossed a paragraph break should paste as a sentence, not
+       with the column break the paginator happened to put in it. */
+    const onDocCopy = useCallback((e: Event) => {
+        const ev = e as ClipboardEvent
+        const doc = (ev.currentTarget ?? ev.target) as Document | null
+        const text = flatten(doc?.getSelection?.()?.toString() ?? '')
+        if (!text || !ev.clipboardData) return
+        ev.clipboardData.setData('text/plain', text)
+        ev.preventDefault()
     }, [])
 
     /* The keyboard does not cross the iframe boundary either, and this one cost

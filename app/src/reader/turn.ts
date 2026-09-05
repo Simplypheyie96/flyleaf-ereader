@@ -47,6 +47,14 @@ const CLAIM_MOUSE_PX = 24
 /** Vertical travel that gives the gesture away to something else. */
 const YIELD_PX = 12
 
+/** How far outside the selection's own rectangles still counts as landing on
+    it. iOS draws a grab handle at each end of a selection, and the knob sits
+    proud of the line — above the first, below the last — so a thumb reaching
+    for one lands on no text at all. Measured against Safari's own handles on
+    a 390px phone: the knob is ~10px across and stands ~12px clear of the
+    line, and the finger that goes for it is imprecise on top of that. */
+const HANDLE_PX = 30
+
 /** Beyond the first and last page of the book there is nothing, so the page
     follows the finger at a decreasing rate and springs back. Apple's
     rubber-band constant. */
@@ -113,6 +121,24 @@ function band(overshoot: number, dim: number): number {
 }
 
 const clamp = (lo: number, hi: number, v: number) => Math.min(hi, Math.max(lo, v))
+
+/* ── the selection, as the gesture layer sees it ───────────────────────────
+   Two questions, and neither of them may cost a layout read on a moving
+   finger. "Is this the same selection I started with" is asked on every move
+   before the drag is claimed, so it is answered from the four properties the
+   browser already holds — never from `toString()`, which walks the range. */
+
+type SelMark = { an: Node | null; ao: number; fn: Node | null; fo: number }
+
+function selMark(sel: Selection | null | undefined): SelMark | null {
+    if (!sel) return null
+    return { an: sel.anchorNode, ao: sel.anchorOffset, fn: sel.focusNode, fo: sel.focusOffset }
+}
+
+function sameSel(a: SelMark | null, b: SelMark | null): boolean {
+    if (!a || !b) return a === b
+    return a.an === b.an && a.ao === b.ao && a.fn === b.fn && a.fo === b.fo
+}
 
 /* ── what the controller needs from the page ──────────────────────────── */
 
@@ -224,6 +250,12 @@ export class TurnController {
     /** true while a pointing device is down. Such a gesture is watched for a
         tap but never claimed as a drag — see #down. */
     #mouse = false
+    /** Where the selection was when this gesture began, and whether the
+        gesture began ON it. Both read once, at touch-down, with nothing
+        moving; together they are what stops a turn from being claimed out
+        from under a reader who is selecting a sentence. */
+    #sel0: SelMark | null = null
+    #selAtDown = false
 
     constructor(cfg: TurnConfig, hooks: TurnHooks) {
         this.#cfg = cfg
@@ -355,6 +387,43 @@ export class TurnController {
            simply did not respond to a drag on a desktop at all. */
         this.#mouse = e.pointerType === 'mouse'
 
+        /* And so do TOUCH drags, which is the whole of this. The rule above
+           was written for a mouse and applied only to a mouse, so on a phone
+           the turn claimed 8px of horizontal travel unconditionally — and
+           every gesture a reader makes to select a sentence is horizontal.
+           Long-press and drag to extend, or grab a handle and pull: 8px in,
+           the layer took the pointer, called preventDefault on every move,
+           and slid the page under the selection that was being made. That is
+           the book "shifting from side to side" while selecting.
+
+           Two facts decide it, both read here, once, before anything moves:
+           where the selection is now, and whether this finger came down on
+           it. A gesture that starts on the selection is reaching for a handle
+           and is never a turn; a gesture that CHANGES the selection is making
+           one and is never a turn (#move). A swipe on a different paragraph
+           while some old selection is still up is neither, and still turns
+           the page — which is why this is two narrow tests and not a blanket
+           "is anything selected". */
+        /* NOT `e.target instanceof Document`, and this cost a measured round
+           to find: a section is an iframe, so its elements come from another
+           realm and `instanceof` compares them against THIS window's
+           constructors. It is false for every node in the book — which made
+           this read the selection of a document that was always null, and the
+           gate below never closed once. Plain property access crosses the
+           boundary; the constructors do not. */
+        const tgt = e.target as Node | null
+        const sdoc = (tgt?.nodeType === 9 ? tgt as unknown as Document : tgt?.ownerDocument)
+            ?? e.view?.document ?? null
+        const sel0 = sdoc?.defaultView?.getSelection?.()
+        /* A COLLAPSED selection is a caret, and a caret is not a selection —
+           it is what the browser leaves behind on any press, including the
+           mousedown this very gesture is about to cause. Recorded as nothing,
+           or the first move would find a caret where there had been none,
+           read it as "the reader is selecting", and no mouse drag would ever
+           turn a page again. */
+        this.#sel0 = sel0 && !sel0.isCollapsed ? selMark(sel0) : null
+        this.#selAtDown = this.#onSelection(e, sel0)
+
         /* Interrupting a commit: continue from where it actually is on
            screen, not from where it was heading. Reading the live transform
            is a style read, and it happens once, at touch-down, before
@@ -405,12 +474,21 @@ export class TurnController {
             }
             if (Math.abs(dx) < (this.#mouse ? CLAIM_MOUSE_PX : CLAIM_PX)) return
             if (Math.abs(dx) <= Math.abs(dy)) return
-            /* A mouse drag that is actually selecting has a live selection
-               behind it, and that is a fact rather than a guess about intent
-               — so it is the test, instead of refusing every mouse drag the
-               way this used to. Drag from the margin, or from a word without
-               catching any text, and the page turns. */
-            if (this.#mouse && this.#selecting()) return
+            /* A drag that is actually selecting has a live selection behind
+               it, and that is a fact rather than a guess about intent — so it
+               is the test, instead of refusing every mouse drag the way this
+               used to. Drag from the margin, or from a word without catching
+               any text, and the page turns.
+
+               Both halves apply to every pointer type. #selAtDown is the
+               finger that came down on the selection, which on a phone is a
+               grab handle and on a desk is a drag of already-selected text.
+               The comparison is the selection this gesture has been BUILDING
+               — a long press that took hold of a word and is now widening it.
+               Neither is a page turn, and neither may be claimed as one. */
+            if (this.#selAtDown) return
+            const live = this.#liveSel()
+            if (live && !live.isCollapsed && !sameSel(selMark(live), this.#sel0)) return
             if (!this.#cfg.paginated) { this.#phase = 'idle'; return }
 
             /* Claimed. Every layout read the drag needs happens here, once. */
@@ -784,12 +862,28 @@ export class TurnController {
 
     /* ── tap ──────────────────────────────────────────────────────────── */
 
-    /** Is the browser mid-selection in the document the gesture started in?
-        Checked in the section's own document, because a selection made inside
-        an iframe does not show up in the host's. */
-    #selecting(): boolean {
-        const sel = this.#target?.ownerDocument?.defaultView?.getSelection()
-        return !!sel && !sel.isCollapsed
+    /** The selection of the document the gesture started in. Read from the
+        SECTION's own document, because a selection made inside an iframe does
+        not show up in the host's. */
+    #liveSel(): Selection | null {
+        return this.#target?.ownerDocument?.defaultView?.getSelection() ?? null
+    }
+
+    /** Did this pointer come down on the live selection — on the words
+        themselves or on a handle standing off one of its ends?
+
+        One layout read, at touch-down, with nothing on screen moving, and
+        only when there is a selection to read. The range's rectangles and the
+        event's clientX/Y are in the same document's viewport whether that is
+        the host or a section iframe, so no frame arithmetic is needed here —
+        unlike #tap, which is comparing a point against the HOST's stage. */
+    #onSelection(e: PointerEvent, sel: Selection | null | undefined): boolean {
+        if (!sel || sel.isCollapsed || sel.rangeCount === 0) return false
+        for (const r of sel.getRangeAt(0).getClientRects()) {
+            if (e.clientX >= r.left - HANDLE_PX && e.clientX <= r.right + HANDLE_PX
+                && e.clientY >= r.top - HANDLE_PX && e.clientY <= r.bottom + HANDLE_PX) return true
+        }
+        return false
     }
 
     /** TRUE only when the tap itself started a turn, so #up can tell a tap
@@ -803,9 +897,19 @@ export class TurnController {
         /* A footnote or a chapter link is the book's, and foliate already
            handles it. */
         if (e.target instanceof Element && e.target.closest('a[href], [epub\\:type~="noteref"]')) return false
-        /* A tap that dismisses a selection is doing that and nothing else. */
+        /* A tap that dismisses a selection is doing that and nothing else —
+           but only a selection that was already there when the finger landed.
+           A long press makes its selection WITHOUT travelling, so it arrives
+           here looking exactly like a tap, and this line used to throw away
+           the selection at the instant the finger lifted: press, hold, watch
+           the words go blue, let go, and they are plain again. Compare it
+           with what was selected at touch-down and the two cases separate
+           with no timer and no guess about intent. */
         const sel = doc?.getSelection?.()
-        if (sel && !sel.isCollapsed) { sel.removeAllRanges(); return false }
+        if (sel && !sel.isCollapsed) {
+            if (sameSel(selMark(sel), this.#sel0)) sel.removeAllRanges()
+            return false
+        }
 
         /* A tap on an existing highlight is a tap on the highlight. foliate's
            own click listener will emit `show-annotation` for it a moment from
