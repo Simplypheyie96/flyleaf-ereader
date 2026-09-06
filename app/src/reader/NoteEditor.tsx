@@ -19,7 +19,10 @@ export interface NoteEditorProps {
     mark: Annotation
     onChange: (note: string) => void
     onRemove: () => void
-    onClose: () => void
+    /** The note as it stands at the moment of closing. The caller needs it:
+        a note opened on a fresh selection mints the highlight under it, and a
+        note that was never written must not leave that highlight behind. */
+    onClose: (note: string) => void
 }
 
 export function NoteEditor({ mark, onChange, onRemove, onClose }: NoteEditorProps) {
@@ -57,7 +60,7 @@ export function NoteEditor({ mark, onChange, onRemove, onClose }: NoteEditorProp
             role="dialog"
             aria-label="Note on this line"
             onKeyDown={e => {
-                if (e.key === 'Escape') { e.stopPropagation(); onClose() }
+                if (e.key === 'Escape') { e.stopPropagation(); onClose(latest.current) }
             }}
         >
             <blockquote className="note-quote">{mark.text}</blockquote>
@@ -79,7 +82,7 @@ export function NoteEditor({ mark, onChange, onRemove, onClose }: NoteEditorProp
                     <TrashIcon />
                     <span>Remove highlight</span>
                 </button>
-                <button type="button" className="note-done" onClick={onClose}>
+                <button type="button" className="note-done" onClick={() => onClose(latest.current)}>
                     <CheckIcon />
                     <span>Done</span>
                 </button>

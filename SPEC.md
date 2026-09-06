@@ -426,6 +426,15 @@ left-to-right wipe** of the fill, once, on apply — a mark being made. Never on
 A note is Kalam on `--card-w` with the highlighted line quoted above it in the reading face at
 13px. Unchanged.
 
+**A note always has a highlight under it, and an abandoned note takes that highlight with it.**
+Tapping Note on a plain selection has to mint a mark before there is anything to write beside, and
+it mints it in the default tint. That is scaffolding for the editor, not a colour anybody chose,
+so it is provisional until there are words next to it: closing the editor with nothing written —
+by Done or by Escape — removes the mark as well. Without that rule, select, Note, Done left a
+mustard highlight in the book for good, in a tint the reader never picked and with no note to
+explain it, which is the reported bug. A mark that already existed is never provisional: emptying
+its note clears the note and keeps the highlight, because that highlight was chosen.
+
 **The selection is the app's, not the platform's.** A phone draws its own callout — Copy, Look
 Up, Share — over any range selection it can see, and there is no API that hides it while the
 range exists. So the app does what Apple Books and Kindle do: the browser owns the selection
@@ -733,10 +742,29 @@ covers are glitching, they will show cover one minute and not show it another mi
   by `shrinkCover`. The cache's `LIMIT` of 512 is a runaway guard, not a memory strategy, and it
   must not be tightened: a cap small enough to bite evicts URLs whose `<img>` is still on screen,
   which reproduces the reported glitch inside the cache meant to fix it.
-- **One error is not evidence.** A spurious error and a genuine decode failure are the same event
-  with the same fields, so the first failure is retried — the URL is dropped and minted again.
-  Corrupt bytes fail twice and get the designed "No cover" ghost; an interrupted load simply
-  succeeds. Nothing ever latches on a single event: the old `dead` flag cleared only when the
+- **The bytes are copied out of IndexedDB at sight, not after a failure.** A Blob that came out of
+  IndexedDB is backed by a file the browser may stop lending, and WebKit neuters IDB-backed Blobs
+  some time after the transaction that produced them; from that moment every URL minted from the
+  handle fails, however many times it is minted again. That is the reported flip. It used to be
+  handled on the way down — two failed loads, *then* copy the bytes into memory — which cannot
+  work, because `arrayBuffer()` on a neutered Blob rejects, so the rescue failed in exactly the
+  case it existed for and the rejection was then read as proof the cover was dead. The copy is now
+  made eagerly, on first sight of a shape, out of the Blob the live query just handed over, which
+  is the one moment it is certain to be readable. Every URL after that is minted from an in-memory
+  Blob, which cannot be neutered. It costs no memory worth counting: the URL retained its Blob
+  either way, so this moves what is held from a file handle to the bytes, at 120KB a cover.
+- **No number of load errors condemns a cover.** A spurious error and a genuine decode failure are
+  the same event with the same fields, so counting them did not resolve the ambiguity — it only
+  made the wrong verdict rarer, and a shelf scrolled hard on a slow phone produces three aborted
+  loads with nothing wrong. A second failure now asks `createImageBitmap` instead, which decodes
+  the bytes directly with no element, no `src` to be moved off and no navigation to abort, so a
+  rejection is about the bytes and nothing else. Bytes that decode clear the count and are minted
+  again; only bytes that will not decode get the ghost. A good cover can no longer be ghosted at
+  all. A shape once proven decodable is remembered, so repeated handle failures cost one decode
+  rather than one each.
+- **One error is still not believed on its own.** The first failure is retried — the URL is
+  dropped and minted again — because an interrupted load simply succeeds the second time and that
+  costs nothing. Nothing ever latches on a single event: the old `dead` flag cleared only when the
   cover's shape changed, and a book's shape never changes, so one aborted load ghosted a good
   cover for the rest of the session and came back only on a remount.
 
@@ -755,10 +783,17 @@ covers are glitching, they will show cover one minute and not show it another mi
   for the session. Any fresh mount clears it and tries the bytes again, at the cost of one decode
   of an at-most-120KB image.
 
+- **A repaint reaches every copy of the book.** A copy or a verdict that lands notifies all
+  mounted covers, not only the one that started it. The same book is on screen in more than one
+  place, and a re-mint that reached one of them left the other pointing at the handle that had
+  already failed.
+
 `audit/covers.mjs` is the gate. Its third question is the direct regression guard — a single
-`error` dispatched at a loaded, valid cover must recover to an image, not to the ghost — and
-question 3b is the guard for the non-consecutive form: two errors with a **successful load between
-them** must also recover.
+`error` dispatched at a loaded, valid cover must recover to an image, not to the ghost — question
+3b is the guard for the non-consecutive form, two errors with a **successful load between them**,
+and question 3c is the neutered handle: with `createObjectURL` stubbed to return a URL pointing at
+nothing and the covers erroring six times over, no good cover may be ghosted. Measured against the
+previous code, 3c ghosted **both** covers on the shelf.
 
 ---
 

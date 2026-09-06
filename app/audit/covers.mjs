@@ -21,7 +21,7 @@
    perfectly valid <img> ghosted it permanently. That is the whole bug in one
    line, and question 3 below is the regression guard for it.
 
-   Five questions, and none of them can be answered by reading the source:
+   Six questions, and none of them can be answered by reading the source:
 
      1. every cover on the shelf is a real image, none is the browser's broken
         glyph, and none has fallen back to the ghost
@@ -78,7 +78,12 @@ const browser = await chromium.launch()
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } })
 const page = await ctx.newPage()
 const errors = []
-page.on('console', e => { if (e.type() === 'error') errors.push(e.text().slice(0, 160)) })
+/* Question 3c mints urls that deliberately point at nothing, and the browser
+   logs a failed resource for each. That noise is the test working, so it is
+   dropped by a flag the test itself sets rather than by matching on the message
+   text, which would also hide a real failure to load a cover. */
+let staged = false
+page.on('console', e => { if (e.type() === 'error' && !staged) errors.push(e.text().slice(0, 160)) })
 
 await page.goto(BASE + '/', { waitUntil: 'networkidle' })
 /* first run seeds the two included books, and seeding IS import — the covers
@@ -157,6 +162,40 @@ else {
   if (!twice.recovered) bad('twice', 'the cover did not come back after the second spurious error')
 }
 say(`two errors, one load between: ghosted=${twice.ghosted} recovered=${twice.recovered}`)
+
+// ---- 3c. the handle is taken away, and every re-mint fails ----
+/* THE REPORTED FLIP, and the case the counting ladder could not survive. A Blob
+   that came out of IndexedDB is backed by a file the browser may stop lending;
+   WebKit neuters IDB-backed Blobs some time after the transaction that produced
+   them, and from that moment every url minted from the handle fails to load,
+   however many times it is minted again. Simulated by making createObjectURL
+   hand back a url pointing at nothing, then erroring the covers repeatedly.
+
+   Measured against the previous code: BOTH good covers went to the ghost. It
+   counted to three and condemned bytes it had never looked at — which is the
+   cover that was there, and later is not, on a phone, with no reload in
+   between. A url that will not load says the handle died; it never says the
+   bytes are bad, so the bytes have to be decoded before any verdict. */
+staged = true
+const neutered = await page.evaluate(async () => {
+  const boxes = () => [...document.querySelectorAll('.cover')]
+  if (!boxes().length || !boxes()[0].querySelector('img')) return { skipped: 'no cover to test' }
+  const real = URL.createObjectURL
+  URL.createObjectURL = () => 'blob:' + location.origin + '/dead-' + Math.random()
+  for (let i = 0; i < 6; i++) {
+    for (const img of document.querySelectorAll('.cover img')) img.dispatchEvent(new Event('error'))
+    await new Promise(r => setTimeout(r, 350))
+  }
+  await new Promise(r => setTimeout(r, 1200))
+  URL.createObjectURL = real
+  await new Promise(r => setTimeout(r, 1200))
+  return { ghosted: boxes().filter(b => b.querySelector('.cover-ghost')).length, of: boxes().length }
+})
+m.neuteredHandle = neutered
+if (neutered.skipped) bad('neutered', neutered.skipped)
+else if (neutered.ghosted) bad('neutered', `${neutered.ghosted} of ${neutered.of} good covers were ghosted because the object url would not load \u2014 that says the handle died, never that the bytes are bad`)
+staged = false
+say(`handle taken away, six failed re-mints: ghosted=${neutered.ghosted ?? '-'} of ${neutered.of ?? '-'}`)
 
 // ---- 4. the urls survive a route change ----
 /* Clicked, not page.goto'd. A hard load tears down the module the cache lives

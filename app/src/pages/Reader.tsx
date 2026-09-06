@@ -1023,10 +1023,21 @@ export function Reader() {
 
     /* Note. On a selection that is not yet a highlight, the mark has to exist
        before it can be written beside — so the tint is applied first, in the
-       default. SPEC.md § 6.1: a note always has a highlight under it. */
+       default. SPEC.md § 6.1: a note always has a highlight under it.
+
+       WHICH MEANS AN ABANDONED NOTE HAS TO TAKE ITS HIGHLIGHT WITH IT. Tapping
+       Note is not choosing a colour; it is asking for somewhere to write. The
+       mustard below is scaffolding for the editor, and if nothing is written
+       in it the reader is left with a permanent highlight in a tint they never
+       picked — reported, and reproduced: select, tap Note, tap Done, and a
+       mustard row is in the book for good. So a mark minted HERE is provisional
+       until there are words beside it (onClose below). A mark that already
+       existed is the reader's own and is never touched: emptying its note
+       clears the note, not the highlight. */
+    const noteMinted = useRef(false)
     const onNote = useCallback(async () => {
         const existing = sel?.mark
-        if (existing) { setSel(null); setNoteFor(existing); return }
+        if (existing) { noteMinted.current = false; setSel(null); setNoteFor(existing); return }
         const view = viewRef.current
         const range = selRange.current
         if (!view || !range || !id) return
@@ -1034,6 +1045,7 @@ export function Reader() {
         const text = rangeText(range)
         if (!text) return
         const row = await addHighlight(id, cfi, text, 'mustard', chapterRef.current)
+        noteMinted.current = true
         view.deselect?.()
         setSel(null)
         setNoteFor(row)
@@ -1468,7 +1480,15 @@ export function Reader() {
                     mark={noteFor}
                     onChange={note => void setNote(noteFor.id, note)}
                     onRemove={() => { const m = noteFor; setNoteFor(null); void removeAnnotation(m.id) }}
-                    onClose={() => setNoteFor(null)}
+                    onClose={note => {
+                        const m = noteFor
+                        const minted = noteMinted.current
+                        noteMinted.current = false
+                        setNoteFor(null)
+                        /* Nothing written, and the highlight was only ever
+                           scaffolding for this editor: it goes with it. */
+                        if (minted && !note.trim()) void removeAnnotation(m.id)
+                    }}
                 />
             )}
 
