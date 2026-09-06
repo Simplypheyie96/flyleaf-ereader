@@ -87,6 +87,19 @@ if (m.sheet.cover?.src && !m.sheet.cover.src.startsWith('blob:'))
     bad('cover', `cover src is ${m.sheet.cover.src}…, not a blob from IndexedDB`)
 say(`imported: "${m.sheet.title}"`)
 
+/* Importing a PDF is what starts `warmPdfData()` (SPEC § 13.6): the whole of
+   /pdfjs/ fetched serially in the background into the CacheFirst cache, so a
+   later open works with the network off. Those are requests to /pdfjs/ by
+   design, and they are not the ones the offline claim is about — the claim is
+   that OPENING this PDF asks the network for nothing. So: wait for the warm to
+   finish, count it, and start the ledger again at the open. */
+await page.waitForFunction(() => !!localStorage.getItem('flyleaf.pdfjs.warm'), null, { timeout: 60000 })
+    .catch(() => bad('warm', 'the pdfjs data warm did not finish within a minute of the import'))
+m.warmFetches = pdfjsFetches().length
+if (m.warmFetches < 100) bad('warm', `the warm fetched ${m.warmFetches} file(s) from /pdfjs/ — the manifest lists ~190`)
+else say(`the import warmed ${m.warmFetches} pdfjs data files into the cache`)
+requests.length = 0
+
 /* ── open the reader ─────────────────────────────────────────────────────── */
 await page.getByRole('button', { name: /Start reading|Continue|Read again/ }).click()
 await page.waitForFunction(
@@ -139,7 +152,7 @@ if (!/page 1 of 12/i.test(m.readout ?? ''))
     bad('readout', `readout reads "${m.readout}" — a PDF's page numbers are the file's own`)
 else say(`readout: "${m.readout}"`)
 
-/* ── the sheet: four controls, no tabs, no type controls ──────────────────── */
+/* ── the sheet: seven controls, no tabs, no type controls ─────────────────── */
 await page.locator('button[aria-label="Page settings"]').click()
 await page.waitForTimeout(500)
 m.sheetShape = await page.evaluate(() => {
@@ -162,11 +175,14 @@ m.sheetShape = await page.evaluate(() => {
     }
 })
 const TYPE_CTLS = /size|face|leading|line width|word|letter|hyphen|justif|weight|margin/i
-if (m.sheetShape?.tabs) bad('sheet', 'the PDF sheet has a tablist — four controls do not need three tabs')
+if (m.sheetShape?.tabs) bad('sheet', 'the PDF sheet has a tablist — seven controls do not need three tabs')
 const strays = (m.sheetShape?.labels ?? []).filter(l => TYPE_CTLS.test(l))
 if (strays.length) bad('sheet', `type controls present on a fixed page: ${strays.join(', ')}`)
-if ((m.sheetShape?.labels ?? []).length !== 4)
-    bad('sheet', `${m.sheetShape?.labels?.length} controls, expected 4 — ${(m.sheetShape?.labels ?? []).join(', ')}`)
+/* Seven, in this order — SPEC § 13.3. `Fit` is present because the driver
+   opens in scroll mode; in pages mode it gives way to `Turn`. */
+const PDF_CTLS = ['Reading', 'Fit', 'Spread', 'Zoom', 'Stock', 'Paper', 'Page tint']
+if ((m.sheetShape?.labels ?? []).join('|') !== PDF_CTLS.join('|'))
+    bad('sheet', `controls are ${(m.sheetShape?.labels ?? []).join(', ')} — expected ${PDF_CTLS.join(', ')}`)
 if (m.sheetShape?.stockSwatches !== 7)
     bad('sheet', `${m.sheetShape?.stockSwatches} stock swatches, expected 7`)
 /* The lead sentence must sit in an even inset, not against the sheet's own top
@@ -304,7 +320,7 @@ if (await hit.count()) {
     else say(`the hit landed on page 5 (scrollTop ${m.hitLanding.scrollTop})`)
 }
 
-/* ── claim 6: the selection menu's absences ──────────────────────────────── */
+/* ── claim 6: the selection menu, whole ──────────────────────────────── */
 await page.keyboard.press('Escape').catch(() => {})
 await page.waitForTimeout(300)
 m.selection = await page.evaluate(async () => {
@@ -336,10 +352,15 @@ m.selection = await page.evaluate(async () => {
 if (m.selection.error) bad('selection', m.selection.error)
 else {
     if (!m.selection.open) bad('selection', `selecting "${m.selection.text}" opened no menu`)
-    if (m.selection.tints > 0)
-        bad('selection', `${m.selection.tints} highlight tints offered on a page with no CFI to anchor one to`)
+    /* A PDF has no CFI, and for a long time that was read as "no marks". It
+       was the wrong conclusion — a mark on a PDF is anchored to the page and a
+       fraction of it (PdfReader `makeMark`), so the menu now offers the five
+       tints and a Note, the same as the reflowable reader. Their absence is
+       the finding now. */
+    if (m.selection.tints !== 5)
+        bad('selection', `${m.selection.tints} highlight tints offered, not 5`)
     const noted = m.selection.actions.some(a => /note/i.test(a))
-    if (noted) bad('selection', 'a Note action on a PDF — there is nothing to attach it to')
+    if (!noted) bad('selection', 'no Note action on the PDF menu')
     if (m.selection.box) {
         if (m.selection.box.x < 0 || m.selection.box.r > m.selection.win.w + 0.5)
             bad('selection', `the menu escapes the pane — ${m.selection.box.x}…${m.selection.box.r} in ${m.selection.win.w}px`)

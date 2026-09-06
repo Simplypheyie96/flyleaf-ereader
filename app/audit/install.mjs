@@ -91,8 +91,16 @@ console.log('\n[1] iOS manualOnly branch, 390x844')
 console.log('\n[2] canPrompt + coarse pointer, 390x844')
 {
   const { ctx, page } = await open({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 3 })
+  /* Since 267d125 the ask is not silent on a browser that never prompts: with
+     no prompt held and not on iOS, the strip shows the route through the
+     browser's own menu — and offers no button, because there is nothing to
+     call prompt() on. The synthetic prompt then turns it into the button. */
   const before = await page.locator('.instl').count()
-  before === 0 ? ok('nothing shown before a prompt is held') : fail('strip shown with no prompt and no iOS')
+  before === 1 ? ok('the browser-menu route is shown before a prompt is held') : fail('no strip before a prompt — the ask went silent again')
+  const btn0 = await page.locator('.instl .btn--sm').count()
+  btn0 === 0 ? ok('no Install button before a prompt is held') : fail('an Install button with nothing to call prompt() on')
+  const body0 = await page.locator('.instl .ui-p').textContent().catch(() => '')
+  if (/Add to Home screen/i.test(body0)) ok('the manual route names the menu item'); else fail(`manual route body: ${body0}`)
   await page.evaluate(SYNTH)
   await page.waitForSelector('.instl', { timeout: 3000 })
   const lbl = await page.locator('.instl .ui-lbl').textContent()

@@ -94,6 +94,10 @@ const REFUSES = [
       why: 'images only — out of scope by decision, not by omission' },
     { file: join(FIX, 'junk.zip'), says: /zip file/i,
       why: 'no book anywhere in it' },
+    { file: join(FIX, 'drm.epub'), says: /DRM-protected/i,
+      why: 'locked, manifest with an enc: prefix — imported and RENDERED until the check matched local names' },
+    { file: join(FIX, 'drm-adobe.epub'), says: /DRM-protected/i,
+      why: 'locked, the default-namespace manifest Adobe writes' },
 ]
 
 const browser = await chromium.launch()

@@ -41,7 +41,7 @@ import { BackIcon, BookmarkIcon, ContentsIcon, SpinnerIcon, TypeIcon } from '../
 import { readPaint } from '../reader/marks'
 import {
     addBookmark, addHighlight, flatten, parsePdfFound, parsePdfLocator, parsePdfRects,
-    pdfMarkLocator, removeAnnotation, removeBookmark, setNote, setTint, sortByPosition,
+    pdfMarkLocator, rangeText, removeAnnotation, removeBookmark, setNote, setTint, sortByPosition,
 } from '../reader/marks'
 import type { PdfRect } from '../reader/marks'
 import { NoteEditor } from '../reader/NoteEditor'
@@ -50,12 +50,27 @@ import { Panel } from '../reader/Panel'
 import type { PanelRequest, SearchYield } from '../reader/Panel'
 import { SelectionMenu } from '../reader/SelectionMenu'
 import type { SelAnchor } from '../reader/SelectionMenu'
+import { SelectionHandles } from '../reader/SelectionHandles'
+import type { HandleEnd } from '../reader/SelectionHandles'
+import { OwnedSelection } from '../reader/selection'
 import { ExportSheet } from '../reader/ExportSheet'
 import { PdfSheet } from '../reader/pdf/PdfSheet'
 import { PdfView } from '../reader/pdf/PdfView'
 import type { PdfFound, PdfLocation, PdfPaintMark, PdfViewHandle } from '../reader/pdf/PdfView'
 import { getPage, openPdf, pageText, PdfRefused, searchPage } from '../reader/pdf/engine'
 import type { PdfDoc, PdfOutlineItem } from '../reader/pdf/engine'
+
+/** The owned range's two ends, in the stage's coordinates — the same frame of
+    reference as the menu's anchor. The text layer is in this document, so the
+    only shift is the stage's own offset. */
+function endsInStage(owned: OwnedSelection, stage: HTMLElement | null): { start: HandleEnd; end: HandleEnd } | null {
+    const ends = owned.ends()
+    if (!ends || !stage) return null
+    const box = stage.getBoundingClientRect()
+    const shift = (e: { x: number; top: number; bottom: number }): HandleEnd =>
+        ({ x: e.x - box.left, top: e.top - box.top, bottom: e.bottom - box.top })
+    return { start: shift(ends.start), end: shift(ends.end) }
+}
 
 /** The outline, flattened once with its depth, because the contents list wants
     a flat list of rows and a PDF outline can nest four deep. */
@@ -155,6 +170,21 @@ export function PdfReader() {
        live, the text is empty by the time a highlight is being made. */
     const selRects = useRef<PdfRect[]>([])
     const selWords = useRef('')
+    /* The owned selection — the same hand-over the reflowable reader makes
+       (reader/selection.ts, SPEC.md § 6.1). The text layer is real DOM in
+       this document, so the platform's callout would sit over it exactly as
+       it would over any page of text; once the range settles the app paints
+       it, clears the browser's, and draws the handles itself. */
+    const ownedRef = useRef(new OwnedSelection())
+    /* Whether the menu open right now is a painted mark's. A mark's menu has
+       no selection under it — the tap that opened it dropped the caret the
+       tap itself put down — so the `selectionchange` that follows arrives
+       collapsed and must not be read as the reader letting go. Read from a
+       ref, because the listener that needs it is bound once per document. */
+    const markOpen = useRef(false)
+    useEffect(() => { markOpen.current = Boolean(sel?.mark) }, [sel])
+    const [handles, setHandles] = useState<{ start: HandleEnd; end: HandleEnd } | null>(null)
+    const [dragging, setDragging] = useState(false)
     const [exportOpen, setExportOpen] = useState(false)
     const [at, setAt] = useState<PdfLocation>({ page: 1, fraction: 0 })
     /* The one search hit the reader tapped. It belongs to the search and dies
@@ -270,8 +300,12 @@ export function PdfReader() {
     const onLocate = useCallback((where: PdfLocation) => {
         setAt(where)
         if (!id) return
+        /* Progress is how far the scroller has come, not where the reading
+           line is: the position is measured a third of the way down the pane
+           (PdfView `READ_LINE`), so read as a page fraction it would say 5% of
+           a document nobody has scrolled yet, and never quite 100%. */
         const pages = docRef.current?.pages ?? 1
-        const fraction = Math.min(1, (where.page - 1 + where.fraction) / pages)
+        const fraction = where.through ?? Math.min(1, (where.page - 1 + where.fraction) / pages)
         clockRef.current?.bump(fraction, true)
         if (writeTimer.current) clearTimeout(writeTimer.current)
         writeTimer.current = window.setTimeout(() => {
@@ -294,55 +328,72 @@ export function PdfReader() {
        reflowable reader: dragging a selection handle fires on every pixel, and
        a menu that re-anchors on every pixel is never where the finger let go. */
     const selTimer = useRef<number | null>(null)
+    /* Read a range's shape, its words and the menu's anchor. Shared by the
+       settle and the handle drag, which moves the range without the browser's
+       help and has to describe it again afterwards. */
+    const describe = useCallback((range: Range): SelAnchor | null => {
+        const stage = stageRef.current
+        if (!stage) return null
+        const host = range.commonAncestorContainer
+        const el = host.nodeType === 1 ? host as Element : host.parentElement
+        if (!el?.closest('.pdf-text')) return null
+        const rects = Array.from(range.getClientRects()).filter(r => r.width > 1 && r.height > 1)
+        if (!rects.length) return null
+        const box = stage.getBoundingClientRect()
+        let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity
+        for (const r of rects) {
+            left = Math.min(left, r.left); right = Math.max(right, r.right)
+            top = Math.min(top, r.top); bottom = Math.max(bottom, r.bottom)
+        }
+        /* The shape, in fractions of each page's own box. Every mounted
+           page is measured once here rather than per rectangle, so a
+           selection running over a spread costs two reads, not two per
+           line. A rectangle is assigned to the page its CENTRE falls in:
+           a line of text at the very foot of a sheet can overlap the gap
+           below it by a pixel, and the centre never does. */
+        const pages = Array.from(stage.querySelectorAll<HTMLElement>('.pdf-page'))
+            .map(el => ({ n: Number(el.dataset.page), r: el.getBoundingClientRect() }))
+            .filter(pg => Number.isFinite(pg.n) && pg.n >= 1 && pg.r.width > 0 && pg.r.height > 0)
+        const shape: PdfRect[] = []
+        for (const r of rects) {
+            const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2
+            const pg = pages.find(q =>
+                cx >= q.r.left && cx <= q.r.right && cy >= q.r.top && cy <= q.r.bottom)
+            if (!pg) continue
+            shape.push({
+                page: pg.n,
+                x: (r.left - pg.r.left) / pg.r.width,
+                y: (r.top - pg.r.top) / pg.r.height,
+                w: r.width / pg.r.width,
+                h: r.height / pg.r.height,
+            })
+        }
+        selRects.current = shape
+        selWords.current = rangeText(range)
+        return {
+            x: (left + right) / 2 - box.left,
+            top: top - box.top,
+            bottom: bottom - box.top,
+        }
+    }, [])
     useEffect(() => {
         if (!doc) return
         const settle = () => {
             const s = document.getSelection()
-            const stage = stageRef.current
-            if (!s || s.isCollapsed || s.rangeCount === 0 || !stage) { setSel(null); return }
+            if (!s || s.isCollapsed || s.rangeCount === 0) {
+                /* The clearing the hand-over itself did — the app still holds
+                   the range — or the caret a tap on a mark left and took
+                   away again: neither is a reader letting go. */
+                if (ownedRef.current.active || markOpen.current) return
+                setSel(null); return
+            }
             const range = s.getRangeAt(0)
-            const host = range.commonAncestorContainer
-            const el = host.nodeType === 1 ? host as Element : host.parentElement
-            if (!el?.closest('.pdf-text')) { setSel(null); return }
-            const rects = Array.from(range.getClientRects()).filter(r => r.width > 1 && r.height > 1)
-            if (!rects.length) { setSel(null); return }
-            const box = stage.getBoundingClientRect()
-            let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity
-            for (const r of rects) {
-                left = Math.min(left, r.left); right = Math.max(right, r.right)
-                top = Math.min(top, r.top); bottom = Math.max(bottom, r.bottom)
-            }
-            /* The shape, in fractions of each page's own box. Every mounted
-               page is measured once here rather than per rectangle, so a
-               selection running over a spread costs two reads, not two per
-               line. A rectangle is assigned to the page its CENTRE falls in:
-               a line of text at the very foot of a sheet can overlap the gap
-               below it by a pixel, and the centre never does. */
-            const pages = Array.from(stage.querySelectorAll<HTMLElement>('.pdf-page'))
-                .map(el => ({ n: Number(el.dataset.page), r: el.getBoundingClientRect() }))
-                .filter(pg => Number.isFinite(pg.n) && pg.n >= 1 && pg.r.width > 0 && pg.r.height > 0)
-            const shape: PdfRect[] = []
-            for (const r of rects) {
-                const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2
-                const pg = pages.find(q =>
-                    cx >= q.r.left && cx <= q.r.right && cy >= q.r.top && cy <= q.r.bottom)
-                if (!pg) continue
-                shape.push({
-                    page: pg.n,
-                    x: (r.left - pg.r.left) / pg.r.width,
-                    y: (r.top - pg.r.top) / pg.r.height,
-                    w: r.width / pg.r.width,
-                    h: r.height / pg.r.height,
-                })
-            }
-            selRects.current = shape
-            selWords.current = flatten(s.toString())
+            const anchor = describe(range)
+            if (!anchor) { setSel(null); return }
+            if (ownedRef.current.take(document, range)) setHandles(endsInStage(ownedRef.current, stageRef.current))
+            else setHandles(null)
             setSel({
-                anchor: {
-                    x: (left + right) / 2 - box.left,
-                    top: top - box.top,
-                    bottom: bottom - box.top,
-                },
+                anchor,
                 /* A drag over fresh words is never an edit of an existing
                    mark; tapping a painted one is, and that path sets `sel`
                    itself. */
@@ -358,15 +409,77 @@ export function PdfReader() {
             document.removeEventListener('selectionchange', onChange)
             if (selTimer.current) clearTimeout(selTimer.current)
         }
-    }, [doc])
+    }, [doc, describe])
 
     const selText = () => sel?.mark?.text ?? selWords.current
-    const dropSel = () => {
+    const dropSel = useCallback(() => {
         document.getSelection()?.removeAllRanges()
+        ownedRef.current.drop()
         selRects.current = []
         selWords.current = ''
+        setHandles(null)
         setSel(null)
-    }
+    }, [])
+
+    /* Whenever the menu closes the owned selection goes with it — one place,
+       so no path out of the menu can leave a wash on the page. */
+    useEffect(() => {
+        if (sel) return
+        ownedRef.current.drop()
+        setHandles(null)
+        setDragging(false)
+    }, [sel])
+
+    /* A tap on the page while the app holds a selection lets go of it and
+       does nothing else. With the browser's range gone the view's own check
+       (`!sel.isCollapsed`) can no longer tell, so it is told here. */
+    const onPageTap = useCallback(() => {
+        /* A tap with a menu up — a selection's or a mark's — closes the menu
+           and nothing else; the chrome is the next tap's. */
+        if (ownedRef.current.active || markOpen.current) { dropSel(); return }
+        toggleChrome()
+    }, [dropSel, toggleChrome])
+
+    /* The handles. Same document, so the finger's client coordinates are the
+       range's — no frame to convert through. */
+    const onHandleDrag = useCallback((which: 'start' | 'end', clientX: number, clientY: number) => {
+        const owned = ownedRef.current
+        if (!owned.moveEnd(which, clientX, clientY)) return
+        setHandles(endsInStage(owned, stageRef.current))
+    }, [])
+    const onHandleEnd = useCallback(() => {
+        const owned = ownedRef.current
+        setDragging(false)
+        const range = owned.range
+        if (!range) return
+        const anchor = describe(range)
+        if (anchor) setSel({ anchor, mark: null })
+    }, [describe])
+
+    /* A scroll moves the words the menu and handles were anchored to; the
+       menu of a line that has left the screen points at nothing. */
+    useEffect(() => {
+        const stage = stageRef.current
+        if (!doc || !stage) return
+        const onScroll = () => setSel(null)
+        stage.addEventListener('scroll', onScroll, { capture: true, passive: true })
+        return () => stage.removeEventListener('scroll', onScroll, { capture: true })
+    }, [doc])
+
+    /* ⌘C / Ctrl+C. Once the app owns the range the platform has nothing left
+       to copy, so the app answers the chord — plain text, one flavour. */
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (!(e.metaKey || e.ctrlKey) || e.altKey || (e.key !== 'c' && e.key !== 'C')) return
+            if (!ownedRef.current.active) return
+            const text = selWords.current
+            if (text) void navigator.clipboard?.writeText(text).catch(() => {})
+            dropSel()
+            e.preventDefault()
+        }
+        window.addEventListener('keydown', onKey)
+        return () => window.removeEventListener('keydown', onKey)
+    }, [dropSel])
 
     /* ── highlights on a fixed page ───────────────────────────────────────
        A PDF has no CFI, and for a long time that was taken to mean it could
@@ -419,6 +532,8 @@ export function PdfReader() {
         if (!el) return
         const r = el.getBoundingClientRect(), box = stage.getBoundingClientRect()
         document.getSelection()?.removeAllRanges()
+        ownedRef.current.drop()
+        setHandles(null)
         selRects.current = []
         selWords.current = ''
         setSel({
@@ -496,9 +611,11 @@ export function PdfReader() {
     }, [])
     const stopSearch = useCallback(() => { searchToken.current++; setFound(null) }, [])
 
+    /* A locator is a `locate` — the point on the reading line when the mark
+       or bookmark was made — so it goes back onto the reading line. */
     const goTo = useCallback((cfi: string) => {
         const where = parsePdfLocator(cfi)
-        if (where) viewRef.current?.goTo(where.page, where.fraction)
+        if (where) viewRef.current?.goTo(where.page, where.fraction, true)
     }, [])
 
     /* Tapping a result. The rule goes under the words, and the scroll puts
@@ -580,14 +697,23 @@ export function PdfReader() {
                         ref={viewRef}
                         onLocate={onLocate}
                         onReady={() => setReady(true)}
-                        onTap={toggleChrome}
+                        onTap={onPageTap}
                         onZoom={setZoom}
                         found={found}
                         marks={painted}
                         onMark={onMarkTap}
                     />
                 )}
-                {sel && (
+                {sel && handles && (
+                    <SelectionHandles
+                        start={handles.start}
+                        end={handles.end}
+                        onDragStart={() => setDragging(true)}
+                        onDrag={onHandleDrag}
+                        onDragEnd={onHandleEnd}
+                    />
+                )}
+                {sel && !dragging && (
                     <SelectionMenu
                         anchor={sel.anchor}
                         bounds={{ width: paneW, height: stageRef.current?.clientHeight ?? 0 }}
@@ -648,7 +774,7 @@ export function PdfReader() {
                                 {chapter && <span className="reader-readout-sep">·</span>}
                                 {chapter && <span className="reader-chapter">{chapter}</span>}
                                 <span className="reader-readout-sep">·</span>
-                                <span>{percent(Math.min(1, (at.page - 1 + at.fraction) / doc.pages))}%</span>
+                                <span>{percent(at.through ?? Math.min(1, (at.page - 1 + at.fraction) / doc.pages))}%</span>
                             </>
                         ) : <span>&nbsp;</span>}
                     </p>

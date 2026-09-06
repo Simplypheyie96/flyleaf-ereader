@@ -8,6 +8,10 @@ import { startSeeding } from './seed'
 import { initOpenQueue } from './openQueue'
 import { Analytics } from '@vercel/analytics/react'
 
+/** The production host and Vercel's own previews, where the insights script
+    is actually served. */
+const ANALYTICS_HOST = /(^|\.)(flyleaf\.cc|vercel\.app)$/
+
 /* Before the first paint: the @font-face rules live in a module rather than in
    a stylesheet, so they have to be installed by hand. */
 installFonts()
@@ -34,14 +38,20 @@ createRoot(document.getElementById('root')!).render(
         is /read/:id and /book/:id: that a book was opened, never which one.
         Every other route here is already generic. Same treatment, same reason,
         as Press's collage and review routes. */}
-    <Analytics
-      beforeSend={(e) => ({
-        ...e,
-        url: e.url
-          .replace(/\/read\/[^/?#]+/, '/read/:id')
-          .replace(/\/book\/[^/?#]+/, '/book/:id'),
-      })}
-    />
+    {/* Only where the script exists. Off Vercel — a local preview, the
+        audit's own server — `/_vercel/insights/script.js` is a 404 in the
+        console of every screen, and a console the audit reads for errors
+        has to be quiet to mean anything. */}
+    {ANALYTICS_HOST.test(location.hostname) && (
+      <Analytics
+        beforeSend={(e) => ({
+          ...e,
+          url: e.url
+            .replace(/\/read\/[^/?#]+/, '/read/:id')
+            .replace(/\/book\/[^/?#]+/, '/book/:id'),
+        })}
+      />
+    )}
   </StrictMode>
 )
 

@@ -153,13 +153,15 @@ for (const tab of ['Text', 'Page', 'Turn']) {
 
 {
   /* Opening the drawer closes the sheet, so the pane grows and the chapter
-     legitimately re-paginates — "page 1 of 12" becoming "page 1 of 6" is the
-     paginator working, not a turn. Position is what must not move, so this
-     compares the chapter and the percentage and ignores the page count. */
+     legitimately re-paginates. Position is what must not move, so this
+     compares the two figures on the pill — the book page and the per-cent —
+     which are flow-independent by design. */
   const place = async () => {
+    /* The chapter's name left the pill in d0e323e — it lives in the card the
+       pill opens. The pill is now two figures, the book page and the per-cent,
+       and neither changes with flow, so both are position. */
     const t = await readout()
-    return [await page.locator('.reader-chapter').innerText(), (t.match(/(\d+)%/) || [])[1],
-      (t.match(/PAGE (\d+)/i) || [])[1]].join('/')
+    return [(t.match(/(\d+)%/) || [])[1], (t.match(/PAGE (\d+)/i) || [])[1]].join('/')
   }
   const before = await place()
   await page.getByRole('button', { name: 'Contents' }).click()

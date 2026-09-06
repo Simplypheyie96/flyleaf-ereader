@@ -51,10 +51,15 @@ export interface SelectionMenuProps {
     onDismiss: () => void
 }
 
-/** Clear of the finger and of the line, both. 10px is the gap; the menu's own
-    height is measured rather than assumed, because two rows of chips is not a
-    number this file should be repeating. */
-const GAP = 10
+/** Clear of the line and of the handle's knob, both. The knob sits tangent
+    to the line and is 10px, so 14px leaves daylight between it and the menu;
+    the menu's own height is measured rather than assumed, because two rows of
+    chips is not a number this file should be repeating.
+
+    This was 60px on touch for one release, to sit the menu past the
+    platform's own callout. There is no platform callout any more — the app
+    owns the selection (selection.ts) — so the gap is the gap. */
+const GAP = 14
 const EDGE = 8
 
 export function SelectionMenu(p: SelectionMenuProps) {
@@ -101,19 +106,11 @@ export function SelectionMenu(p: SelectionMenuProps) {
     let top: number
     let left: number
 
-    const isTouch = window.matchMedia('(pointer: coarse)').matches
-    // On touch devices, the native OS menu pops up right next to the text.
-    // It's usually about 45-50px tall. We use a 60px gap to float our menu
-    // just past the OS menu so they stack neatly!
-    const effectiveGap = isTouch ? 60 : GAP
-    
-    const canGoAbove = p.anchor.top - effectiveGap - h >= EDGE
-    const above = canGoAbove
-    
+    const above = p.anchor.top - GAP - h >= EDGE
     top = above
-        ? Math.max(EDGE, p.anchor.top - effectiveGap - h)
-        : Math.min(p.bounds.height - h - EDGE, p.anchor.bottom + effectiveGap)
-    
+        ? Math.max(EDGE, p.anchor.top - GAP - h)
+        : Math.min(p.bounds.height - h - EDGE, p.anchor.bottom + GAP)
+
     left = clamp(p.anchor.x - w / 2, EDGE, Math.max(EDGE, p.bounds.width - w - EDGE))
 
     return (

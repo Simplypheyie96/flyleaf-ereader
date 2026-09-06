@@ -135,8 +135,11 @@ export function BookDetail() {
   const pct = percent(book.progress)
   const started = Boolean(book.openedAt) || book.progress > 0
 
-  const read = async () => {
-    await touchBook(book.id)
+  /* Navigate first, then record the touch. The reader records it too, on
+     open, and awaiting it here left a gap in which a back-press landed on the
+     shelf only for the reader to be pushed on top of it a moment later. */
+  const read = () => {
+    void touchBook(book.id)
     navigate(`/read/${book.id}`)
   }
 

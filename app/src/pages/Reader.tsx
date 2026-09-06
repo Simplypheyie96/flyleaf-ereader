@@ -38,11 +38,14 @@ import { Panel } from '../reader/Panel'
 import type { PanelRequest, SearchYield } from '../reader/Panel'
 import { SelectionMenu } from '../reader/SelectionMenu'
 import type { SelAnchor } from '../reader/SelectionMenu'
+import { SelectionHandles } from '../reader/SelectionHandles'
+import type { HandleEnd } from '../reader/SelectionHandles'
+import { OwnedSelection } from '../reader/selection'
 import { NoteEditor } from '../reader/NoteEditor'
 import { ExportSheet } from '../reader/ExportSheet'
 import { Overlayer } from '../vendor/foliate-js/overlayer.js'
 import {
-    addBookmark, addHighlight, drawFor, drawForFound, flatten, readPaint, removeAnnotation,
+    addBookmark, addHighlight, drawFor, drawForFound, flatten, rangeText, readPaint, removeAnnotation,
     removeBookmark, setNote, setTint, sortByPosition, withinPage,
 } from '../reader/marks'
 import type { MarkPaint } from '../reader/marks'
@@ -254,6 +257,15 @@ export function Reader() {
     const selRange = useRef<Range | null>(null)
     const selIndex = useRef(0)
     const selTimer = useRef<number | null>(null)
+    /* The selection once the app has taken it from the browser — painted by
+       the app, with no range left in the document for the platform to hang
+       its own menu on. `handles` is where its two ends are, in stage
+       coordinates, for the app's own grab handles; `dragging` hides the menu
+       while one of them is being moved, so it is not re-anchored on every
+       pixel and reappears where the finger let go. selection.ts has the why. */
+    const ownedRef = useRef(new OwnedSelection())
+    const [handles, setHandles] = useState<{ start: HandleEnd; end: HandleEnd } | null>(null)
+    const [dragging, setDragging] = useState(false)
     /* Read inside listeners registered once per book. */
     const marginRef = useRef(8)
     const chapterRef = useRef<string | null>(null)
@@ -389,6 +401,7 @@ export function Reader() {
                     stage: () => stageRef.current,
                     toggleChrome,
                     onMark,
+                    dismissSelection,
                 })
                 turnRef.current = turn
                 turn.attach(document)
@@ -495,6 +508,12 @@ export function Reader() {
         selTimer.current = window.setTimeout(() => {
             const s = doc.getSelection?.()
             if (!s || s.isCollapsed || s.rangeCount === 0 || !s.toString().trim()) {
+                /* The browser's selection going empty is the app's own doing
+                   once it has taken the selection over — `take` clears it,
+                   and this fires 220ms later to report the clearing. Nothing
+                   to do: the menu stays open on the range the app holds, and
+                   a tap on the page is what dismisses it (dismissSelection). */
+                if (ownedRef.current.active) return
                 /* A tap on a highlight does two things at once: the engine
                    hit-tests the overlay and the menu opens on the mark, and the
                    browser places a caret in the text under the finger. 220ms
@@ -519,8 +538,68 @@ export function Reader() {
             selRange.current = range.cloneRange()
             selIndex.current = docIndex.current.get(doc) ?? 0
             selIsMark.current = false
+            /* The hand-over. Settled means the finger is up, so this is the
+               moment the browser's selection — and with it the platform's
+               Copy · Look Up · Share — is taken away and the app's put in its
+               place. Where the document cannot paint a highlight of its own,
+               `take` declines and the browser keeps the selection, exactly as
+               before: the menu still opens, there are just two of them. */
+            if (ownedRef.current.take(doc, range)) setHandles(endsFor(ownedRef.current, stageRef.current))
+            else setHandles(null)
             setSel({ anchor, mark: null })
         }, 220)
+    }, [])
+
+    /* Putting an owned selection away: the paint off the words, the handles
+       off the page, the menu closed. Called by the gesture layer on a tap,
+       which is the one way a phone reader dismisses a selection, and answers
+       whether there was one — a tap that dismissed something does nothing
+       else (turn.ts `#tap`). */
+    const dismissSelection = useCallback((): boolean => {
+        if (!ownedRef.current.active) return false
+        ownedRef.current.drop()
+        selRange.current = null
+        setHandles(null)
+        setSel(null)
+        return true
+    }, [])
+
+    /* Whenever the menu closes — for a tint, a copy, a turn, Escape, a panel
+       opening — the owned selection goes with it. One place, because there are
+       a dozen `setSel(null)`s in this file and a paint that outlives its menu
+       is a highlight the reader never asked for. */
+    useEffect(() => {
+        if (sel) return
+        ownedRef.current.drop()
+        setHandles(null)
+        setDragging(false)
+    }, [sel])
+
+    /* ── the handles ──────────────────────────────────────────────────────
+       A drag moves one end of the owned range to the word under the finger
+       (selection.ts `moveEnd`), then re-reads the ends for the handles. The
+       finger is in the host's coordinates; the range is in the section's; the
+       frame's own box is the difference, the same way `anchorFor` reads it. */
+    const onHandleDrag = useCallback((which: 'start' | 'end', clientX: number, clientY: number) => {
+        const owned = ownedRef.current
+        const doc = owned.doc
+        const stage = stageRef.current
+        if (!doc || !stage) return
+        const win = doc.defaultView as (Window & { frameElement?: Element | null }) | null
+        const frame = win?.frameElement?.getBoundingClientRect()
+        if (!frame) return
+        if (!owned.moveEnd(which, clientX - frame.left, clientY - frame.top)) return
+        selRange.current = owned.range
+        setHandles(endsFor(owned, stage))
+    }, [])
+    const onHandleEnd = useCallback(() => {
+        const owned = ownedRef.current
+        const range = owned.range
+        const doc = owned.doc
+        setDragging(false)
+        if (!range || !doc) return
+        const anchor = anchorFor(range, doc, stageRef.current, pageSize())
+        if (anchor) setSel({ anchor, mark: null })
     }, [])
 
     /* A click that landed on an existing highlight. The engine hit-tests the
@@ -815,7 +894,12 @@ export function Reader() {
            CLAUDE.md is explicit that position is CFI-anchored, so the CFI of the
            page being left is taken here and put back once the relayout settles —
            two frames, because `render()` schedules its own scroll. */
-        const reflow = r.getAttribute('flow') !== s.flow
+        /* Only a CHANGE of flow. On the first apply after open the renderer
+           has no `flow` attribute at all, and treating that as a change put
+           the reader back at the CFI of the pre-settings layout — the page
+           before the one the engine had just restored, every reopen. */
+        const flowNow = r.getAttribute('flow')
+        const reflow = flowNow !== null && flowNow !== s.flow
         const anchor = reflow ? pageCFIRef.current : null
 
         set('gap', s.flow === 'scrolled'
@@ -930,7 +1014,7 @@ export function Reader() {
         }
         if (!view || !range || !id) return
         const cfi = view.getCFI(selIndex.current, range)
-        const text = flatten(range.toString())
+        const text = rangeText(range)
         if (!text) return
         void addHighlight(id, cfi, text, color, chapterRef.current)
         view.deselect?.()
@@ -947,7 +1031,7 @@ export function Reader() {
         const range = selRange.current
         if (!view || !range || !id) return
         const cfi = view.getCFI(selIndex.current, range)
-        const text = flatten(range.toString())
+        const text = rangeText(range)
         if (!text) return
         const row = await addHighlight(id, cfi, text, 'mustard', chapterRef.current)
         view.deselect?.()
@@ -956,7 +1040,7 @@ export function Reader() {
     }, [id, sel])
 
     const onCopy = useCallback(() => {
-        const text = sel?.mark?.text ?? flatten(selRange.current?.toString() ?? '')
+        const text = sel?.mark?.text ?? rangeText(selRange.current)
         if (text) void navigator.clipboard?.writeText(text).catch(() => {})
         viewRef.current?.deselect?.()
         setSel(null)
@@ -1050,14 +1134,36 @@ export function Reader() {
         if (!ready) return
         const onKey = (e: KeyboardEvent) => {
             const t = e.target as HTMLElement | null
-            if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return
+            /* Anything that takes typing keeps its keys. A slider is an input
+               too, but not one that types, and Escape on a focused slider in
+               the sheet has to be the same Escape as on its chips. */
+            const typing = !!t && (t.isContentEditable
+                || /^(TEXTAREA|SELECT)$/.test(t.tagName)
+                || (t.tagName === 'INPUT' && !/^(range|checkbox|radio|button)$/.test((t as HTMLInputElement).type)))
+            if (typing) return
             /* A focused chip in the sheet is a button, so the test above lets
                it through — and Left/Right on a tablist means "the next tab",
-               not "the next page". */
-            if (t?.closest('.sheet') || t?.closest('.reader-panel')) return
+               not "the next page". Escape is the exception: with focus on a
+               chip, Escape did nothing at all, because this return came before
+               the case below ever saw it — and the one key that has to work
+               from inside the sheet is the one that leaves it. */
+            if ((t?.closest('.sheet') || t?.closest('.reader-panel')) && e.key !== 'Escape') return
             const turn = turnRef.current
             const view = viewRef.current
             if (!turn || !view) return
+            /* A modified key is not one of the letters below — ⌘C was
+               opening the contents panel, because the switch matched the
+               `c` and never asked about the ⌘. Copy is the one chord this
+               page answers, and only once the app owns the selection: with
+               no range in the document the platform has nothing to copy, so
+               the app does it. Everything else modified is the browser's. */
+            if (e.metaKey || e.ctrlKey || e.altKey) {
+                if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === 'c' || e.key === 'C') && ownedRef.current.active) {
+                    onCopy()
+                    e.preventDefault()
+                }
+                return
+            }
             const fwd = rtl ? -1 : 1
             switch (e.key) {
                 case 'ArrowRight': case 'PageDown': turn.turnBy(fwd as 1 | -1); break
@@ -1077,7 +1183,14 @@ export function Reader() {
                 case 'm': case 'M': openPanel('marks'); break
                 case 'f': case 'F': findText(''); break
                 case 'Escape':
-                    if (panelOpen) setPanelOpen(false)
+                    /* The menu's own Escape listener is on the host window,
+                       and a key pressed while the section has focus never
+                       reaches it — it comes through here, relayed from the
+                       section's document. So the selection is answered here
+                       as well, and before the panels: the thing on top goes
+                       first. Native or owned, both are the menu's. */
+                    if (sel) { setSel(null); view.deselect?.() }
+                    else if (panelOpen) setPanelOpen(false)
                     else if (sheetOpen) setSheetOpen(false)
                     else if (gotoOpen) setGotoOpen(false)
                     else return
@@ -1092,7 +1205,7 @@ export function Reader() {
             window.removeEventListener('keydown', onKey)
             keyRef.current = null
         }
-    }, [ready, rtl, settings?.size, panelOpen, sheetOpen, gotoOpen, toggleTick, openPanel, findText])
+    }, [ready, rtl, settings?.size, panelOpen, sheetOpen, gotoOpen, sel, toggleTick, openPanel, findText, onCopy])
 
     /* One alias for the whole render. `settings` is undefined for the first
        frame of a cold start, and a reader who reaches the sheet in that frame
@@ -1176,18 +1289,27 @@ export function Reader() {
                     visible with the chrome hidden, which is the point of it —
                     the reader can see the page is kept while reading it. */}
                 {ticked && <span className="reader-tick" aria-hidden="true" />}
-                {sel && (
+                {sel && handles && (
+                    <SelectionHandles
+                        start={handles.start}
+                        end={handles.end}
+                        onDragStart={() => setDragging(true)}
+                        onDrag={onHandleDrag}
+                        onDragEnd={onHandleEnd}
+                    />
+                )}
+                {sel && !dragging && (
                     <SelectionMenu
                         anchor={sel.anchor}
                         bounds={{ width: paneW, height: stageRef.current?.clientHeight ?? 0 }}
                         tint={sel.mark?.color ?? null}
                         hasNote={Boolean(sel.mark?.note)}
-                        text={sel.mark?.text ?? flatten(selRange.current?.toString() ?? '')}
+                        text={sel.mark?.text ?? rangeText(selRange.current)}
                         onTint={onTint}
                         onNote={() => void onNote()}
                         onCopy={onCopy}
-                        onLookUp={() => lookUp(sel.mark?.text ?? flatten(selRange.current?.toString() ?? ''))}
-                        onFind={() => findText(sel.mark?.text ?? flatten(selRange.current?.toString() ?? ''))}
+                        onLookUp={() => lookUp(sel.mark?.text ?? rangeText(selRange.current))}
+                        onFind={() => findText(sel.mark?.text ?? rangeText(selRange.current))}
                         onRemove={sel.mark ? onRemoveSel : undefined}
                         onDismiss={() => { setSel(null); viewRef.current?.deselect?.() }}
                     />
@@ -1618,6 +1740,24 @@ function inRange(range: Range | null, sel: Selection | null | undefined): boolea
     } catch {
         return false
     }
+}
+
+/** The two ends of an owned selection, in stage coordinates, for the handles.
+    Same frame arithmetic as `anchorFor` below; null when the frame cannot be
+    found, which is also when the handles could not be placed. */
+function endsFor(owned: OwnedSelection, stage: HTMLElement | null): { start: HandleEnd; end: HandleEnd } | null {
+    const doc = owned.doc
+    const ends = owned.ends()
+    if (!doc || !ends || !stage) return null
+    const win = doc.defaultView as (Window & { frameElement?: Element | null }) | null
+    const frame = win?.frameElement?.getBoundingClientRect()
+    if (!frame) return null
+    const box = stage.getBoundingClientRect()
+    const dx = frame.left - box.left
+    const dy = frame.top - box.top
+    const shift = (e: { x: number; top: number; bottom: number }): HandleEnd =>
+        ({ x: e.x + dx, top: e.top + dy, bottom: e.bottom + dy })
+    return { start: shift(ends.start), end: shift(ends.end) }
 }
 
 function anchorFor(range: Range, doc: Document, stage: HTMLElement | null, pageSize: number): SelAnchor | null {

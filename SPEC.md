@@ -254,6 +254,16 @@ laying the book out **twice**; an attribute is now written only when its value a
 Verified at 2% and at 42% of a 428-page book, both directions: same sentence at the top of the
 pane, same page and per-cent on the readout.
 
+**Scrolled → Paginated rebuilds the paged view; it does not re-lay the column.** The column is a
+row of section frames (§ *Crossing a chapter in Scrolled flow*), and on the way back the engine
+only re-laid the current one, leaving every frame in place under a paged layout — measured at
+390×844: three frames still live, two stacked above the viewport and still taking selections, the
+page being read 150px tall. The crossing now reloads the current section through the same path a
+chapter change takes, which is what tears the column down, anchored on the fraction the reader was
+at; the CFI restore above then lands the sentence, and the engine's `goTo` waits for the rebuild
+so the CFI is never resolved against a frame mid-load (`PATCHES.md` § 9). Verified: one frame
+after the crossing, full height, same first words on the page as before it.
+
 Choosing Scrolled hides the turn control rather than greying it — there is no turn to style.
 
 #### Crossing a chapter in Scrolled flow
@@ -398,7 +408,7 @@ pages; it just does not move.
 |---|---|
 | **Swipe** | Tracked 1:1. Requires **8px of horizontal travel** before it claims the gesture — below that, the touch belongs to text selection. There is deliberately **no time window** on it: an earlier build only claimed inside 200ms, so a slow deliberate drag travelled its 8px, missed the window and left the page sitting still, which is what "the slide is resisting" was. A horizontal drag turns the page however long the reader takes over it. By **mouse** the threshold is **24px** and the turn stands down if a selection has actually formed — a measured fact rather than a guess at intent, and the reason a desktop drag now turns at all |
 | **Tap zones** | Left third back, right third forward, middle third toggles chrome. Setting: **Tap to turn**, default on. Off leaves the whole pane as a chrome toggle. **A tap that lands on a highlight is a tap on the highlight and nothing else** — it opens that mark's menu and neither turns the page nor takes the chrome away. Without that exemption the same tap did two things at once: a mark in an outer third turned the page out from under the menu opening over it, and a mark in the middle third took the readout away, and either way the reader had to go looking for the sentence they had just pressed. The overlay's own hit test is the authority on "on it", because it holds the mark's rectangles after the text has reflowed |
-| **Keyboard** | `→` `Space` `PgDn` forward · `←` `⇧Space` `PgUp` back · `Home` `End` book ends · `T` contents · `F` find · `B` bookmark · `+` `−` size. Flat 300ms on the commit curve |
+| **Keyboard** | `→` `Space` `PgDn` forward · `←` `⇧Space` `PgUp` back · `Home` `End` book ends · `C` contents · `M` marks · `F` find · `B` bookmark · `+` `−` size · `Esc` closes the topmost thing — selection, then panel, then sheet — **including from a focused chip inside the sheet or panel**, where every other key stays the sheet's (Left/Right on the tablist moves tabs, not pages). Flat 300ms on the commit curve |
 | **Never swallowed** | foliate's `#turnPage` takes a lock, holds it across the scroll **and** a further unconditional 100ms, and a turn arriving while it is held returns silently — the page simply does not move. Longer into a new chapter, where the lock also spans the file load. This was the "I slide left or right and it makes no difference, and it won't budge until I tap" fault, and it is why a tap issued a moment later worked. Turns are now queued through `#page()` rather than dropped, **capped at one pending**: unbounded queueing traded it for a worse fault, a reader who swipes at a stuck-looking page getting the whole burst at once (measured, one drag ran page 1 → 8) |
 | **Edges** | At **the book's own first and last page** — not at a chapter boundary — a drag meets rubber-band resistance (Apple's constant, 0.55) and springs back over 220ms. It never turns and it never feels stuck |
 | **Commit** | Distance **plus projected momentum** (iOS deceleration, 0.998) past **28% of the page** (`COMMIT`), on every page alike — *or* any release still travelling the way the drag was going at **0.25px/ms** or more (`FLICK`), however short it was. Half a page was the first pass and it was wrong: on a 375px phone that is 176px of reach, so a deliberate 120px drag sprang back after looking exactly like a page turn. That is what the owner reported as "a lot of resistance for some pages, and sometimes it isn't there" — the same threshold met by momentum on a fast gesture and missed on a slow one. A short drag placed and held springs back; the same distance thrown carries. A finger that stops before it lifts has stopped: velocity is read over the last **100ms** only, and an empty window is zero, never the gesture's average |
@@ -415,6 +425,43 @@ left-to-right wipe** of the fill, once, on apply — a mark being made. Never on
 
 A note is Kalam on `--card-w` with the highlighted line quoted above it in the reading face at
 13px. Unchanged.
+
+**The selection is the app's, not the platform's.** A phone draws its own callout — Copy, Look
+Up, Share — over any range selection it can see, and there is no API that hides it while the
+range exists. So the app does what Apple Books and Kindle do: the browser owns the selection
+only while the finger is down. **220ms** after the last `selectionchange` the app takes it —
+paints the range itself through the CSS Custom Highlight API (`::highlight(flyleaf-selection)`,
+the same `--hl-select` wash `::selection` used), calls `removeAllRanges()` so the platform has
+nothing left to put a callout on, and draws its own two handles (`reader/selection.ts`,
+`reader/SelectionHandles.tsx`). Every function the callout carried is on the app's menu instead,
+and every function the handles carried is on the app's handles: a drag moves that end to the
+word under the finger, snapped to word boundaries, and dragging one handle past the other swaps
+them rather than collapsing the range. The menu hides while a handle is held and re-anchors on
+release. ⌘C / Ctrl+C copies the owned text as plain text — the platform can no longer, because
+there is no range — and never opens the contents panel, which an unmodified `c` still does.
+
+A tap on the page, Escape, a turn, a tint, a note, Copy, Find and In this book all drop the
+owned selection with the menu; a paint that outlives its menu is a highlight the reader never
+asked for. A tap that dismissed a selection does nothing else — it neither turns nor toggles the
+chrome. The hand-over is a change of ownership, never a loss: the range, its text and its CFI are
+the same before and after.
+
+*Where the API is absent* (`CSS.highlights` — Safari 17.2, Chrome 105, Firefox 140) the app
+declines to take the selection: the platform keeps it, the app's menu opens beside the callout as
+it did before, and there are no app handles. Refusing to clear a range nothing can repaint is the
+whole of the fallback.
+
+*Known limit, stated rather than hidden.* iOS recognises a long-press before the app can hear of
+it, so the platform's callout can flash for up to the 220ms of the debounce before the hand-over.
+A shorter debounce was rejected: it would take the selection from under a finger that has merely
+paused mid-drag on a native handle.
+
+Measured at 390×844 and 1280×800 against the built app: browser selection empty in the section
+after settle, `CSS.highlights.has('flyleaf-selection')` true, both handles within 2px of the
+range's first and last rect, the wash visible over the words (mean RGB 203/183/147 on Cream),
+the end handle growing the range word-snapped with no turn during the drag, a crossed start
+handle swapping ends, ⌘C copying the owned text and leaving the panel closed, and every dismissal
+above clearing menu, handles and paint together.
 
 ### 6.2 Bookmarks
 
@@ -505,7 +552,9 @@ did not ask for.
 gives the left and right thirds of the page to the page turn (§ 5.1), and a reader who taps to
 turn would get a definition instead. So the gesture is the platform's own word selection:
 tap-and-hold on a phone, double-click on a desktop. It is one gesture, it is the gesture every
-reader already knows means *this word*, and the answer is printed before it is asked for. The
+reader already knows means *this word*, and the answer is printed before it is asked for. Once
+it settles the app owns it (§ 6.1), so the definition arrives on the app's menu and never
+beside the platform's. The
 same rule holds in the PDF reader, over its text layer.
 
 **A selection of exactly one word gets a definition. Anything longer does not** — a passage has
@@ -1047,8 +1096,24 @@ the fingers rather than to a scroll ratio, so the word you pinched on is still u
 
 `pdf:<page>:<fraction>` in the same `locators` row a reflowable book uses. This is not a
 compromised CFI: on a document whose pages cannot reflow, **the page number is the content
-anchor**. It survives zoom, fit, rotation and screen. Measured: left on page 5 at 36%, reopened
-on page 5 at 36%, same `scrollTop` of 2101.
+anchor**. It survives zoom, fit, rotation and screen.
+
+**The position is measured at the reading line, a third of the way down the pane** — not at
+the pane's top edge. The top edge is where the page you have *finished* still shows: with two
+inches of page 4 left above a page-5 search hit, a top-edge readout said `PAGE 4`, a bookmark
+taken there was filed under page 4, and a reload put the hit back under the chrome. The reading
+line is where the eye is, so the readout, the bookmark, the marks list and the restore all name
+the page being read. `goTo(page, fraction)` for a locator, a mark, a bookmark or a search hit puts
+that point *on* the reading line — the same definition both ways, so a restore is exact. The
+outline is the one caller that still lands a page's top edge at the top of the pane, because a
+chapter heading is at the top of its page.
+
+**Progress is the scroller's own ratio** (`through`: 0 at the top of the document, 1 at its
+foot, 1 for a document that fits its pane), not a page fraction — a page fraction read at the
+reading line says 5% of a document nobody has scrolled yet and never reaches 100%.
+
+Measured (`audit/pdf.mjs`): a hit labelled page 5 opens with the readout on page 5; left on page 5
+at 36%, reopened on page 5 at 36%, same `scrollTop` of 1820.
 
 ### 13.3 The sheet — seven controls
 

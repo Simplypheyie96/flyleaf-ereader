@@ -305,6 +305,24 @@ export function flatten(s: string): string {
     return s.replace(/\s+/g, ' ').trim()
 }
 
+/** The words a Range holds, as they read — not as `Range.toString()` has
+    them. That method concatenates text nodes and nothing else: a selection
+    that crosses a paragraph boundary comes back as "…end.Next…", and in the
+    PDF text layer, where pdfjs ends each line with a `<br>` rather than a
+    newline character, every line end joins two words ("inthe"). This clones
+    the contents and puts a space either side of each break and each block
+    before flattening, so Copy, a highlight's stored text and the menu's own
+    readout all agree with what the reader saw. */
+const BLOCKS = 'br, p, div, li, h1, h2, h3, h4, h5, h6, blockquote, pre, td, th, tr, dd, dt, ' +
+    'figcaption, section, article, header, footer, aside, hr'
+export function rangeText(range: Range | null | undefined): string {
+    if (!range) return ''
+    let frag: DocumentFragment
+    try { frag = range.cloneContents() } catch { return flatten(range.toString()) }
+    for (const el of Array.from(frag.querySelectorAll(BLOCKS))) { el.before(' '); el.after(' ') }
+    return flatten(frag.textContent ?? '')
+}
+
 /* ── reading order ────────────────────────────────────────────────────────
    The marks list is grouped by chapter in reading order, which is CFI order
    and not creation order. Comparing two CFIs is not string comparison, so the

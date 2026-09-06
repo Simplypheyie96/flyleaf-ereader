@@ -151,7 +151,12 @@ function findCover(opf: Document, opfPath: string): string | null {
     silently rendering an unreadable one. */
 function isEncrypted(encryptionXml: string): boolean {
   const doc = xml(encryptionXml)
-  const refs = Array.from(doc.getElementsByTagName('CipherReference'))
+  /* By local name, in any namespace. `getElementsByTagName` matches the
+     QUALIFIED name, so a manifest written as `<enc:CipherReference>` — a
+     shape that is in the wild, and in the OCF spec's own examples — went
+     unseen, and a locked book imported and put its chapter on a page. The
+     audit fixture `drm.epub` is that shape for exactly this reason. */
+  const refs = Array.from(doc.getElementsByTagNameNS('*', 'CipherReference'))
   if (!refs.length) return false
   const OBFUSCATION = [
     'http://www.idpf.org/2008/embedding',
@@ -159,9 +164,11 @@ function isEncrypted(encryptionXml: string): boolean {
   ]
   return refs.some((ref) => {
     const uri = ref.getAttribute('URI') ?? ''
-    const algorithm = ref.closest('EncryptedData')
-      ?.querySelector('EncryptionMethod')
-      ?.getAttribute('Algorithm') ?? ''
+    let data: Element | null = ref
+    while (data && data.localName !== 'EncryptedData') data = data.parentElement
+    const algorithm = data
+      ? (data.getElementsByTagNameNS('*', 'EncryptionMethod')[0]?.getAttribute('Algorithm') ?? '')
+      : ''
     /* A font being obfuscated is fine. Anything else being encrypted is not,
        and an .xhtml behind any algorithm at all is a chapter we cannot read. */
     if (OBFUSCATION.includes(algorithm)) return false

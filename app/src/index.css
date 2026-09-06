@@ -2510,6 +2510,48 @@ body::before{
   z-index:3;
 }
 
+/* ═══ the selection's handles ══════════════════════════════════════════════
+   Drawn by the app once it owns the selection (reader/selection.ts), because
+   the platform's handles left with the platform's menu. A hairline of ink the
+   height of the line, a 10px knob — above the start, below the end — and a
+   44px hit square around the knob that paints nothing. Positioned from the
+   host, in stage coordinates, like the menu; the reader sets left/top/height
+   inline from the selection's own rects.
+
+   Below the menu (7) and above the tick (3). `touch-action:none` because a
+   handle being dragged must never become a scroll of the page under it. */
+.selhandle{
+  position:absolute;
+  width:2px;
+  margin-left:-1px;
+  background:var(--stock-ink);
+  z-index:6;
+  touch-action:none;
+  cursor:col-resize;
+}
+.selhandle::before,
+.selhandle::after{
+  content:'';
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+}
+/* the knob */
+.selhandle::before{
+  width:10px; height:10px;
+  border-radius:50%;
+  background:var(--stock-ink);
+}
+/* the hit square — invisible, and the reason the knob can be as small as a
+   knob should be */
+.selhandle::after{
+  width:44px; height:44px;
+}
+.selhandle--start::before{ bottom:100%; }
+.selhandle--start::after{ bottom:calc(100% - 17px); }
+.selhandle--end::before{ top:100%; }
+.selhandle--end::after{ top:calc(100% - 17px); }
+
 /* ═══ the panel ════════════════════════════════════════════════════════════
    Contents, marks and search in one surface, over the page, in the stage's own
    grid area — so it covers the text and nothing else, exactly as the contents
@@ -3556,6 +3598,10 @@ a.top-t:hover{ text-decoration:underline; text-underline-offset:2px; }
 /* The selection has to be visible over a canvas the app did not draw, so it
    carries the highlighter's own tint rather than the platform accent. */
 .textLayer ::selection{ background:color-mix(in srgb, var(--hl-mustard) 65%, transparent); color:transparent; }
+/* The owned selection's paint (reader/selection.ts) — the same wash, drawn by
+   the app once the browser's range is cleared. The text stays transparent:
+   the words on show are the canvas's. */
+.textLayer::highlight(flyleaf-selection){ background:color-mix(in srgb, var(--hl-mustard) 65%, transparent); color:transparent; }
 .textLayer br::selection{ background:transparent; }
 
 /* ══════════════════════════════════════════════════════════════════════════
