@@ -38,7 +38,10 @@ import {
 import type { PdfRect } from '../marks'
 import type { HighlightColor, Turn } from '../../types'
 
-export type PdfLocation = { page: number; fraction: number }
+/** `through` is the scroller's own progress, 0 at the top of the document
+    and 1 at its foot — the number the progress readout wants, which the
+    reading-line position (`page` + `fraction`) is deliberately not. */
+export type PdfLocation = { page: number; fraction: number; through?: number }
 /** The one search hit the reader tapped: which page, and the run of words on
     it, in fractions of the page box so it survives every zoom and fit. */
 export type PdfFound = { page: number; fraction: number; x: number; w: number }
@@ -262,6 +265,20 @@ function band(k: number, lo: number, hi: number) {
     return k
 }
 
+
+/* The text layer sits over the painted marks so that words stay selectable,
+   which means a tap on a mark lands on the text layer and never on the mark's
+   own button. So the mark is found by looking through the stack under the
+   tap, stopping at the page: `elementsFromPoint` sees through `.pdf-text`
+   to the button beneath it. */
+const markAt = (x: number, y: number): string | null => {
+    for (const n of document.elementsFromPoint(x, y)) {
+        if (n.classList.contains('pdf-mark')) return n.getAttribute('data-mark')
+        if (n.classList.contains('pdf-page')) break
+    }
+    return null
+}
+
 export function PdfView(p: PdfViewProps) {
     const scrollRef = useRef<HTMLDivElement | null>(null)
     const stripRef = useRef<HTMLDivElement | null>(null)
@@ -305,25 +322,46 @@ export function PdfView(p: PdfViewProps) {
     }, [])
 
     /* ── where we are, and what to mount ──────────────────────────────── */
+    /* The reading line: a third of the way down the pane. It is where `goTo`
+       lands a search hit, and it is the line whose page the readout names —
+       the two have to agree, or tapping a hit labelled "page 5" opens a pill
+       that says PAGE 4 because a sliver of the page before is still at the
+       top edge. Measured against the top edge instead, that is exactly what
+       happened. A third rather than a half because the chrome sits at both
+       ends, and a line dead centre reads as further down than the eye expects. */
+    const READ_LINE = 1 / 3
+
     const locate = useCallback((): PdfLocation => {
         const el = scrollRef.current
         const { tops, hs, rowOf, rowFirst } = Lref.current
         if (!el || !tops.length) return { page: 1, fraction: 0 }
-        const y = el.scrollTop
-        let i = 0
-        /* Binary search rather than a scan: a 900-page file is the case this
-           runs on, once per animation frame of a scroll. */
-        let lo = 0, hi = tops.length - 1
-        while (lo <= hi) {
-            const mid = (lo + hi) >> 1
-            if (tops[mid] <= y + 1) { i = mid; lo = mid + 1 } else hi = mid - 1
+        const line = el.scrollTop + el.clientHeight * READ_LINE
+        let r: number
+        if (cb.current.mode === 'pages') {
+            /* The slot is the row: a squat sheet centred in its slot can leave
+               the reading line above its own top edge, and a search on the
+               sheet tops would then name the row before. */
+            r = clamp(Math.round(el.scrollTop / Math.max(1, el.clientHeight)), 0, rowFirst.length - 1)
+        } else {
+            let i = 0
+            /* Binary search rather than a scan: a 900-page file is the case
+               this runs on, once per animation frame of a scroll. */
+            let lo = 0, hi = tops.length - 1
+            while (lo <= hi) {
+                const mid = (lo + hi) >> 1
+                if (tops[mid] <= line + 1) { i = mid; lo = mid + 1 } else hi = mid - 1
+            }
+            r = rowOf[i]
         }
-        /* The LEFT page of the row. In a spread the search above stops on
-           whichever of the pair shares the row's top, and reporting the recto
-           would make the readout, the chapter label and the saved position all
-           name the page the reader is not looking at first. */
-        const page = rowFirst[rowOf[i]]
-        return { page, fraction: clamp((y - tops[i]) / Math.max(1, hs[i]), 0, 1) }
+        /* The LEFT page of the row, and its height. In a spread the search
+           stops on whichever of the pair shares the row's top, and reporting
+           the recto would make the readout, the chapter label and the saved
+           position all name the page the reader is not looking at first —
+           and measuring the fraction against the recto's height would make
+           `goTo` land somewhere else on a pair of unequal pages. */
+        const page = rowFirst[r]
+        const f = page - 1
+        return { page, fraction: clamp((line - tops[f]) / Math.max(1, hs[f]), 0, 1) }
     }, [])
 
     const sweep = useCallback(() => {
@@ -358,17 +396,24 @@ export function PdfView(p: PdfViewProps) {
     useEffect(() => { sweep() }, [L, sweep])
 
     /* ── going somewhere ──────────────────────────────────────────────── */
+    /** `centre` puts the point on the reading line — the inverse of `locate`,
+        so a position it measured comes back to the same scrollTop. Without it
+        the point goes to the top edge, which is what a contents entry wants:
+        the page's own top, not a third of the page before. Never scrolled
+        past the top of the document, so a hit on page one still shows page
+        one. In pages mode the slot is the position, so the row snaps whole. */
     const goTo = useCallback((page: number, fraction = 0, centre = false) => {
         const el = scrollRef.current
-        const { tops, hs } = Lref.current
+        const { tops, hs, rowOf } = Lref.current
         if (!el || !tops.length) return
         const i = clamp(Math.round(page) - 1, 0, tops.length - 1)
+        if (cb.current.mode === 'pages') {
+            el.scrollTop = rowOf[i] * el.clientHeight
+            sweep()
+            return
+        }
         const y = tops[i] + clamp(fraction, 0, 1) * hs[i]
-        /* A third rather than a half: the chrome is at both ends, and a line
-           put dead centre reads as further from the top than the eye expects
-           of a thing it just asked to be taken to. Never scrolled past the top
-           of the document, so a hit on page one still shows page one. */
-        const lift = centre ? el.clientHeight / 3 : 0
+        const lift = centre ? el.clientHeight * READ_LINE : 0
         el.scrollTop = Math.round(Math.max(0, y - lift))
         sweep()
     }, [sweep])
@@ -380,7 +425,8 @@ export function PdfView(p: PdfViewProps) {
         if (opened.current || !box.w || !L.tops.length) return
         opened.current = true
         const at = cb.current.start
-        if (at) goTo(at.page, at.fraction)
+        /* A saved position is a `locate` — a point on the reading line. */
+        if (at) goTo(at.page, at.fraction, true)
         else sweep()
     }, [box.w, L.tops.length, goTo, sweep])
 
@@ -501,6 +547,8 @@ export function PdfView(p: PdfViewProps) {
             if (moved > 8 || held > 500) return
             const sel = document.getSelection()
             if (sel && !sel.isCollapsed) return
+            const mark = markAt(e.clientX, e.clientY)
+            if (mark) { cb.current.onMark?.(mark); return }
             cb.current.onTap()
         }
 
@@ -545,6 +593,8 @@ export function PdfView(p: PdfViewProps) {
         if ((e.nativeEvent as PointerEvent).pointerType === 'touch') return
         const sel = document.getSelection()
         if (sel && !sel.isCollapsed) return
+        const mark = markAt(e.clientX, e.clientY)
+        if (mark) { cb.current.onMark?.(mark); return }
         cb.current.onTap()
     }, [])
 

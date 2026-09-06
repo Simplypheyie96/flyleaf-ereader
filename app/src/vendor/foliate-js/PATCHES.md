@@ -617,3 +617,48 @@ them the column settling shorter than its own estimate as real section heights
 arrived — never a reversal, never a step backwards. The same walk with the
 compensation still in scored 27. A second pass over sections already loaded is
 clean.
+
+## 8. `paginator.js` — a view whose frame is off the tree has no document
+
+**Files:** `paginator.js` — `setStyles()` (the `requestAnimationFrame` that
+repaints `#background`), `focusView()`, and `#mediaQueryListener`.
+**Marked in source as:** `PATCHED: the frame can be off the tree`
+
+**Why.** `View.document` is `iframe.contentDocument`, and that is `null` while the
+iframe is not attached. Upstream reads it unguarded in three places, all of them
+asynchronous — a `requestAnimationFrame`, a media-query change, a focus call —
+so a view that was attached when the call was made can be detached when it runs.
+Patch 6 (the scrolled column) produces exactly that gap on a scrolled-flow open:
+the app's first `setStyles` lands, the flow attribute follows and rebuilds the
+container around the frame, and the queued frame callback then reads
+`null.defaultView`. Measured on the seeded book, 390×844, a reload with the
+settings row already on `scrolled`: uncaught `TypeError: Cannot read properties
+of null (reading 'defaultView')` on 2 of 3 opens. Nothing visible broke — the
+background repaint was the only casualty — but it is an uncaught error on every
+other open in scrolled flow, and the audit rightly fails on it.
+
+**The change.** Each of the three reads goes through `this.#view?.document` and
+returns when there is none. The next `setStyles`, `expand` or `#onLoad` repaints
+the background with a live document, as it always did.
+
+## 9. `paginator.js` — crossing back to paginated tears the column down
+
+**Files:** `paginator.js` — `attributeChangedCallback('flow')`, `goTo()`, `#afterScroll()`.
+**Marked in source as:** `FLYLEAF PATCH 9`
+
+**Why.** Patch 11 builds the slot column when flow crosses *into* scrolled. Crossing
+*back* only called `render()`, which re-lays the current view and nothing else — so
+every slot and every neighbouring section's iframe stayed in `#container` under a
+paged layout. Measured on the seeded book, 390×844, Paginated → Scrolled → Paginated
+through the sheet: three section frames still connected, two of them stacked above
+the viewport at y −1112 and −1387 and still taking selections, and the page the
+reader was looking at 150px tall (the frame's box went 716 → 150). The teardown
+did exist, in `#createView`, but nothing reached it until the next chapter boundary.
+
+**The change.** Crossing to paginated with slots standing unloads the other resident
+sections and re-displays the current one through `#display` with its real `src`,
+which runs `#createView` and so the teardown, anchored on the fraction of the last
+relocate (`#lastFraction`, recorded in `#afterScroll`). The rebuild is kept in
+`#crossing`, and `goTo()` awaits it — the app follows every flow change with a
+`goTo(cfi)` two frames later, which would otherwise resolve its CFI against a frame
+still loading. The existing scrolled crossing is put behind the same promise.

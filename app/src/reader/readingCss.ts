@@ -319,6 +319,13 @@ a:any-link {
     background: ${dark ? palette.select : `color-mix(in oklab, ${palette.select} 42%, transparent)`};
     color: inherit;
 }
+/* The same wash, for the selection once the app owns it (selection.ts).
+   The hand-over from the browser's selection to the app's must not be
+   visible, so the two rules have to agree to the colour. */
+::highlight(flyleaf-selection) {
+    background-color: ${dark ? palette.select : `color-mix(in oklab, ${palette.select} 42%, transparent)`};
+    color: inherit;
+}
 /* The gesture layer owns horizontal movement in a paginated book, so the
    browser must not claim it for a pan. Vertical stays native in scrolled
    flow, where there is something to scroll. */

@@ -173,6 +173,13 @@ export interface TurnHooks {
         chrome away, because both leave the reader hunting for the sentence
         they were just looking at. */
     onMark(e: PointerEvent): boolean
+    /** Is the app holding a selection of its own (selection.ts)? Once the
+        browser's selection has been handed over there is nothing in the
+        section document for `#tap` to see, so the reader has to be asked.
+        A tap while it holds one dismisses it and does nothing else — the
+        same rule as for a native selection, one layer up. Returns true
+        when it dismissed something. */
+    dismissSelection(): boolean
 }
 
 type Phase = 'idle' | 'watching' | 'dragging' | 'committing'
@@ -910,6 +917,9 @@ export class TurnController {
             if (sameSel(selMark(sel), this.#sel0)) sel.removeAllRanges()
             return false
         }
+        /* The same, for a selection the app has taken over: no range in the
+           document, but words painted and a menu open. A tap puts them away. */
+        if (this.#hooks.dismissSelection()) return false
 
         /* A tap on an existing highlight is a tap on the highlight. foliate's
            own click listener will emit `show-annotation` for it a moment from

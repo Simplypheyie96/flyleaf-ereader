@@ -489,6 +489,10 @@ export class Paginator extends HTMLElement {
     #touchState
     #touchScrolled
     #lastVisibleRange
+    /* FLYLEAF PATCH 9. The fraction of the last relocate, and the rebuild a
+       flow crossing has in flight; see attributeChangedCallback. */
+    #lastFraction = 0
+    #crossing = null
     constructor() {
         super()
         this.#root.innerHTML = `<style>
@@ -670,7 +674,7 @@ export class Paginator extends HTMLElement {
         })
 
         this.#mediaQueryListener = () => {
-            if (!this.#view) return
+            if (!this.#view?.document) return
             this.#background.style.background = getBackground(this.#view.document)
         }
         this.#mediaQuery.addEventListener('change', this.#mediaQueryListener)
@@ -692,8 +696,36 @@ export class Paginator extends HTMLElement {
                     const index = this.#index
                     const anchor = this.#anchor
                     this.#buildSlots()
-                    if (index >= 0) void this.#display(
+                    if (index >= 0) this.#crossing = this.#display(
                         Promise.resolve({ index, src: true, anchor }))
+                        .catch(e => console.warn(e))
+                        .finally(() => { this.#crossing = null })
+                    break
+                }
+                /* FLYLEAF PATCH 9 (PATCHES.md § 9). Back to paginated with the
+                   column still standing. render() only re-lays the current
+                   view, which left every slot and every neighbouring section's
+                   iframe in the container under a paged layout: measured, the
+                   page came back 150px tall with two live sections stacked
+                   above it off-screen, still taking selections. So the
+                   crossing is a reload of the current section through
+                   #display -- #createView is what tears the column down --
+                   anchored on the fraction the reader was at. The app's CFI
+                   goTo that follows lands the sentence, and goTo() waits for
+                   this rebuild so it cannot land in a frame mid-load. */
+                if (!this.scrolled && this.#slots.length && this.#index >= 0) {
+                    const index = this.#index
+                    const anchor = this.#lastFraction
+                    for (const { index: i } of this.#views)
+                        if (i !== index) this.sections[i]?.unload?.()
+                    const onLoad = detail => {
+                        this.setStyles(this.#styles)
+                        this.dispatchEvent(new CustomEvent('load', { detail }))
+                    }
+                    this.#crossing = this.#display(Promise.resolve(this.sections[index].load())
+                        .then(src => ({ index, src, anchor, onLoad })))
+                        .catch(e => console.warn(e))
+                        .finally(() => { this.#crossing = null })
                     break
                 }
                 this.render()
@@ -1221,6 +1253,7 @@ export class Paginator extends HTMLElement {
             detail.fraction = (page - 1) / (pages - 2)
             detail.size = 1 / (pages - 2)
         }
+        if (detail.fraction >= 0) this.#lastFraction = detail.fraction
         this.dispatchEvent(new CustomEvent('relocate', { detail }))
     }
     /* ── PATCH 6: the continuous column ──────────────────────────────── */
@@ -1448,6 +1481,8 @@ export class Paginator extends HTMLElement {
     }
     async goTo(target) {
         if (this.#locked) return
+        // PATCH 9: a flow crossing is rebuilding the view; land after it
+        if (this.#crossing) await this.#crossing
         const resolved = await target
         if (this.#canGoToIndex(resolved.index)) return this.#goTo(resolved)
     }
@@ -1555,14 +1590,18 @@ export class Paginator extends HTMLElement {
         if (!applied) return
 
         // NOTE: needs `requestAnimationFrame` in Chromium
-        requestAnimationFrame(() =>
-            this.#background.style.background = getBackground(this.#view.document))
+        requestAnimationFrame(() => {
+            // PATCHED: the frame can be off the tree by the time this runs (a
+            // scrolled column being built around it), and then it has no document
+            const doc = this.#view?.document
+            if (doc) this.#background.style.background = getBackground(doc)
+        })
 
         // needed because the resize observer doesn't work in Firefox
         this.#view?.document?.fonts?.ready?.then(() => this.#view.expand())
     }
     focusView() {
-        this.#view.document.defaultView.focus()
+        this.#view?.document?.defaultView?.focus()
     }
     destroy() {
         this.#observer.unobserve(this)
