@@ -16,9 +16,8 @@ with three faces:
 | **Flyleaf Press** | [press.flyleaf.cc](https://press.flyleaf.cc) | the review app — long reviews shared whole as printed cards |
 | **Flyleaf eReader** | [read.flyleaf.cc](https://read.flyleaf.cc) | this one, where you read the file |
 
-The app lives in [`app/`](app/). Everything at this level is design material: `DESIGN.md` (the
-visual system, inherited from Flyleaf Press), `SPEC.md` (the reading surface — every control, its
-range, its default, and what "done" means for it) and `CLAUDE.md` (the standing brief).
+The app lives in [`app/`](app/). Everything at this level is design material: `SPEC.md` (the
+reading surface — every control, its range, its default, and what "done" means for it).
 
 ## Reading engine
 

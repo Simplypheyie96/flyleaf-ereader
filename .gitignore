@@ -42,3 +42,7 @@ app/tsconfig.tsbuildinfo
 # where video belongs.
 flyleaf-ereader-launch.mp4
 *.mp4
+
+# Design memory stays on the maker's machine, not on GitHub.
+CLAUDE.md
+DESIGN.md
