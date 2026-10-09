@@ -37,7 +37,7 @@ import { Fold } from '../components/Fold'
 const OUT = {
   journal: 'https://flyleaf.cc',
   press: 'https://press.flyleaf.cc',
-  maker: 'https://simplypheyie.is-a.dev',
+  maker: 'https://feyidesigns.com',
 } as const
 
 /** One destination outside the app. */
