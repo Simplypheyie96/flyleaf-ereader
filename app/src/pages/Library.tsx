@@ -10,7 +10,7 @@ import {
   ListIcon, PlusIcon, SearchIcon, SortIcon, SpinnerIcon, SyncIcon, TrashIcon,
 } from '../components/icons'
 import { FORMAT_LABEL, bytes, percent, remember, shortDate, stored } from '../lib'
-import { SYNC_AVAILABLE } from '../sync/google'
+import { SYNC_AVAILABLE } from '../sync/cloud'
 import type { Book, Collection } from '../types'
 
 /* The Library — the shelf, and nothing but the shelf.

@@ -480,11 +480,12 @@ export function SettingsPage() {
           <dl className="fine">
             <dt>Your books stay here</dt>
             <dd>
-              There is no account and no server. Every book, highlight, note and
-              position lives in this browser's storage on this device, and nothing
-              about your reading is sent anywhere. Deleting the app — or clearing
-              this site's data — deletes all of it, so export a backup first if you
-              would miss it.
+              Every book, highlight, note and position lives in this browser's
+              storage on this device, and nothing about your reading is sent
+              anywhere unless you sign in to sync. Then it is also kept on
+              Flyleaf's servers, private to your account, until you remove it.
+              Deleting the app — or clearing this site's data — deletes this
+              device's copy, so export a backup first if you would miss it.
             </dd>
             <dt>No DRM, ever</dt>
             <dd>

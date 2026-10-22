@@ -1,54 +1,41 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  SYNC_AVAILABLE,
-  SYNC_EVENT,
-  account,
-  needsSignIn,
-  optedIn,
-  signIn,
-  signOut,
-  warmUp,
-} from '../sync/google'
+import { SYNC_EVENT, optedIn as usedDrive, warmUp } from '../sync/google'
+import { SYNC_AVAILABLE, account, optedIn, signOut } from '../sync/cloud'
 import {
   bringTogether,
-  driveRoom,
+  forgetCopy,
   forgetDrive,
+  fromDrive,
   hasUnsharedWork,
   lastSync,
   otherLibrary,
   pauseAutoSync,
   resumeAutoSync,
+  storageFull,
   SYNC_PROGRESS,
   syncNow,
   syncProgress,
+  tooBig,
 } from '../sync/sync'
-import { bytes } from '../lib'
+import { GoogleButton } from './GoogleButton'
 
-/* Google Drive sync, as one settings panel.
+/* Sync across devices, as one settings panel.
 
-   OFF UNTIL SOMEBODY TURNS IT ON, and the whole panel hides itself when the
-   app was built without a Google client ID — a button that opens onto an error
-   is worse than no button. The library is local either way; this only decides
-   whether a copy also lives in the reader's own Drive.
+   SIGNED IN ONCE, THEN NOTHING TO PRESS. The Flyleaf account replaced Google
+   Drive because Drive's hour-long tokens signed every phone out; the session
+   here lasts as long as the device keeps being used. So there is no "Sync now"
+   and no "sign in again": the panel says who this device is signed in as, and
+   that it keeps up by itself. Journal's panel, in this app's idiom.
 
-   ONE QUESTION, ONCE. Connecting a device that is already carrying books Drive
-   has never seen is the one moment two libraries genuinely meet, and it asks
-   before merging — a shelf that silently grows by nine books is a thing that
-   happened TO somebody. Every sync after that is silent, because a merge is a
-   union and cannot take anything away.
+   OFF UNTIL SOMEBODY SIGNS IN, and the whole panel hides itself when the app
+   was built without a Google client ID — a button that opens onto an error is
+   worse than no button.
 
-   PORTED FROM FLYLEAF PRESS, and rebuilt in this app's own idiom: Press has a
-   `Confirm` modal and `.set-row`; this has `.panel`, `.set-acts` and an inline
-   `.set-confirm`, and the question is asked in the panel rather than over it.
-   Two differences of substance, both because this app carries books and Press
-   carries text about them: the book files are a separate opt-in with the
-   reader's Drive room named beside it, and the position row moves constantly,
-   so what the panel reports is the last SYNC and never a per-row state. */
-
-/** What `silentToken` throws when Google will not renew access unasked. The
-    panel shows that state as its own row with a button in it, so the same
-    words arriving as an error would be a duplicate rather than news. */
-const STALE = 'Sign in to Google again to keep syncing.'
+   ONE QUESTION, ONCE. Signing in a device that is already carrying books the
+   account has never seen is the one moment two libraries genuinely meet, and
+   it asks before merging — a shelf that silently grows by nine books is a
+   thing that happened TO somebody. Every sync after that is silent, because a
+   merge is a union and cannot take anything away. */
 
 function ago(at: number): string {
   const s = Math.max(0, Math.round((Date.now() - at) / 1000))
@@ -63,16 +50,15 @@ function ago(at: number): string {
 /** What came of a sync, in one sentence. Rows, not books — a position and a
     highlight are both rows, and calling four of them "4 books" would be a lie
     somebody could check. */
-function tally(r: { gained: number; updated: number; removed: number; files: number; filesLeft: number; unchanged: boolean }): string {
-  if (r.unchanged) return 'Already up to date.'
+function tally(r: { gained: number; updated: number; removed: number; files: number; filesLeft: number }): string {
   const parts = [
     r.gained ? `${r.gained} came down` : null,
     r.updated ? `${r.updated} updated` : null,
     r.removed ? `${r.removed} removed` : null,
     r.files ? `${r.files} ${r.files === 1 ? 'book file' : 'book files'} moved` : null,
   ].filter(Boolean)
-  const head = parts.length ? `Synced — ${parts.join(', ')}.` : 'Synced.'
-  /* NO SILENT CAPS. Three files move per pass; if more are waiting the panel
+  const head = parts.length ? `${parts.join(', ')}.` : 'Everything was already up to date.'
+  /* NO SILENT CAPS. Ten files move per pass; if more are waiting the panel
      says so, because a reader watching two of forty books arrive would
      otherwise conclude it had failed. */
   return r.filesLeft ? `${head} ${r.filesLeft} more still to move — they go a few at a time while the app is open.` : head
@@ -82,63 +68,59 @@ export function SyncPanel() {
   const [on, setOn] = useState(optedIn())
   const [who, setWho] = useState(account())
   const [at, setAt] = useState(lastSync())
-  /* Held in state rather than read at render. `refresh` is what the sync event
-     calls, and setting states to the values they already hold makes React bail
-     out of the render entirely — so a background sync that shut the quiet path
-     announced it to a panel that never redrew. */
-  const [stale, setStale] = useState(needsSignIn())
-  const [room, setRoom] = useState<{ used: number; limit: number | null } | null>(null)
+  const [drive, setDrive] = useState(usedDrive())
+  const [full, setFull] = useState(storageFull())
+  const [big, setBig] = useState<string[]>([])
   const [busy, setBusy] = useState('')
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const [asking, setAsking] = useState<{ device: string; at: number } | null>(null)
-  const [dropping, setDropping] = useState(false)
+  /* Which irreversible button has been pressed once. The second press is in
+     the inline confirm, where the sentence explaining it lands. */
+  const [sure, setSure] = useState<'copy' | 'drive' | null>(null)
   /* The file pass, while it is running. Book files are the only part of a
-     sync that takes long enough to need reporting, and `sync.ts` counts them
-     out; this is only the readout. Null between passes, which is most of the
-     time. */
+     sync that takes long enough to need reporting. Null between passes. */
   const [moving, setMoving] = useState(syncProgress())
 
+  /* Held in state rather than read at render: setting states to the values
+     they already hold makes React bail out, and a background sync must still
+     redraw the panel when something did move. */
   const refresh = useCallback(() => {
     setOn(optedIn())
     setWho(account())
     setAt(lastSync())
-    setStale(needsSignIn())
+    setDrive(usedDrive())
+    setFull(storageFull())
   }, [])
 
   useEffect(() => {
     if (!SYNC_AVAILABLE) return
     const tick = () => setMoving(syncProgress())
     window.addEventListener(SYNC_PROGRESS, tick)
-    return () => window.removeEventListener(SYNC_PROGRESS, tick)
-  }, [])
-
-  useEffect(() => {
-    if (!SYNC_AVAILABLE) return
-    /* Google's script is fetched now rather than inside the press that needs
-       it: Safari only lets a popup open from within the gesture that asked,
-       and a network round trip mid-gesture spends that permission. */
-    warmUp()
     window.addEventListener(SYNC_EVENT, refresh)
-    return () => window.removeEventListener(SYNC_EVENT, refresh)
+    return () => {
+      window.removeEventListener(SYNC_PROGRESS, tick)
+      window.removeEventListener(SYNC_EVENT, refresh)
+    }
   }, [refresh])
 
-  /* The Drive allowance, fetched once while connected, because the sentence
-     beside the book-files switch is about somebody's own storage and a number
-     they can check beats an adjective. Failure is silence: the switch does not
-     depend on knowing. */
+  /* Google's Drive script, fetched now rather than inside the press that needs
+     it: Safari only lets a popup open from within the gesture that asked. Only
+     for a device that used Drive — nobody else will ever open that window. */
   useEffect(() => {
-    if (!SYNC_AVAILABLE || !on || stale) return
+    if (SYNC_AVAILABLE && drive) warmUp()
+  }, [drive])
+
+  /* The books that cannot go up, named, so a shelf row with no file on the
+     other device is a fact somebody was told rather than a fault. */
+  useEffect(() => {
+    if (!SYNC_AVAILABLE || !on) return
     let alive = true
-    void driveRoom()
-      .then((r) => {
-        if (alive) setRoom(r)
-      })
-      .catch(() => {})
+    void tooBig().then((titles) => alive && setBig(titles))
     return () => {
       alive = false
     }
-  }, [on, stale])
+  }, [on, at])
 
   if (!SYNC_AVAILABLE) return null
 
@@ -147,33 +129,32 @@ export function SyncPanel() {
     setErr('')
   }
   const fail = (e: unknown) => {
-    setErr(e instanceof Error ? e.message : 'Something went wrong talking to Google.')
+    setErr(e instanceof Error ? e.message : 'Something went wrong talking to Flyleaf.')
     setMsg('')
   }
 
-  const connect = async () => {
-    setBusy('connect')
+  /* Google's button has signed the reader in by the time this runs. Auto-sync
+     is held until the question below is answered, so nothing merges
+     underneath it. */
+  const connected = async () => {
+    refresh()
+    setBusy('in')
     setErr('')
     setMsg('')
     try {
-      /* Held until the question below is answered, so nothing merges
-         underneath it. */
       pauseAutoSync()
-      await signIn()
-      refresh()
-      if (await hasUnsharedWork()) {
-        const other = await otherLibrary()
-        if (other) {
-          setAsking(other)
-          return
-        }
+      const other = await otherLibrary()
+      if (other && (await hasUnsharedWork())) {
+        setAsking(other)
+        return
       }
       resumeAutoSync()
       const r = await syncNow()
       refresh()
-      say(r.unchanged ? 'Connected. Everything was already up to date.' : `Connected. ${tally(r)}`)
+      say(`Signed in. ${tally(r)}`)
     } catch (e) {
       resumeAutoSync()
+      refresh()
       fail(e)
     } finally {
       setBusy('')
@@ -182,7 +163,7 @@ export function SyncPanel() {
 
   const merge = async () => {
     setAsking(null)
-    setBusy('sync')
+    setBusy('in')
     try {
       const r = await bringTogether()
       refresh()
@@ -194,12 +175,36 @@ export function SyncPanel() {
     }
   }
 
-  const now = async () => {
-    setBusy('sync')
+  /* No. Signing back out is the honest undo: signed in but never syncing would
+     be a panel that says On and does nothing. */
+  const apart = async () => {
+    setAsking(null)
+    setBusy('out')
+    await signOut()
+    resumeAutoSync()
+    refresh()
+    say('Left as they are. This device is not syncing, and the library in your account is untouched.')
+    setBusy('')
+  }
+
+  const leave = async () => {
+    setBusy('out')
+    await signOut()
+    refresh()
+    say('Signed out of this device. Your library stays here and in your account.')
+    setBusy('')
+  }
+
+  /* Signed out as part of the same press: still signed in, this device would
+     write the library straight back up within seconds. */
+  const dropCopy = async () => {
+    setBusy('drop')
     try {
-      const r = await syncNow()
+      await forgetCopy()
+      await signOut()
+      setSure(null)
       refresh()
-      say(tally(r))
+      say('Removed from Flyleaf. This device is signed out, and every book on it remains here.')
     } catch (e) {
       fail(e)
     } finally {
@@ -207,21 +212,20 @@ export function SyncPanel() {
     }
   }
 
-  /* THE WAY BACK. Without it the panel is a dead end: the silent path shuts
-     for six hours after Google refuses to renew access unasked, and Sync now
-     takes that same path — so it throws before a window can open, and the only
-     escape was to disconnect and connect again. This is the same press as
-     Connect, minus the merge question, which was answered when this device
-     first joined. */
-  const resume = async () => {
-    setBusy('signin')
+  const bringDrive = async () => {
+    setBusy('drive')
     setErr('')
     setMsg('')
     try {
-      await signIn()
-      const r = await syncNow()
+      const got = await fromDrive()
       refresh()
-      say(r.unchanged ? 'Signed in. Everything was already up to date.' : `Signed in. ${tally(r)}`)
+      if (!got) say('That Google Drive holds no Flyleaf eReader library.')
+      else if (!got.rows && !got.files) say('Brought in. Nothing there was new to this device.')
+      else
+        say(
+          `Brought in from Google Drive: ${got.rows} ${got.rows === 1 ? 'row' : 'rows'}` +
+            (got.files ? `, ${got.files} ${got.files === 1 ? 'book file' : 'book files'}.` : '.'),
+        )
     } catch (e) {
       fail(e)
     } finally {
@@ -229,180 +233,32 @@ export function SyncPanel() {
     }
   }
 
-  const disconnect = async () => {
-    setBusy('off')
+  const dropDrive = async () => {
+    setBusy('drive')
     try {
-      await signOut()
+      const n = await forgetDrive()
+      setSure(null)
       refresh()
-      say('Disconnected. The copy in your Drive was left alone.')
+      say(n ? 'Removed the old copy from Google Drive.' : 'Google Drive held no Flyleaf eReader library.')
     } catch (e) {
       fail(e)
     } finally {
       setBusy('')
     }
   }
-
-  const drop = async () => {
-    setDropping(false)
-    setBusy('drop')
-    try {
-      /* Interactive, because this has to work for somebody who disconnected
-         first and then thought better of leaving the copy behind. */
-      const n = await forgetDrive(true)
-      await signOut()
-      refresh()
-      say(
-        n
-          ? 'The copy was removed from your Drive. Your library here is untouched.'
-          : 'There was nothing in your Drive to remove.',
-      )
-    } catch (e) {
-      fail(e)
-    } finally {
-      setBusy('')
-    }
-  }
-
 
   return (
     /* The id is the destination of the Library head's "Sync" link, and
-       SettingsPage does the scrolling. Named for what a reader would guess
-       rather than for this component. */
+       SettingsPage does the scrolling. */
     <section className="panel" id="sync">
-      <p className="ui-lbl">Google Drive sync</p>
+      <p className="ui-lbl">Sync across devices</p>
 
-      {/* STATE FIRST, and it opens with a single word, so the answer to "am I
-          synced?" is the first thing read: Off / On / Paused. The ways out sit
-          below the action, never beside the sentence describing the state. */}
-      <p className="ui-p" style={{ marginTop: 8 }}>
-        {!on ? (
-          <>
-            Off. Your library lives on this device only. Turn this on and a copy is kept in a
-            hidden folder of your own Google Drive — one this app can see and no other app can — so
-            the same shelf, the same highlights and the same page appear on your other devices.
-            Nothing is ever sent to us.
-          </>
-        ) : stale ? (
-          <>
-            Paused. Signed in as {who || 'your Google account'}
-            {at ? `, last synced ${ago(at)}` : ', not synced yet'}. Google won’t renew this device’s
-            access without being asked, so nothing has synced since. Nothing is lost — your library
-            is here, and the copy in your Drive is where you left it.
-          </>
-        ) : (
-          <>
-            On, syncing to {who || 'your Google account'}
-            {' · '}
-            {at ? `last synced ${ago(at)}` : 'not synced yet'}.
-          </>
-        )}
-      </p>
-
-      {on && !stale && (
-        <p className="ui-p ui-p--soft" style={{ marginTop: 8 }}>
-          Syncing happens by itself — after you close a book, when you come back to the app, and
-          every minute or two while it is open. Reading settings stay on the device that set them: a
-          phone’s type size is a poor fit for a laptop.
-        </p>
-      )}
-
-      {!on && (
-        <div className="set-acts">
-          <button className="btn btn--sm" type="button" onClick={() => void connect()} disabled={!!busy}>
-            {busy === 'connect' ? 'Connecting…' : 'Connect Google Drive'}
-          </button>
-        </div>
-      )}
-
-      {on && (
-        <>
-          {stale ? (
-            /* THE ONLY PRESS THAT WORKS IN THIS STATE, so it is the primary
-               one. Sync now takes the silent path and would throw before a
-               window could open. */
-            <div className="set-acts">
-              <button className="btn btn--sm" type="button" onClick={() => void resume()} disabled={!!busy}>
-                {busy === 'signin' ? 'Signing in…' : 'Sign in to Google again'}
-              </button>
-            </div>
-          ) : (
-            <>
-              {/* THE BOOK FILES ARE A SECOND DECISION, and it belongs to the
-                  reader rather than to us: the record of a hundred books is
-                  well under a megabyte, and the books themselves can be
-                  hundreds. But it is on by default now. It was off, and off is
-                  indefensible as a starting state: the other device gets a
-                  shelf of rows it cannot open and cannot even draw a cover
-                  for, because the cover travels inside the file bundle and
-                  nowhere else. Turning it off is a decision to make with a
-                  working sync in front of you, not a wall to find on a new
-                  device. */}
-              <p className="ui-p ui-p--soft" style={{ marginTop: 18 }}>
-                A book opened on one device can be opened on the others without finding the file again. It uses your Drive space, and a large book takes a while.
-              </p>
-              {room && (
-                <p className="mono-meta" style={{ marginTop: 12 }}>
-                  {room.limit === null
-                    ? `${bytes(room.used)} used in your Drive`
-                    : `${bytes(room.used)} of ${bytes(room.limit)} used in your Drive`}
-                </p>
-              )}
-
-              {/* WHAT IS ACTUALLY HAPPENING, while it happens. "Syncing" on
-                  its own cannot tell a working sync from a stuck one, and the
-                  book files are minutes of it on a phone. Shown for any pass,
-                  including the automatic ones, because the reader did not
-                  start those either and they are the ones that look like
-                  nothing. `.bar` is the shelf's own progress hairline, so this
-                  adds no new component and no new token. */}
-              {moving && (
-                <div className="sync-move" role="status" aria-live="polite">
-                  <p className="mono-meta">
-                    {`Moving book ${Math.min(moving.done + 1, moving.total)} of ${moving.total}`}
-                  </p>
-                  <span
-                    className="bar"
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={moving.total}
-                    aria-valuenow={moving.done}
-                    aria-label="Book files moving"
-                  >
-                    <span
-                      className="bar-fill"
-                      style={{ width: `${Math.round((moving.done / moving.total) * 100)}%` }}
-                    />
-                  </span>
-                </div>
-              )}
-
-              <div className="set-acts">
-                <button className="btn btn--ghost btn--sm" type="button" onClick={() => void now()} disabled={!!busy}>
-                  {busy === 'sync' ? 'Syncing…' : 'Sync now'}
-                </button>
-              </div>
-            </>
-          )}
-        </>
-      )}
-
-      {/* The paused sentence is the state paragraph's whole subject, and a
-          failed background sync hands back those same words — printed here as
-          well, they would appear twice in one panel. */}
-      {(msg || err) && !(stale && err === STALE) && (
-        <p className={err ? 'ui-p ui-p--warn' : 'mono-meta'} role="status" style={{ marginTop: 14 }}>
-          {err || msg}
-        </p>
-      )}
-
-      {asking && (
+      {asking ? (
         /* ASKED IN THE PANEL, not over it. This app has no modal confirm, and
-           the inline block is what a restore uses two panels down — the same
-           shape for the same kind of decision. */
+           the inline block is what a restore uses two panels down. */
         <div className="set-confirm">
           <p className="ui-p">
-            There is already a library in this Google account, last changed on{' '}
-            {asking.device || 'another device'}
+            Your account already holds a library, last changed on {asking.device || 'another device'}
             {asking.at ? ` ${ago(asking.at)}` : ''}.
           </p>
           <p className="ui-p ui-p--soft" style={{ marginTop: 8 }}>
@@ -411,88 +267,165 @@ export function SyncPanel() {
           </p>
           <div className="set-acts" style={{ marginTop: 14 }}>
             <button className="btn btn--sm" type="button" disabled={!!busy} onClick={() => void merge()}>
-              {busy === 'sync' ? 'Bringing together…' : 'Bring them together'}
+              {busy === 'in' ? 'Bringing together…' : 'Bring them together'}
             </button>
-            <button
-              className="btn btn--ghost btn--sm"
-              type="button"
-              disabled={!!busy}
-              onClick={() => {
-                setAsking(null)
-                resumeAutoSync()
-                say('Left as it was. Nothing has been merged — press Sync now when you want to join them.')
-              }}
-            >
-              Not now
+            <button className="btn btn--ghost btn--sm" type="button" disabled={!!busy} onClick={() => void apart()}>
+              {busy === 'out' ? 'Signing out…' : 'Leave them as they are'}
             </button>
           </div>
         </div>
+      ) : on ? (
+        <>
+          <p className="ui-p" style={{ marginTop: 8 }}>
+            Signed in as {who}. This device syncs on its own and stays signed in. There is nothing
+            to press.
+          </p>
+          <p className="mono-meta" style={{ marginTop: 8 }}>
+            {at ? `Last synced ${ago(at)}` : 'Not synced yet'}
+          </p>
+
+          {/* WHAT IS ACTUALLY HAPPENING, while it happens. "Syncing" on its own
+              cannot tell a working sync from a stuck one, and the book files
+              are minutes of it on a phone. `.bar` is the shelf's own progress
+              hairline, so this adds no new component and no new token. */}
+          {moving && (
+            <div className="sync-move" role="status" aria-live="polite">
+              <p className="mono-meta">{`Moving book ${Math.min(moving.done + 1, moving.total)} of ${moving.total}`}</p>
+              <span
+                className="bar"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={moving.total}
+                aria-valuenow={moving.done}
+                aria-label="Book files moving"
+              >
+                <span className="bar-fill" style={{ width: `${Math.round((moving.done / moving.total) * 100)}%` }} />
+              </span>
+            </div>
+          )}
+
+          {full && (
+            <p className="ui-p ui-p--warn" style={{ marginTop: 14 }}>
+              Your 1 GB of book files on Flyleaf is full, so new books stay on the device they were
+              added on. Your notes, highlights and places still sync.
+            </p>
+          )}
+          {big.length > 0 && (
+            <p className="ui-p ui-p--soft" style={{ marginTop: 14 }}>
+              {big.length === 1 ? 'One book is' : `${big.length} books are`} over the 25 MB Flyleaf
+              carries per file, so {big.length === 1 ? 'it stays' : 'they stay'} on this device:{' '}
+              {big.join(', ')}. {big.length === 1 ? 'Its highlights and place' : 'Their highlights and places'} still sync.
+            </p>
+          )}
+        </>
+      ) : (
+        <>
+          <p className="ui-p" style={{ marginTop: 8 }}>
+            Sign in once and your shelf, highlights and places appear on your other devices and keep
+            up with them by themselves. They are kept on Flyleaf’s servers, private to your account,
+            and you can remove them from here at any time. Reading settings stay on each device.
+          </p>
+          <div style={{ marginTop: 18 }}>
+            {busy === 'in' ? (
+              <p className="mono-meta" role="status">
+                Signing in…
+              </p>
+            ) : (
+              <GoogleButton onDone={() => void connected()} onError={fail} />
+            )}
+          </div>
+        </>
       )}
 
-      {on && !stale && !asking && (
-        /* THE TWO WAYS OUT, adjacent, because the only thing separating them is
-           whether the copy in Drive survives. They used to be a button beside
-           Sync now and a red plate below it — and the plate, sitting directly
-           under a line saying "Synced", read as a report that the sync had
-           failed. Rows instead: the label states the outcome plainly, the
+      {(msg || err) && (
+        <p className={err ? 'ui-p ui-p--warn' : 'mono-meta'} role="status" style={{ marginTop: 14 }}>
+          {err || msg}
+        </p>
+      )}
+
+      {on && !asking && (
+        /* THE TWO WAYS OUT, as rows: the label states the outcome plainly, the
            danger lives on the button alone, and the sentence about what cannot
-           be undone waits for the press. Press's shape, verbatim. */
+           be undone waits for the press. */
         <div className="set-rows">
           <div className="set-row set-row--stack">
             <div className="set-row-txt">
-              <div className="ui-lbl">Stop syncing</div>
-              <p>
-                Ends syncing on this device. The copy already in your Drive is left where it is, so
-                connecting again picks it back up.
-              </p>
+              <div className="ui-lbl">Sign out of this device</div>
+              <p>Stops syncing here. Your library stays on this device and in your account.</p>
             </div>
-            <button
-              className="btn btn--ghost btn--sm"
-              type="button"
-              disabled={!!busy}
-              onClick={() => void disconnect()}
-            >
-              {busy === 'off' ? 'Disconnecting…' : 'Disconnect'}
+            <button className="btn btn--ghost btn--sm" type="button" disabled={!!busy} onClick={() => void leave()}>
+              {busy === 'out' ? 'Signing out…' : 'Sign out'}
             </button>
           </div>
           <div className="set-row set-row--stack">
             <div className="set-row-txt">
-              <div className="ui-lbl">Remove the copy from Drive</div>
-              {/* worth saying where it can be done: the folder is hidden from
-                  Drive's own screens, so this button is the only way out */}
+              <div className="ui-lbl">Remove my library from Flyleaf</div>
               <p>
-                Deletes the copy from your Drive — the only place this can be done — and
-                disconnects. Your library here is untouched, but any other device that was syncing
-                will stop finding it.
+                Deletes the copy in your account, book files included, and signs this device out.
+                Every book stays on this device, but your other devices will have nothing to sync
+                with.
               </p>
             </div>
-            {dropping ? (
-              /* ASKED IN THE ROW, not over it. This app has no modal confirm,
-                 and the inline block is what the merge above and the restore two
-                 panels down both use. */
+            {sure === 'copy' ? (
               <div className="set-confirm">
-                <p className="ui-p">This cannot be undone from here or from Drive.</p>
+                <p className="ui-p">This cannot be undone.</p>
                 <div className="set-acts" style={{ marginTop: 14 }}>
-                  <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => void drop()}>
-                    {busy === 'drop' ? 'Removing…' : 'Remove the copy'}
+                  <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => void dropCopy()}>
+                    {busy === 'drop' ? 'Removing…' : 'Yes, remove it'}
                   </button>
-                  <button
-                    className="btn btn--ghost btn--sm"
-                    type="button"
-                    disabled={!!busy}
-                    onClick={() => setDropping(false)}
-                  >
+                  <button className="btn btn--ghost btn--sm" type="button" disabled={!!busy} onClick={() => setSure(null)}>
                     Keep it
                   </button>
                 </div>
               </div>
             ) : (
-              <button
-                className="btn btn--danger btn--sm"
-                type="button"
-                disabled={!!busy}
-                onClick={() => setDropping(true)}
-              >
+              <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => setSure('copy')}>
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {drive && !asking && (
+        /* ONLY FOR A DEVICE THAT SYNCED THROUGH DRIVE BEFORE, and only until
+           the old copy is removed. Nothing moves until it is pressed. */
+        <div className="set-rows">
+          <div className="set-row set-row--stack">
+            <div className="set-row-txt">
+              <div className="ui-lbl">Your old Google Drive copy</div>
+              <p>
+                An older Flyleaf eReader kept a copy of this library in your Google Drive. Bring it in
+                once and it joins the library here{on ? ' and in your account' : ''}. The Drive copy is
+                left as it is.
+              </p>
+            </div>
+            <button className="btn btn--ghost btn--sm" type="button" disabled={!!busy} onClick={() => void bringDrive()}>
+              {busy === 'drive' && sure !== 'drive' ? 'Bringing it in…' : 'Bring in my Google Drive copy'}
+            </button>
+          </div>
+          <div className="set-row set-row--stack">
+            <div className="set-row-txt">
+              <div className="ui-lbl">Remove the Google Drive copy</div>
+              <p>
+                Opens Google to confirm the account, then deletes the old copy from your Drive. Nothing
+                here or in your Flyleaf account is touched.
+              </p>
+            </div>
+            {sure === 'drive' ? (
+              <div className="set-confirm">
+                <p className="ui-p">This cannot be undone from here or from Drive.</p>
+                <div className="set-acts" style={{ marginTop: 14 }}>
+                  <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => void dropDrive()}>
+                    {busy === 'drive' ? 'Removing…' : 'Yes, remove it from Drive'}
+                  </button>
+                  <button className="btn btn--ghost btn--sm" type="button" disabled={!!busy} onClick={() => setSure(null)}>
+                    Keep it
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => setSure('drive')}>
                 Remove
               </button>
             )}

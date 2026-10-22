@@ -1,4 +1,13 @@
-/* Signing in to Google, and nothing more than that.
+/* Signing in to Google Drive — now only to bring an old copy in, and to
+   remove it.
+
+   SYNC NO LONGER RUNS THROUGH THIS FILE. It runs through the Flyleaf account
+   (`cloud.ts`), whose session does not expire an hour after it was last used.
+   What is left here serves the one-time "Bring in my Google Drive copy" and
+   "Remove the Google Drive copy" in Settings, for readers who synced through
+   Drive before, plus the script loader and typings `cloud.ts` shares. The rest
+   of this comment describes the Drive arrangement as it was.
+
 
    WHY THIS IS THE SHAPE IT IS. Flyleaf eReader has no server and does not want
    one — the library is local, and that is the promise. So sync does not mean
@@ -66,6 +75,21 @@ declare global {
   interface Window {
     google?: {
       accounts: {
+        /** Sign-in with an ID token: what the Flyleaf account uses. See cloud.ts. */
+        id?: {
+          initialize(config: {
+            client_id: string
+            callback: (response: { credential?: string }) => void
+            ux_mode?: 'popup'
+            auto_select?: boolean
+            itp_support?: boolean
+          }): void
+          renderButton(
+            el: HTMLElement,
+            options: { theme?: string; size?: string; shape?: string; text?: string; width?: number; logo_alignment?: string },
+          ): void
+          disableAutoSelect(): void
+        }
         oauth2: {
           initTokenClient(config: {
             client_id: string
@@ -227,7 +251,7 @@ function remember(on: boolean) {
    waiting for. */
 const SCRIPT_PATIENCE = 20_000
 
-function loadScript(): Promise<void> {
+export function loadScript(): Promise<void> {
   if (window.google?.accounts?.oauth2) return Promise.resolve()
   if (loading) return loading
 

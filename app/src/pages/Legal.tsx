@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { SEEDS } from '../seed'
 
-/* The two pages Google requires of any app that asks for a Drive scope, and
+/* The two pages Google requires of any app that signs people in with it, and
    that a reader is entitled to whether Google asks or not.
 
    They live in the app rather than on a marketing site because there is no
@@ -14,13 +14,15 @@ import { SEEDS } from '../seed'
    Every claim below was checked against the code before it was written, not
    assumed. The only measurement is Vercel's page-view count, with both id
    routes collapsed to their pattern before send (`main.tsx`), the complete list of hosts the
-   app can ever reach is the four in "When this app talks to the internet",
+   app can ever reach is the list in "When this app talks to the internet",
    the Wiktionary row is a user-tapped link that is absent offline
-   (`reader/Panel.tsx`), and Drive sync writes only to appDataFolder
+   (`reader/Panel.tsx`), sync goes only to Flyleaf's own server at
+   api.flyleaf.cc (`sync/cloud.ts`), and the old Drive sync is reduced to a
+   one-time bring-in that reads and deletes only appDataFolder
    (`sync/drive.ts`). If any of that changes, these pages change with it. */
 
 /** Sentence-cased, so it reads as a date and not as a version string. */
-const UPDATED = '23 August 2026'
+const UPDATED = '22 October 2026'
 
 /** Shared foot: back to where a reader almost certainly came from, plus the
     other document, because somebody reading one usually wants both. */
@@ -48,11 +50,11 @@ export function PrivacyPage() {
         <section className="panel">
           <p className="ui-lbl">The short version</p>
           <p className="ui-p" style={{ marginTop: 8 }}>
-            Flyleaf eReader has no account and no server of its own. Your books,
-            your highlights, your notes and your place in each one are held in
-            this browser's storage on this device. Nothing about <em>what</em> you
-            read leaves the device unless you switch on Google Drive sync
-            yourself, and you can switch it off again in Settings. The one thing
+            Flyleaf eReader needs no account. Your books, your highlights, your
+            notes and your place in each one are held in this browser's storage
+            on this device. Nothing about <em>what</em> you read leaves the device
+            unless you sign in to sync it, and you can sign out, or remove what
+            was synced, from Settings at any time. The one thing
             that is counted is how many people open the app, and that count can
             never say which book.
           </p>
@@ -82,9 +84,19 @@ export function PrivacyPage() {
               <code>/read/:id</code> and <code>/book/:id</code> — so the count can
               say a book was opened, and never which one. There is no crash
               reporting, no advertising identifier and no other third-party
-              script on the page. Nobody, including the person who made this, can
-              see which books are in your library or what you have underlined in
-              them.
+              script on the page, and nothing about your library is ever part
+              of the count.
+            </dd>
+            <dt>If you sign in to sync</dt>
+            <dd>
+              Your shelf, your highlights, notes and bookmarks, your place in each
+              book, and the book files themselves are kept on Flyleaf's servers,
+              which run on Cloudflare. They are stored against your account,
+              encrypted in transit and at rest, and handed only to devices signed
+              in to that account. They are not read, and not used for anything
+              but giving them back to you. A book file larger than 25 MB is not
+              uploaded and stays on the device it was added on. When two devices
+              sync they merge on the devices, so neither overwrites the other.
             </dd>
             <dt>The two included books</dt>
             <dd>
@@ -106,7 +118,7 @@ export function PrivacyPage() {
         <section className="panel">
           <p className="ui-lbl">When this app talks to the internet</p>
           <p className="ui-p ui-p--soft" style={{ marginTop: 8 }}>
-            Five occasions, and this is the complete list. Four of them are
+            Six occasions, and this is the complete list. Five of them are
             optional; the page-view count is the one that is not.
           </p>
           <dl className="fine">
@@ -118,19 +130,26 @@ export function PrivacyPage() {
               or your browser's Do Not Track setting will stop it, and the app
               works exactly the same either way, offline included.
             </dd>
-            <dt>Google Drive sync — only if you turn it on</dt>
+            <dt>Syncing — only if you sign in</dt>
             <dd>
-              If you sign in from Settings, the app asks Google for two things:
-              the address of the account you signed in with, so it can show you
-              which one is connected, and permission to use its own hidden
-              application folder in your Drive. Google describes that permission
-              as seeing, creating and deleting <em>its own</em> configuration
-              data — it cannot see, list or touch any other file in your Drive,
-              including files put there by other apps. Into that folder the app
-              writes a copy of your shelf, your highlights and notes, your
-              positions, and the book files themselves, so a second device can
-              pick up where the first left off. Signing out stops it; "Remove the
-              copy from Drive" in Settings deletes what is there.
+              Google signs you in, under{' '}
+              <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
+                its privacy policy
+              </a>
+              , and tells the app only your name and email address. From then on
+              the app talks to Flyleaf's own server at api.flyleaf.cc, run on{' '}
+              <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">
+                Cloudflare
+              </a>
+              , which records ordinary request information as any host does.
+              Signing out stops it.
+            </dd>
+            <dt>The old Google Drive copy — only if you press it</dt>
+            <dd>
+              An older version synced through a hidden folder in your own Google
+              Drive. If you used it, Settings offers to bring that copy in and to
+              remove it from Drive; either asks Google for permission to that one
+              hidden folder only, and only when you press it.
             </dd>
             <dt>A tip — only if you send one</dt>
             <dd>
@@ -160,16 +179,16 @@ export function PrivacyPage() {
           <dl className="fine">
             <dt>Turn sync off</dt>
             <dd>
-              Sign out in Settings and the app stops talking to Drive
-              immediately. Your library on this device is untouched. You can also
-              remove Google's permission entirely from your Google Account's
-              third-party access page, which the app cannot do on your behalf.
+              Sign out in Settings and this device stops syncing immediately. Your
+              library on this device, and the copy in your account, are untouched.
             </dd>
-            <dt>Delete the Drive copy</dt>
+            <dt>Delete what was synced</dt>
             <dd>
-              "Remove the copy from Drive" deletes only the files this app put
-              in its own hidden folder. It cannot reach anything else in your
-              Drive, and it never touches the library on this device.
+              "Remove my library from Flyleaf" in Settings deletes your library
+              and every book file from Flyleaf's servers, and signs the device
+              out. It never touches the library on this device. "Remove the
+              Google Drive copy", shown only if you used the older Drive sync,
+              deletes only the files that version put in its hidden folder.
             </dd>
             <dt>Take your data with you</dt>
             <dd>
@@ -189,9 +208,9 @@ export function PrivacyPage() {
         <section className="panel">
           <p className="ui-lbl">Children, and getting in touch</p>
           <p className="ui-p" style={{ marginTop: 8 }}>
-            The app is not directed at children and collects nothing from anyone,
-            of any age. There is no profile to build because there is nothing
-            collected to build one out of.
+            The app is not directed at children and builds no profile of anyone,
+            of any age. What sync keeps is your own library, kept for you and
+            nothing else.
           </p>
           <p className="ui-p" style={{ marginTop: 12 }}>
             If something here is unclear or looks wrong, the contact route is the
@@ -221,8 +240,8 @@ export function TermsPage() {
           <p className="ui-lbl">The short version</p>
           <p className="ui-p" style={{ marginTop: 8 }}>
             Flyleaf eReader is free, made by one person, and given away as it is.
-            It opens book files you already have. It does not sell books, does not
-            hold an account for you, and makes no claim on anything you open in
+            It opens book files you already have. It does not sell books, needs no
+            account unless you choose to sync, and makes no claim on anything you open in
             it or write in it — your books, your highlights and your notes are
             yours. In exchange, it comes with no warranty and no guarantee that
             it will keep working.
@@ -239,13 +258,22 @@ export function TermsPage() {
             <dd>
               Open any book file you have the right to read, on as many devices
               as you like, online or off. Install it to a home screen if you want
-              to. No licence key, no seat count, no sign-in.
+              to. No licence key, no seat count, and no sign-in unless you want
+              your library on more than one device.
+            </dd>
+            <dt>Sync, if you sign in</dt>
+            <dd>
+              Signing in with Google keeps your library on Flyleaf's servers so it
+              follows you between devices. It is free and offered as it is: a book
+              file over 25 MB stays on the device it was added on, and book files
+              across the Flyleaf apps share 1 GB per account. Keep a backup of
+              anything you would miss.
             </dd>
             <dt>Keep what you make</dt>
             <dd>
               Highlights, notes and bookmarks are yours. Export them whenever you
               want. Nothing you write in this app is claimed, licensed or read by
-              anyone else.
+              anyone else, synced or not.
             </dd>
             <dt>What you are responsible for</dt>
             <dd>
