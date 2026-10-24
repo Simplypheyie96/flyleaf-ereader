@@ -469,12 +469,25 @@ function embeddedBody(document: Document): Embedded | null {
     return null
 }
 
+const APP_ORIGINS = ['capacitor://localhost', 'https://localhost']
+
 export default {
     async fetch(request: Request): Promise<Response> {
+        /* The store apps (branch `store`) run at these origins and call this
+           across origins; the web app calls it same-origin and gets no CORS
+           headers at all, exactly as before. */
+        const origin = request.headers.get('origin') ?? ''
+        const cors: Record<string, string> = APP_ORIGINS.includes(origin)
+            ? { 'access-control-allow-origin': origin, 'access-control-allow-methods': 'POST', 'access-control-allow-headers': 'content-type', vary: 'origin' }
+            : {}
+        if (request.method === 'OPTIONS' && cors['access-control-allow-origin']) {
+            return new Response(null, { status: 204, headers: cors })
+        }
         const json = (body: unknown, status = 200) =>
             new Response(JSON.stringify(body), {
                 status,
                 headers: {
+                    ...cors,
                     'content-type': 'application/json; charset=utf-8',
                     /* Never cached anywhere. What somebody reads is their
                        business, and a shared cache in front of this would make

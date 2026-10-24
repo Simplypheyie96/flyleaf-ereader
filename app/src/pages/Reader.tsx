@@ -43,6 +43,7 @@ import type { HandleEnd } from '../reader/SelectionHandles'
 import { OwnedSelection } from '../reader/selection'
 import { NoteEditor } from '../reader/NoteEditor'
 import { ExportSheet } from '../reader/ExportSheet'
+import { locked } from '../unlock'
 import { Overlayer } from '../vendor/foliate-js/overlayer.js'
 import {
     addBookmark, addHighlight, drawFor, drawForFound, flatten, rangeText, readPaint, removeAnnotation,
@@ -1470,7 +1471,7 @@ export function Reader() {
                     onEditNote={a => { setPanelOpen(false); setNoteFor(a) }}
                     onRemoveAnnotation={a => void removeAnnotation(a.id)}
                     onRemoveBookmark={b => void removeBookmark(b.id)}
-                    onExport={() => { setPanelOpen(false); setExportOpen(true) }}
+                    onExport={() => { if (locked()) return; setPanelOpen(false); setExportOpen(true) }}
                     onClose={() => { setPanelOpen(false); stopSearch() }}
                 />
             )}

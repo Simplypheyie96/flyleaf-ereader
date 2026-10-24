@@ -13,9 +13,16 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "icons": "node scripts/make-icons.mjs",
-    "audit:measure": "vite build && node audit/measure.mjs"
+    "audit:measure": "vite build && node audit/measure.mjs",
+    "ios": "VITE_STORE=1 VITE_GOOGLE_CLIENT_ID=1093925806507-geheiusfcb8belpi6bdpl6p8afi74g99.apps.googleusercontent.com npm run build && npx cap sync ios",
+    "android": "VITE_STORE=1 VITE_GOOGLE_CLIENT_ID=1093925806507-geheiusfcb8belpi6bdpl6p8afi74g99.apps.googleusercontent.com npm run build && npx cap sync android",
+    "android:bundle": "npm run android && cd android && ./gradlew bundleRelease"
   },
   "dependencies": {
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capgo/capacitor-social-login": "8.5.13",
+    "@capgo/native-purchases": "8.8.2",
     "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource-variable/figtree": "^5.3.0",
     "@fontsource-variable/ibm-plex-sans": "^5.3.0",
@@ -41,6 +48,9 @@
     "react-router-dom": "^7.6.0"
   },
   "devDependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/cli": "8.5.3",
+    "@capacitor/ios": "8.5.3",
     "@fontsource-variable/eb-garamond": "^5.3.0",
     "@fontsource-variable/newsreader": "^5.3.0",
     "@fontsource-variable/source-serif-4": "^5.3.0",

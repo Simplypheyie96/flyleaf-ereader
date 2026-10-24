@@ -6,6 +6,8 @@ import App from './App'
 import { initServiceWorker } from './pwa'
 import { startSeeding } from './seed'
 import { initOpenQueue } from './openQueue'
+import { nativeApp } from './native'
+import { refresh as refreshUnlock } from './unlock'
 import { Analytics } from '@vercel/analytics/react'
 
 /** The production host and Vercel's own previews, where the insights script
@@ -58,7 +60,15 @@ createRoot(document.getElementById('root')!).render(
 /* Importing ./pwa is itself load-bearing: the beforeinstallprompt listener
    goes on at module scope, and that event fires once, early. Register the
    worker from here too, so Settings has a registration to check. */
-initServiceWorker()
+if (!nativeApp) initServiceWorker()
+/* The store apps bundle their files and update through the store: no worker,
+   which would only serve an old copy after an update. They check the unlock
+   instead, against the store and the account. The class is for what only a
+   full-screen webview needs (the status bar's inset, index.css). */
+else {
+  document.documentElement.classList.add('native')
+  void refreshUnlock()
+}
 
 /* Sync, if it was ever turned on. Started after the app has settled, and the
    reason is timing rather than bundle size — Settings imports the panel

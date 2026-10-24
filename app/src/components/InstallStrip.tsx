@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { promptInstall, useInstall } from '../pwa'
+import { nativeApp } from '../native'
 import { remember, stored } from '../lib'
 import { CloseIcon } from './icons'
 
@@ -96,7 +97,7 @@ export function InstallStrip() {
   const [off, setOff] = useState(() => stored(KEY, ['on', 'off'] as const, 'on') === 'off')
 
   const copy = copyFor(install.canPrompt, install.manualOnly)
-  if (off || install.installed || !copy) return null
+  if (off || install.installed || !copy || nativeApp) return null
 
   const dismiss = () => {
     remember(KEY, 'off')

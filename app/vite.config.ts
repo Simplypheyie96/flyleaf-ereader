@@ -109,6 +109,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(COMMIT),
+    __STORE__: JSON.stringify(process.env.VITE_STORE === '1'),
   },
   plugins: [
     react(),

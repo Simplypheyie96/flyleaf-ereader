@@ -11,6 +11,8 @@ import type { BackupSummary, RestoreResult } from '../backup'
 import type { Settings } from '../types'
 import { LeaveIcon } from '../components/icons'
 import { SyncPanel } from '../components/SyncPanel'
+import { nativeApp } from '../native'
+import { locked, useUnlocked } from '../unlock'
 import { Tip } from '../components/Tip'
 import { Erase } from '../components/Erase'
 import { Fold } from '../components/Fold'
@@ -219,7 +221,7 @@ export function SettingsPage() {
                 type="button"
                 className="btn btn--ghost btn--sm btn--seg"
                 aria-pressed={settings.theme === t.id}
-                onClick={() => set({ theme: t.id })}
+                onClick={() => { if (t.id !== 'system' && locked()) return; set({ theme: t.id }) }}
               >
                 {/* The choice is a colour, so the control shows it. Named
                     alone, "Sepia" and "Ink" are guesses. */}
@@ -240,9 +242,12 @@ export function SettingsPage() {
             Above the apps panel rather than inside it, still: a jar is not a
             destination, and the one place it must not be is a row in a list of
             other places to go. */}
-        <Tip />
+        {/* The store apps pay through the store (App Store 3.1.1, Play
+            payments policy): the jar becomes the unlock, Supporter included,
+            and there is nothing to install. */}
+        {nativeApp ? <UnlockPanel /> : <Tip />}
 
-        <section className="panel">
+        {!nativeApp && <section className="panel">
           <p className="ui-lbl">This device</p>
           <p className="ui-p" style={{ marginTop: 8 }}>
             {install.installed
@@ -260,7 +265,7 @@ export function SettingsPage() {
               </button>
             </div>
           )}
-        </section>
+        </section>}
 
         <section className="panel">
           <p className="ui-lbl">Your library</p>
@@ -530,7 +535,7 @@ export function SettingsPage() {
           <p className="ui-p" style={{ marginTop: 8, fontFamily: 'var(--mono)', fontSize: 12.5 }}>
             {__APP_VERSION__} · {__APP_COMMIT__}
           </p>
-          <div className="set-acts">
+          {!nativeApp && <div className="set-acts">
             <button
               className="btn btn--ghost btn--sm"
               type="button"
@@ -548,10 +553,33 @@ export function SettingsPage() {
             >
               Check for updates
             </button>
-          </div>
+          </div>}
           {update && <p className="ui-p ui-p--soft" style={{ marginTop: 10 }}>{update}</p>}
         </section>
       </div>
     </main>
+  )
+}
+
+/* The store apps' place to buy or restore the unlock without first pressing
+   something locked. */
+function UnlockPanel() {
+  const done = useUnlocked()
+  return (
+    <section className="panel">
+      <p className="ui-lbl">Unlock</p>
+      <p className="ui-p" style={{ marginTop: 8 }}>
+        {done
+          ? 'Unlocked. Page stocks, themes, marks export and sync are open. Thank you.'
+          : 'Reading, places and highlights are free. One purchase opens page stocks, themes, marks export and sync.'}
+      </p>
+      {!done && (
+        <div className="set-acts">
+          <button className="btn btn--sm" type="button" onClick={() => locked()}>
+            Unlock or restore
+          </button>
+        </div>
+      )}
+    </section>
   )
 }

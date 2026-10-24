@@ -69,7 +69,7 @@ export function account(): string {
 /** Thrown when the server no longer knows the session. The only way out. */
 export const SIGNED_OUT = 'signed-out'
 
-async function call(path: string, init: RequestInit = {}): Promise<Response> {
+export async function call(path: string, init: RequestInit = {}): Promise<Response> {
   const s = session()
   if (!s) throw new Error(SIGNED_OUT)
   let res: Response
@@ -119,10 +119,12 @@ export async function googleButton(el: HTMLElement, done: (email: string) => voi
   })
 }
 
-async function exchange(credential: string): Promise<string> {
+/* `apple` only from the store apps (src/native.ts): same session, the server
+   checks Apple's ID token instead of Google's. */
+export async function exchange(credential: string, provider: 'google' | 'apple' = 'google'): Promise<string> {
   let res: Response
   try {
-    res = await fetch(`${API}/auth/google`, {
+    res = await fetch(`${API}/auth/${provider}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ credential, app: APP }),
@@ -130,7 +132,7 @@ async function exchange(credential: string): Promise<string> {
   } catch {
     throw new Error('Could not reach Flyleaf. Check your connection and try again.')
   }
-  if (!res.ok) throw new Error('Google signed you in, but Flyleaf could not. Try again.')
+  if (!res.ok) throw new Error(`${provider === 'apple' ? 'Apple' : 'Google'} signed you in, but Flyleaf could not. Try again.`)
   const { token, user } = (await res.json()) as { token: string; user: { email: string; name: string } }
   keep({ token, email: user.email, name: user.name })
   return user.email

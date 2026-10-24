@@ -49,3 +49,8 @@ DESIGN.md
 
 # Claude Code launch config stays local
 .claude/
+
+# Native shells: the upload key and machine paths never travel.
+app/android/keystore.properties
+app/android/*.jks
+app/android/*.keystore

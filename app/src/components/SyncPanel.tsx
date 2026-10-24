@@ -18,6 +18,9 @@ import {
   tooBig,
 } from '../sync/sync'
 import { GoogleButton } from './GoogleButton'
+import { NativeSignIn } from './NativeSignIn'
+import { nativeApp } from '../native'
+import { GATED, locked, unlocked, useUnlocked } from '../unlock'
 
 /* Sync across devices, as one settings panel.
 
@@ -81,6 +84,7 @@ export function SyncPanel() {
   /* The file pass, while it is running. Book files are the only part of a
      sync that takes long enough to need reporting. Null between passes. */
   const [moving, setMoving] = useState(syncProgress())
+  const open = useUnlocked()
 
   /* Held in state rather than read at render: setting states to the values
      they already hold makes React bail out, and a background sync must still
@@ -138,6 +142,9 @@ export function SyncPanel() {
      underneath it. */
   const connected = async () => {
     refresh()
+    /* Signed in on a store app that is not unlocked: the panel offers the
+       unlock, and nothing syncs until it is bought. */
+    if (GATED && !unlocked()) return
     setBusy('in')
     setErr('')
     setMsg('')
@@ -253,7 +260,36 @@ export function SyncPanel() {
     <section className="panel" id="sync">
       <p className="ui-lbl">Sync across devices</p>
 
-      {asking ? (
+      {GATED && !open ? (
+        <>
+          <p className="ui-p" style={{ marginTop: 8 }}>
+            Sync comes with the unlock: your shelf, highlights and places on every device, with up
+            to 1 GB of book files kept on Flyleaf’s servers, private to your account.
+          </p>
+          <div className="set-acts">
+            <button className="btn btn--sm" type="button" onClick={() => locked()}>
+              Unlock or restore
+            </button>
+          </div>
+          {on ? (
+            <p className="ui-p ui-p--soft" style={{ marginTop: 14 }}>
+              Signed in as {who}, which has not unlocked yet.{' '}
+              <button className="btn btn--ghost btn--sm" type="button" disabled={!!busy} onClick={() => void leave()}>
+                Sign out
+              </button>
+            </p>
+          ) : (
+            <>
+              <p className="ui-p ui-p--soft" style={{ marginTop: 14 }}>
+                Unlocked on another device? Sign in with the same account to bring it here.
+              </p>
+              <div style={{ marginTop: 12 }}>
+                <NativeSignIn onDone={() => void connected()} onError={fail} />
+              </div>
+            </>
+          )}
+        </>
+      ) : asking ? (
         /* ASKED IN THE PANEL, not over it. This app has no modal confirm, and
            the inline block is what a restore uses two panels down. */
         <div className="set-confirm">
@@ -331,7 +367,7 @@ export function SyncPanel() {
                 Signing in…
               </p>
             ) : (
-              <GoogleButton onDone={() => void connected()} onError={fail} />
+              nativeApp ? <NativeSignIn onDone={() => void connected()} onError={fail} /> : <GoogleButton onDone={() => void connected()} onError={fail} />
             )}
           </div>
         </>

@@ -13,6 +13,8 @@ import { PrivacyPage, TermsPage } from './pages/Legal'
 import { useSettings } from './db'
 import type { Settings } from './types'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { NativeShell } from './components/NativeShell'
+import { nativeApp } from './native'
 
 /* The chrome theme, resolved here so exactly one place decides it. 'system'
    follows the OS and keeps following it — a matchMedia listener rather than a
@@ -87,6 +89,7 @@ function Shell() {
       {/* The whole window is a drop target — inside the router, because a drop
           hands the file to /open the same way an OS launch does. */}
       <DropTarget />
+      {nativeApp && <NativeShell />}
     </>
   )
 }

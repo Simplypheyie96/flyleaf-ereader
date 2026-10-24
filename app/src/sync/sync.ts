@@ -43,6 +43,7 @@ import {
   unpackBook,
 } from './record'
 import type { Folded, MarksDoc, PlaceDoc, ShelfDoc } from './record'
+import { unlocked } from '../unlock'
 
 const SYNCED_AT_KEY = 'flyleaf-ereader-synced-at'
 /** `<rev> <signature>`: the account revision this device last matched, and
@@ -571,7 +572,8 @@ export function autoSyncPaused(): boolean {
    not one per caller: three triggers inside the same window still produce one
    sync, which is what the floor was for. */
 function attempt() {
-  if (!optedIn() || paused) return
+  /* In the store apps sync is part of the unlock (src/unlock.ts); always true on the web. */
+  if (!optedIn() || paused || !unlocked()) return
 
   const waited = Date.now() - lastRun
   if (waited < QUIET) {

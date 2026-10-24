@@ -54,6 +54,7 @@ import { SelectionHandles } from '../reader/SelectionHandles'
 import type { HandleEnd } from '../reader/SelectionHandles'
 import { OwnedSelection } from '../reader/selection'
 import { ExportSheet } from '../reader/ExportSheet'
+import { locked } from '../unlock'
 import { PdfSheet } from '../reader/pdf/PdfSheet'
 import { PdfView } from '../reader/pdf/PdfView'
 import type { PdfFound, PdfLocation, PdfPaintMark, PdfViewHandle } from '../reader/pdf/PdfView'
@@ -840,7 +841,7 @@ export function PdfReader() {
                     onEditNote={a => { setPanelOpen(false); setNoteFor(a) }}
                     onRemoveAnnotation={a => void removeAnnotation(a.id)}
                     onRemoveBookmark={b => void removeBookmark(b.id)}
-                    onExport={() => { setPanelOpen(false); setExportOpen(true) }}
+                    onExport={() => { if (locked()) return; setPanelOpen(false); setExportOpen(true) }}
                     onClose={() => { setPanelOpen(false); stopSearch() }}
                 />
             )}

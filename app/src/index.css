@@ -505,6 +505,9 @@ body::before{
   display:flex; flex-direction:column; align-items:center;
   overflow-x:clip;
 }
+/* The store apps draw under the status bar; a browser tab and the installed
+   PWA never do, so the web keeps its 28px. */
+.native .page{ padding-top:calc(28px + env(safe-area-inset-top)); }
  /* The measure lives HERE, on the container, and nowhere else.
 
     Two rounds of this went the other way — a per-paragraph cap, tuned from
@@ -3090,6 +3093,9 @@ body::before{
    short form with a decision in it. Copy first, because on iOS a download is a
    fight and copy is what most readers actually want. */
 .sheet.export{ padding:14px 16px calc(14px + env(safe-area-inset-bottom)); gap:12px; }
+/* The store apps' unlock sheet (components/NativeShell.tsx): the export sheet's
+   parts, pinned to the bottom of any screen rather than a row of the reader. */
+.sheet.unlock{ position:fixed; inset:auto 0 0; z-index:60; max-height:none; }
 .export-head{
   display:flex; align-items:baseline; gap:10px;
   margin:0;
