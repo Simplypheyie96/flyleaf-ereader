@@ -242,7 +242,7 @@ export function Sheet({ settings: s, lang, measureBites, emMeasure, onLive, onSe
                                     type="button"
                                     className="sheet-opt sheet-opt--stock"
                                     aria-pressed={s.stock === k.id}
-                                    onClick={() => { if (k.id !== 'day' && locked()) return; onSet({ stock: k.id }) }}
+                                    onClick={() => { if (__STORE__ && k.id !== 'day' && locked()) return; onSet({ stock: k.id }) }}
                                 >
                                     {/* The swatch carries data-stock, so its
                                         colour comes from the same block in

@@ -841,7 +841,7 @@ export function PdfReader() {
                     onEditNote={a => { setPanelOpen(false); setNoteFor(a) }}
                     onRemoveAnnotation={a => void removeAnnotation(a.id)}
                     onRemoveBookmark={b => void removeBookmark(b.id)}
-                    onExport={() => { if (locked()) return; setPanelOpen(false); setExportOpen(true) }}
+                    onExport={() => { if (__STORE__ && locked()) return; setPanelOpen(false); setExportOpen(true) }}
                     onClose={() => { setPanelOpen(false); stopSearch() }}
                 />
             )}

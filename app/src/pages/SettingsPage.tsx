@@ -221,7 +221,7 @@ export function SettingsPage() {
                 type="button"
                 className="btn btn--ghost btn--sm btn--seg"
                 aria-pressed={settings.theme === t.id}
-                onClick={() => { if (t.id !== 'system' && locked()) return; set({ theme: t.id }) }}
+                onClick={() => { if (__STORE__ && t.id !== 'system' && locked()) return; set({ theme: t.id }) }}
               >
                 {/* The choice is a colour, so the control shows it. Named
                     alone, "Sepia" and "Ink" are guesses. */}

@@ -41,7 +41,7 @@ function set(on: boolean) {
 
 export const unlocked = () => held
 
-export function useUnlocked(): boolean {
+function useHeld(): boolean {
   return useSyncExternalStore(
     (f) => {
       window.addEventListener(EVENT, f)
@@ -50,6 +50,8 @@ export function useUnlocked(): boolean {
     unlocked,
   )
 }
+/* A constant on the web build, so nothing of this module ships there. */
+export const useUnlocked: () => boolean = __STORE__ ? useHeld : () => true
 
 /** For a locked control's press: true (and the unlock sheet opens) when the
     feature is locked, so the caller returns instead of acting. */

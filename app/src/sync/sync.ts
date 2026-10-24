@@ -573,7 +573,7 @@ export function autoSyncPaused(): boolean {
    sync, which is what the floor was for. */
 function attempt() {
   /* In the store apps sync is part of the unlock (src/unlock.ts); always true on the web. */
-  if (!optedIn() || paused || !unlocked()) return
+  if (!optedIn() || paused || (__STORE__ && !unlocked())) return
 
   const waited = Date.now() - lastRun
   if (waited < QUIET) {

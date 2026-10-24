@@ -144,7 +144,7 @@ export function SyncPanel() {
     refresh()
     /* Signed in on a store app that is not unlocked: the panel offers the
        unlock, and nothing syncs until it is bought. */
-    if (GATED && !unlocked()) return
+    if (__STORE__ && GATED && !unlocked()) return
     setBusy('in')
     setErr('')
     setMsg('')
@@ -260,7 +260,7 @@ export function SyncPanel() {
     <section className="panel" id="sync">
       <p className="ui-lbl">Sync across devices</p>
 
-      {GATED && !open ? (
+      {__STORE__ && GATED && !open ? (
         <>
           <p className="ui-p" style={{ marginTop: 8 }}>
             Sync comes with the unlock: your shelf, highlights and places on every device, with up

@@ -127,7 +127,7 @@ export function PdfSheet({ settings: s, zoom, spreadOk, onZoom, onLive, onSet }:
                             type="button"
                             className="sheet-opt sheet-opt--stock"
                             aria-pressed={s.stock === k.id}
-                            onClick={() => { if (k.id !== 'day' && locked()) return; onSet({ stock: k.id }) }}
+                            onClick={() => { if (__STORE__ && k.id !== 'day' && locked()) return; onSet({ stock: k.id }) }}
                         >
                             <span className="sheet-sw" data-stock={k.id} aria-hidden="true" />
                             {k.label}
