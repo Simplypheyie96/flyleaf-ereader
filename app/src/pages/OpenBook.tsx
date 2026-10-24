@@ -189,9 +189,9 @@ export function OpenBook() {
         <section className="drop drop--link">
           <LinkIcon />
           <p className="ui-p drop-lead">
-            Or paste a link to an article. It is fetched once, stripped to its
-            text and pictures, and kept here — after that it opens offline like
-            any other book.
+            Or paste a link — to an article, or straight to a PDF or EPUB. It is
+            fetched once and kept here, and after that it opens offline like any
+            other book.
           </p>
           <form
             className="link-row"
@@ -202,7 +202,7 @@ export function OpenBook() {
             }}
           >
             <label className="sr-only" htmlFor="article-url">
-              The web address of an article to read
+              The web address of an article or a book file
             </label>
             {/* type="url" and not type="text": it is what puts the slash and
                 the dot on an iOS keyboard, and what lets the browser offer an
