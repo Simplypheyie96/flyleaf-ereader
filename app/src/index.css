@@ -508,6 +508,15 @@ body::before{
 /* The store apps draw under the status bar; a browser tab and the installed
    PWA never do, so the web keeps its 28px. */
 .native .page{ padding-top:calc(28px + env(safe-area-inset-top)); }
+/* A status column down the right edge (iPhone Duo) keeps its clock and camera in
+   the top corner; the page flows round that corner and uses the rest of the column. */
+@media (orientation:portrait){
+  .native{ --cw:var(--safe-area-inset-right, env(safe-area-inset-right, 0px)); --ch:calc(var(--cw) * 1.9); }
+  .native .page-inner:not(:has(> .empty))::before{ content:""; float:right; width:var(--cw); height:calc(var(--ch) - 28px - env(safe-area-inset-top)); margin-left:8px; }
+  .native .statcard{ display:flow-root; }
+  /* Paginated text can't flow round a corner, so the reader alone keeps off the column. */
+  .native .reader{ padding-right:var(--cw); }
+}
  /* The measure lives HERE, on the container, and nowhere else.
 
     Two rounds of this went the other way — a per-paragraph cap, tuned from

@@ -23,12 +23,15 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 }
 
-/// Holds the app inside the screen's side safe areas (a status column down one edge,
-/// or the notch in landscape). Top and bottom stay full-bleed: the web pads those itself
-/// with env(safe-area-inset-*). The strips beside the app take the page's own background.
+/// In landscape, holds the app inside the side safe areas (the notch). In portrait the app
+/// stays full-bleed; a status column down one edge (iPhone Duo) reaches the web as
+/// env(safe-area-inset-right), and the web keeps only its top row clear of it.
+/// The strips beside the app take the page's own background.
 final class SafeSidesViewController: UIViewController {
     private let bridge: CAPBridgeViewController
     private var background: NSKeyValueObservation?
+    private var full: [NSLayoutConstraint] = []
+    private var safe: [NSLayoutConstraint] = []
 
     init(_ bridge: CAPBridgeViewController) {
         self.bridge = bridge
@@ -46,12 +49,24 @@ final class SafeSidesViewController: UIViewController {
         NSLayoutConstraint.activate([
             app.topAnchor.constraint(equalTo: view.topAnchor),
             app.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            app.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
-            app.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
         ])
+        full = [app.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                app.trailingAnchor.constraint(equalTo: view.trailingAnchor)]
+        safe = [app.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+                app.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor)]
+        NSLayoutConstraint.activate(full)
         bridge.didMove(toParent: self)
         background = bridge.webView?.observe(\.underPageBackgroundColor, options: [.initial, .new]) { [weak self] webView, _ in
             self?.view.backgroundColor = webView.underPageBackgroundColor
+        }
+    }
+
+    override func viewWillLayoutSubviews() {
+        super.viewWillLayoutSubviews()
+        let landscape = view.bounds.width > view.bounds.height
+        if landscape != safe.first!.isActive {
+            NSLayoutConstraint.deactivate(landscape ? full : safe)
+            NSLayoutConstraint.activate(landscape ? safe : full)
         }
     }
 
