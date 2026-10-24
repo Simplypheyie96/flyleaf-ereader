@@ -10,9 +10,11 @@ import { parseHTML } from 'linkedom'
    fetch on the reader's behalf.
 
    What it is NOT is a general proxy. It takes a URL, fetches the page, runs
-   Readability over it, inlines the images, and hands back clean HTML. It does
-   not log, does not store, does not authenticate, and holds no secret to leak.
-   The whole of its state is the request it is currently serving.
+   Readability over it, inlines the images, and hands back clean HTML — or, when
+   the link is a book file rather than a page, relays that file and nothing
+   else (see "book links" below). It does not log, does not store, does not
+   authenticate, and holds no secret to leak. The whole of its state is the
+   request it is currently serving.
 
    Once the article is back, the app writes it to IndexedDB like any other
    import and never speaks to this function again. That is what keeps the
@@ -32,6 +34,18 @@ const UA =
    platform's own ceiling. */
 const FETCH_TIMEOUT_MS = 15_000
 const IMAGE_TIMEOUT_MS = 8_000
+
+/* A book link is different: the body is relayed to the phone as it arrives,
+   so the download runs at the reader's speed, not the origin's, and 40MB on a
+   bad connection is well past the 15 seconds an article gets. Started when the
+   response turns out to be a book, and still inside the platform's ceiling. */
+const BOOK_TIMEOUT_MS = 120_000
+
+/* What a book link may weigh. Larger than any page, because a PDF with
+   scanned plates is routinely tens of megabytes, and still a cap: this relays
+   bytes it has only glanced at, and a limit is what keeps that from being a
+   general download service. */
+const MAX_BOOK_BYTES = 60 * 1024 * 1024
 
 /* A page bigger than this is not an article. The cap is on what we read, not
    on what the origin claims in Content-Length — a lying header is exactly the
@@ -107,14 +121,18 @@ function safeUrl(raw: string): URL | null {
 /* ------------------------------------------------------------------ fetch --
 
    Redirects are followed by hand rather than by `redirect: 'follow'` so that
-   every hop goes back through `safeUrl`. */
-async function fetchGuarded(start: URL, accept: string, timeoutMs: number): Promise<Response> {
+   every hop goes back through `safeUrl`.
+
+   The signal is the caller's, not made here, because it also governs reading
+   the body — and only the caller knows, once it has seen the headers, whether
+   that body is a page to read in a few seconds or a book to relay for a
+   minute. */
+async function fetchGuarded(start: URL, accept: string, signal: AbortSignal): Promise<Response> {
     let url = start
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-        const stop = AbortSignal.timeout(timeoutMs)
         const res = await fetch(url.toString(), {
             redirect: 'manual',
-            signal: stop,
+            signal,
             headers: { 'user-agent': UA, accept, 'accept-language': 'en,*;q=0.5' },
         })
         if (res.status >= 300 && res.status < 400) {
@@ -319,7 +337,7 @@ async function inlineImages(root: Element, base: URL): Promise<{ used: number; d
         }
 
         try {
-            const res = await fetchGuarded(target, 'image/*', IMAGE_TIMEOUT_MS)
+            const res = await fetchGuarded(target, 'image/*', AbortSignal.timeout(IMAGE_TIMEOUT_MS))
             const type = (res.headers.get('content-type') ?? '').split(';')[0].trim()
             if (!res.ok || !IMAGE_TYPES.test(type)) throw new Error('not an image')
             const bytes = await readCapped(res, MAX_IMAGE_BYTES)
@@ -469,6 +487,146 @@ function embeddedBody(document: Document): Embedded | null {
     return null
 }
 
+/* ------------------------------------------------------------ book links --
+
+   A link that answers with a file rather than a page: a PDF on a university
+   site, an EPUB on a publisher's download server. The browser could import it
+   if it could reach it, and it cannot, for the same CORS reason it cannot
+   reach an article — so the bytes come through here, untouched.
+
+   Relayed as a stream, not read into memory and sent back whole: a function's
+   buffered response is capped at 4.5MB on this platform, which is less than a
+   good many books, and a streamed one is not.
+
+   Which makes the first bytes the gate. The function passes on nothing until
+   it has seen a book's signature — the same four the app's own sniff starts
+   from — so a link to an installer or a video is refused here rather than
+   carried to the phone to be refused there. A zip passes, because a book in a
+   zip is how most downloads arrive and `src/import` unwraps one; anything
+   else in a zip is refused on the device, by the code that already knows how
+   to say what it is. */
+const BOOK_HEAD = 1024
+
+function looksLikeBook(head: Uint8Array): boolean {
+    const text = new TextDecoder('latin1').decode(head.subarray(0, BOOK_HEAD))
+    return (
+        text.includes('%PDF-') ||
+        text.startsWith('PK\x03\x04') ||
+        text.slice(60, 68) === 'BOOKMOBI' ||
+        /<FictionBook[\s>]/i.test(text)
+    )
+}
+
+/** What the file should be called on the shelf until its own metadata says
+    otherwise. The server's name for it if it gave one, the last segment of the
+    address if not. A PDF with no title in it is shelved under this. */
+function bookFileName(res: Response, url: URL): string {
+    const disposition = res.headers.get('content-disposition') ?? ''
+    const encoded = disposition.match(/filename\*\s*=\s*[\w-]*'[^']*'([^;]+)/i)?.[1]
+    const plain = disposition.match(/filename\s*=\s*"?([^";]+)"?/i)?.[1]
+    const segment = url.pathname.split('/').filter(Boolean).pop() ?? ''
+    let name = ''
+    for (const raw of [encoded, plain, segment]) {
+        if (!raw) continue
+        try {
+            name = decodeURIComponent(raw.trim())
+        } catch {
+            name = raw.trim()
+        }
+        if (name) break
+    }
+    return name.replace(/[\\/\u0000-\u001f]/g, ' ').trim().slice(0, 120) || 'Book'
+}
+
+/** Relay a book, or refuse it before a byte has been sent. */
+async function relayBook(
+    res: Response,
+    type: string,
+    finalUrl: URL,
+    abort: AbortController,
+    json: (body: unknown, status?: number) => Response,
+): Promise<Response> {
+    const declared = Number(res.headers.get('content-length') ?? 0)
+    if (declared > MAX_BOOK_BYTES) {
+        await res.body?.cancel()
+        return json({ error: 'That file is too large to fetch here. Download it and import it with Choose a file.' }, 413)
+    }
+
+    const timer = setTimeout(() => abort.abort(), BOOK_TIMEOUT_MS)
+    const reader = res.body?.getReader()
+    const head: Uint8Array[] = []
+    let size = 0
+    let done = !reader
+    while (!done && size < BOOK_HEAD) {
+        const next = await reader!.read()
+        done = next.done
+        if (next.value) {
+            head.push(next.value)
+            size += next.value.length
+        }
+    }
+    const first = new Uint8Array(size)
+    let at = 0
+    for (const chunk of head) {
+        first.set(chunk, at)
+        at += chunk.length
+    }
+    if (!looksLikeBook(first)) {
+        clearTimeout(timer)
+        await reader?.cancel()
+        return json({ error: `That link is ${type || 'a file'}, which is neither an article nor a book this can read.` }, 415)
+    }
+
+    /* Counted as it goes, not trusted from the header: a missing or lying
+       Content-Length is exactly the case the cap is for. Over it, the stream
+       errors and the phone's read fails — the status has already been sent,
+       so a broken stream is the only way left to say no. */
+    const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+            controller.enqueue(first)
+            if (done) {
+                clearTimeout(timer)
+                controller.close()
+            }
+        },
+        async pull(controller) {
+            try {
+                const next = await reader!.read()
+                if (next.done) {
+                    clearTimeout(timer)
+                    controller.close()
+                    return
+                }
+                size += next.value.length
+                if (size > MAX_BOOK_BYTES) throw new Error('over the cap')
+                controller.enqueue(next.value)
+            } catch (err) {
+                clearTimeout(timer)
+                await reader!.cancel().catch(() => {})
+                controller.error(err)
+            }
+        },
+        async cancel() {
+            clearTimeout(timer)
+            await reader?.cancel().catch(() => {})
+        },
+    })
+
+    return new Response(body, {
+        headers: {
+            /* Octet-stream whatever the origin said: the app sniffs the bytes
+               itself, and nothing about this response should invite a browser
+               to render it. */
+            'content-type': 'application/octet-stream',
+            'cache-control': 'no-store',
+            'referrer-policy': 'no-referrer',
+            'x-content-type-options': 'nosniff',
+            'x-flyleaf-file-name': encodeURIComponent(bookFileName(res, finalUrl)),
+            'x-flyleaf-url': encodeURIComponent(finalUrl.toString()),
+        },
+    })
+}
+
 /* Online readers for books, as opposed to pages with an article on them.
 
    BookFunnel's "Read Now" link is the one people actually paste: it is what an
@@ -522,8 +680,17 @@ export default {
             return json({ error: 'That does not look like a web address this can open.' }, 400)
         }
 
+        /* One controller for the whole request, so that the deadline can be
+           moved once the headers say what is coming. An article keeps the
+           fifteen seconds it always had; a book gets its own, in relayBook. */
+        const abort = new AbortController()
+        const articleTimer = setTimeout(() => abort.abort(), FETCH_TIMEOUT_MS)
+
         try {
-            const res = await fetchGuarded(url, 'text/html,application/xhtml+xml', FETCH_TIMEOUT_MS)
+            /* The page first, and anything at all a distant second: a server
+               that offers both should hand over the article, and one holding
+               only a PDF should not answer 406 for want of being asked. */
+            const res = await fetchGuarded(url, 'text/html,application/xhtml+xml,*/*;q=0.1', abort.signal)
             if (!res.ok) {
                 return json(
                     {
@@ -536,12 +703,13 @@ export default {
                 )
             }
             const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+            const finalUrl = new URL(res.url || url.toString())
             if (type && !/^(text\/html|application\/xhtml\+xml|text\/plain)$/.test(type)) {
-                return json({ error: `That link is ${type}, not an article. Save it and import the file instead.` }, 415)
+                clearTimeout(articleTimer)
+                return await relayBook(res, type, finalUrl, abort, json)
             }
 
             const bytes = await readCapped(res, MAX_PAGE_BYTES)
-            const finalUrl = new URL(res.url || url.toString())
             const html = decode(bytes, res.headers.get('content-type'))
 
             /* Readability wants a document that knows where it came from, so
@@ -661,6 +829,8 @@ ${root.innerHTML}
             /* A timeout, a DNS failure, a TLS error. The reader does not need
                the distinction and the message must not leak our internals. */
             return json({ error: 'That page could not be reached.' }, 502)
+        } finally {
+            clearTimeout(articleTimer)
         }
     },
 }
