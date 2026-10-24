@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Flyleaf eReader feature graphic</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500&family=IBM+Plex+Mono:wght@500&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}
+body{background:#cfccc6;padding:24px;display:grid;gap:24px;justify-content:center;font-family:"Archivo",system-ui,sans-serif}
+.fg{width:1024px;height:500px;position:relative;overflow:hidden;color:#1B1917}
+.lock{display:flex;align-items:center;gap:14px}
+.ic{flex:none;fill:currentColor;width:52px;height:52px}
+img.ic{border-radius:12px}
+.name{font-family:"Playfair Display",Georgia,serif;font-weight:600;font-size:52px;line-height:1;letter-spacing:-.015em}
+.in{position:absolute;left:64px;top:0;bottom:0;width:360px;display:flex;flex-direction:column;justify-content:center;gap:22px}
+.in p{font-size:23px;font-weight:500;line-height:1.35;color:#5c574f}
+.ph{position:absolute;border-radius:30px;border:6px solid #1B1917;box-shadow:0 0 0 1px rgba(255,255,255,.18),0 24px 48px rgba(10,10,20,.28)}
+/* A · one big phone, a real piece of it lifted out */
+.a{background:#F4F2ED}
+.a .hero{left:660px;top:56px;width:300px}
+.a .float{position:absolute;left:452px;bottom:44px;width:300px;border-radius:14px;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 18px 36px rgba(10,10,20,.22);transform:rotate(-3deg);z-index:2}
+/* B · three phones fanned */
+.b{background:#F6EBD9;color:#1B1917}.b .in p{color:#5c574f}
+.b .ph{width:208px}
+.p1{left:470px;top:96px;transform:rotate(-6deg)}
+.p2{left:640px;top:48px;z-index:2}
+.p3{left:786px;top:110px;transform:rotate(6deg)}
+/* C · brand strip over four phones */
+.c{background:#F4F2ED}
+.strip{position:absolute;left:0;right:0;top:0;height:96px;background:#1C5480;color:#F4F2ED;display:flex;align-items:center;justify-content:space-between;padding:0 64px}
+.strip .ic{width:40px;height:40px}.strip .name{font-size:36px}
+.strip>span{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:14px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;opacity:.85}
+.c .ph{width:200px;top:132px}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute"><symbol id="mark" viewBox="0 0 512 512"><path d="M256 57.6 A74.67 59.73 -90 1 1 256 206.93 A74.67 59.73 -90 1 1 256 57.6 Z M444.69 194.69 A74.67 59.73 -18 1 1 302.66 240.85 A74.67 59.73 -18 1 1 444.69 194.69 Z M372.61 416.51 A74.67 59.73 54 1 1 284.84 295.68 A74.67 59.73 54 1 1 372.61 416.51 Z M139.39 416.51 A74.67 59.73 126 1 1 227.16 295.68 A74.67 59.73 126 1 1 139.39 416.51 Z M67.31 194.69 A74.67 59.73 198 1 1 209.34 240.85 A74.67 59.73 198 1 1 67.31 194.69 Z M217.6 256 A38.4 38.4 0 1 1 294.4 256 A38.4 38.4 0 1 1 217.6 256 Z"/></symbol></svg>
+<section class="fg a" id="a"><div class="in"><div class="lock "><svg class="ic"><use href="#mark"/></svg><span class="name">Flyleaf eReader</span></div><p>A quiet reader for your own EPUB and PDF books.</p></div><img class="ph hero" src="er-2.jpg" alt=""><img class="float" src="er-float.jpg" alt=""></section>
+<section class="fg b" id="b"><div class="in"><div class="lock "><svg class="ic"><use href="#mark"/></svg><span class="name">Flyleaf eReader</span></div><p>A quiet reader for your own EPUB and PDF books.</p></div><img class="ph p1" src="er-1.jpg" alt=""><img class="ph p2" src="er-3.jpg" alt=""><img class="ph p3" src="er-8.jpg" alt=""></section>
+<section class="fg c" id="c"><div class="strip"><div class="lock "><svg class="ic"><use href="#mark"/></svg><span class="name">Flyleaf eReader</span></div><span>EPUB · PDF · seven page stocks</span></div><img class="ph" style="left:64px" src="er-1.jpg" alt=""><img class="ph" style="left:296px" src="er-2.jpg" alt=""><img class="ph" style="left:528px" src="er-7b.jpg" alt=""><img class="ph" style="left:760px" src="er-8.jpg" alt=""></section>
+</body></html>
