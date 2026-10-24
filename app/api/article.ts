@@ -469,6 +469,23 @@ function embeddedBody(document: Document): Embedded | null {
     return null
 }
 
+/* Online readers for books, as opposed to pages with an article on them.
+
+   BookFunnel's "Read Now" link is the one people actually paste: it is what an
+   author sends instead of a file. The page is an empty shell that a script
+   fills with the book from BookFunnel's own servers, so Readability finds
+   nothing — and the generic 422 then blames a front page or a feed, which
+   tells the reader nothing about what to do. The book is not in the markup to
+   be rescued the way a Substack post is; what helps is saying where the file
+   is. Checked against the final URL, so a download link that redirects into
+   the reader is caught too. */
+function readerAppMessage(url: URL): string | null {
+    if (/(^|\.)bookfunnel\.com$/i.test(url.hostname)) {
+        return 'that is BookFunnel’s online reader, which shows the book inside its own app and never puts the file in the page. Open the BookFunnel email or download page for this book, download it as EPUB or PDF, and import that file with Choose a file.'
+    }
+    return null
+}
+
 export default {
     async fetch(request: Request): Promise<Response> {
         const json = (body: unknown, status = 200) =>
@@ -570,6 +587,8 @@ export default {
             const embedded = foundText.length < THIN_ARTICLE ? carried : null
 
             if (!embedded && foundText.length < THIN_ARTICLE) {
+                const reader = readerAppMessage(finalUrl)
+                if (reader) return json({ error: reader }, 422)
                 return json(
                     { error: 'There was no article on that page — it may be a front page, a feed, built entirely in JavaScript, or a post too short to tell apart from the page around it.' },
                     422,
