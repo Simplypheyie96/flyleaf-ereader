@@ -232,6 +232,15 @@ export async function fetchMedia(hash: string): Promise<Blob | null> {
   return new Blob([await res.arrayBuffer()])
 }
 
+/** Close the Flyleaf account: every app's copy, its media, the purchase records
+    (the store keeps the purchase, so Restore brings it back), every session. */
+export async function deleteAccount() {
+  const res = await call('/me', { method: 'DELETE' })
+  if (!res.ok) throw new Error('That could not be deleted. Try again.')
+  window.google?.accounts?.id?.disableAutoSelect()
+  keep(null)
+}
+
 /** Delete the library and every book file from the account. */
 export async function drop() {
   const res = await call(`/doc/${APP}`, { method: 'DELETE' })

@@ -3,6 +3,7 @@ import { SYNC_EVENT, optedIn as usedDrive, warmUp } from '../sync/google'
 import { SYNC_AVAILABLE, account, optedIn, signOut } from '../sync/cloud'
 import {
   bringTogether,
+  forgetAccount,
   forgetCopy,
   forgetDrive,
   fromDrive,
@@ -80,7 +81,7 @@ export function SyncPanel() {
   const [asking, setAsking] = useState<{ device: string; at: number } | null>(null)
   /* Which irreversible button has been pressed once. The second press is in
      the inline confirm, where the sentence explaining it lands. */
-  const [sure, setSure] = useState<'copy' | 'drive' | null>(null)
+  const [sure, setSure] = useState<'copy' | 'account' | 'drive' | null>(null)
   /* The file pass, while it is running. Book files are the only part of a
      sync that takes long enough to need reporting. Null between passes. */
   const [moving, setMoving] = useState(syncProgress())
@@ -212,6 +213,20 @@ export function SyncPanel() {
       setSure(null)
       refresh()
       say('Removed from Flyleaf. This device is signed out, and every book on it remains here.')
+    } catch (e) {
+      fail(e)
+    } finally {
+      setBusy('')
+    }
+  }
+
+  const dropAccount = async () => {
+    setBusy('account')
+    try {
+      await forgetAccount()
+      setSure(null)
+      refresh()
+      say('Your Flyleaf account is deleted. This device is signed out, and every book on it remains here.')
     } catch (e) {
       fail(e)
     } finally {
@@ -420,6 +435,35 @@ export function SyncPanel() {
               </button>
             )}
           </div>
+          {/* The store apps must let a reader close the account they made there. */}
+          {nativeApp && (
+            <div className="set-row set-row--stack">
+              <div className="set-row-txt">
+                <div className="ui-lbl">Delete my Flyleaf account</div>
+                <p>
+                  Closes your account for eReader, Journal and Press and signs this device out.
+                  Every book stays on this device, and a purchase comes back with Restore.
+                </p>
+              </div>
+              {sure === 'account' ? (
+                <div className="set-confirm">
+                  <p className="ui-p">This cannot be undone.</p>
+                  <div className="set-acts" style={{ marginTop: 14 }}>
+                    <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => void dropAccount()}>
+                      {busy === 'account' ? 'Deleting…' : 'Yes, delete it'}
+                    </button>
+                    <button className="btn btn--ghost btn--sm" type="button" disabled={!!busy} onClick={() => setSure(null)}>
+                      Keep it
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => setSure('account')}>
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

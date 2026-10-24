@@ -190,6 +190,17 @@ export function PrivacyPage() {
               Google Drive copy", shown only if you used the older Drive sync,
               deletes only the files that version put in its hidden folder.
             </dd>
+            <dt>Delete your Flyleaf account</dt>
+            <dd>
+              The account is the one sign-in eReader, Journal and Press share. In
+              the App Store or Google Play app, "Delete my Flyleaf account" under
+              Settings → Sync across devices deletes it, everything it holds for all three apps, its
+              sign-ins and its purchase records, and signs the device out. Without
+              the app, write to <a href="mailto:support@feyidesigns.com">support@feyidesigns.com</a>{' '}
+              from the address you signed in with and it is deleted within 30
+              days. A purchase stays yours with the store and comes back with
+              Restore.
+            </dd>
             <dt>Take your data with you</dt>
             <dd>
               Export a backup from Settings at any time. It is a single file

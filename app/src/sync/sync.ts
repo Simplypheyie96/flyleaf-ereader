@@ -24,7 +24,7 @@ import { deviceName } from './device'
 import { dropAll, listFolder, readBlob, readText } from './drive'
 import type { DriveFile } from './drive'
 import { SYNC_EVENT, signIn, signOut as driveSignOut, silentToken } from './google'
-import { SIGNED_OUT, drop, fetchMedia, missing, optedIn, peek, pull, push, putMedia } from './cloud'
+import { SIGNED_OUT, deleteAccount, drop, fetchMedia, missing, optedIn, peek, pull, push, putMedia } from './cloud'
 import {
   MARKS,
   PLACE,
@@ -440,10 +440,19 @@ export async function bringTogether(): Promise<SyncResult> {
 /** Take the library out of the account. The caller signs out in the same
     press: still signed in, this device would put it straight back. Nothing on
     the device is touched — this removes the copy, not the library. */
-export async function forgetCopy(): Promise<void> {
+export function forgetCopy(): Promise<void> {
+  return forget(drop)
+}
+
+/** The same for the whole account, which also signs this device out. */
+export function forgetAccount(): Promise<void> {
+  return forget(deleteAccount)
+}
+
+async function forget(remove: () => Promise<void>): Promise<void> {
   pauseAutoSync()
   try {
-    await drop()
+    await remove()
     put(MARK_KEY, '')
     put(FILES_KEY, '')
     put(FULL_KEY, '')
