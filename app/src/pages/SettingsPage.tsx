@@ -11,7 +11,7 @@ import type { BackupSummary, RestoreResult } from '../backup'
 import type { Settings } from '../types'
 import { LeaveIcon } from '../components/icons'
 import { SyncPanel } from '../components/SyncPanel'
-import { nativeApp } from '../native'
+import { nativeApp, shareFile } from '../native'
 import { locked, useUnlocked } from '../unlock'
 import { Tip } from '../components/Tip'
 import { Erase } from '../components/Erase'
@@ -168,11 +168,14 @@ export function SettingsPage() {
          would be the nicer path, but it is Chromium-only and this one is the same
          two lines everywhere — and on iOS, where a backup matters most because the
          storage is the most likely to be evicted, it is the only one there is. */
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = name
-      document.body.append(a); a.click(); a.remove()
-      requestAnimationFrame(() => URL.revokeObjectURL(url))
+      if (nativeApp) await shareFile(blob, name)
+      else {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url; a.download = name
+        document.body.append(a); a.click(); a.remove()
+        requestAnimationFrame(() => URL.revokeObjectURL(url))
+      }
       setWrote(`${name} · ${summary.books} ${summary.books === 1 ? 'book' : 'books'} · ${bytes(blob.size)}`)
     } catch {
       setRefused('The backup could not be written. If the device is very low on space, freeing some and trying again is the fix.')

@@ -132,3 +132,29 @@ export async function restore(): Promise<Receipt[]> {
   await NativePurchases.restorePurchases()
   return owned()
 }
+
+const cancelled = (e: unknown) => /cancel/i.test(`${(e as { code?: string })?.code} ${(e as Error)?.message}`)
+
+function base64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+}
+
+/** A webview cannot download, so in the store app a file goes to the share
+    sheet instead (Save to Files, Drive, mail). Backing out of it is not a failure. */
+export async function shareFile(blob: Blob, name: string): Promise<void> {
+  const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+    import('@capacitor/filesystem'),
+    import('@capacitor/share'),
+  ])
+  const { uri } = await Filesystem.writeFile({ path: name, data: await base64(blob), directory: Directory.Cache })
+  try {
+    await Share.share({ files: [uri], title: name })
+  } catch (e) {
+    if (!cancelled(e)) throw e
+  }
+}

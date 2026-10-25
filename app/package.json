@@ -21,6 +21,8 @@
   "dependencies": {
     "@capacitor/app": "8.1.2",
     "@capacitor/core": "8.5.3",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/share": "8.0.3",
     "@capgo/capacitor-social-login": "8.5.13",
     "@capgo/native-purchases": "8.8.2",
     "@fontsource-variable/dm-sans": "^5.3.0",
