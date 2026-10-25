@@ -8,6 +8,7 @@ import { Cover } from '../components/Cover'
 import { InstallStrip } from '../components/InstallStrip'
 import { GridIcon, HomeIcon, ListIcon, SpinnerIcon, StatsIcon } from '../components/icons'
 import type { Book, Locator } from '../types'
+import { APP_NAME } from '../native'
 
 /* ── Home ─────────────────────────────────────────────────────────────────
    The first screen. It answers one question — "what am I reading?" — and then
@@ -115,7 +116,7 @@ export function Home() {
     <main className="page">
       <div className="page-inner">
         <header className="app-head">
-          <h1>Flyleaf eReader</h1>
+          <h1>{APP_NAME}</h1>
           <p className="app-sub">{greeting(feed)}</p>
         </header>
 

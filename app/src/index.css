@@ -3104,7 +3104,7 @@ body::before{
 .sheet.export{ padding:14px 16px calc(14px + env(safe-area-inset-bottom)); gap:12px; }
 /* The store apps' unlock sheet (components/NativeShell.tsx): the export sheet's
    parts, pinned to the bottom of any screen rather than a row of the reader. */
-.sheet.unlock{ position:fixed; inset:auto 0 0; z-index:60; max-height:none; }
+.sheet.unlock{ position:fixed; inset:auto 0 0; z-index:60; max-height:none; background:var(--stock-bg, var(--paper)); }
 .export-head{
   display:flex; align-items:baseline; gap:10px;
   margin:0;

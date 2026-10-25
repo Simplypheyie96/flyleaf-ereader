@@ -11,7 +11,7 @@ import type { BackupSummary, RestoreResult } from '../backup'
 import type { Settings } from '../types'
 import { LeaveIcon } from '../components/icons'
 import { SyncPanel } from '../components/SyncPanel'
-import { nativeApp, shareFile } from '../native'
+import { APP_NAME, nativeApp, shareFile } from '../native'
 import { locked, useUnlocked } from '../unlock'
 import { Tip } from '../components/Tip'
 import { Erase } from '../components/Erase'
@@ -207,7 +207,7 @@ export function SettingsPage() {
       <div className="page-inner">
         <header className="app-head">
           <h1>Settings</h1>
-          <span>Flyleaf eReader</span>
+          <span>{APP_NAME}</span>
         </header>
 
         <section className="panel">
