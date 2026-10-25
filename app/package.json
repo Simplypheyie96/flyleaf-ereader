@@ -14,7 +14,7 @@
     "preview": "vite preview",
     "icons": "node scripts/make-icons.mjs",
     "audit:measure": "vite build && node audit/measure.mjs",
-    "ios": "VITE_STORE=1 VITE_GOOGLE_CLIENT_ID=1093925806507-geheiusfcb8belpi6bdpl6p8afi74g99.apps.googleusercontent.com npm run build && npx cap sync ios",
+    "ios": "VITE_STORE=1 VITE_GOOGLE_IOS=1093925806507-2tcu466e0ot0o7lspmlk3vmb1vcr0ool.apps.googleusercontent.com VITE_GOOGLE_CLIENT_ID=1093925806507-geheiusfcb8belpi6bdpl6p8afi74g99.apps.googleusercontent.com npm run build && npx cap sync ios",
     "android": "VITE_STORE=1 VITE_GOOGLE_CLIENT_ID=1093925806507-geheiusfcb8belpi6bdpl6p8afi74g99.apps.googleusercontent.com npm run build && npx cap sync android",
     "android:bundle": "npm run android && cd android && ./gradlew bundleRelease"
   },
