@@ -77,7 +77,7 @@ export function PrivacyPage() {
             </dd>
             <dt>What is counted, and what is not</dt>
             <dd>
-              Vercel, which hosts this app, counts page views: a visit, the page
+              On the website, Vercel, which hosts it, counts page views: a visit, the page
               shape, a rough country, and where the visit came from. It sets no
               cookie and builds no profile of you. Before anything is sent, the
               two addresses that carry a book's identity are rewritten to
@@ -85,7 +85,7 @@ export function PrivacyPage() {
               say a book was opened, and never which one. There is no crash
               reporting, no advertising identifier and no other third-party
               script on the page, and nothing about your library is ever part
-              of the count.
+              of the count. The App Store and Google Play apps send no count at all.
             </dd>
             <dt>If you sign in to sync</dt>
             <dd>
@@ -119,10 +119,11 @@ export function PrivacyPage() {
           <p className="ui-lbl">When this app talks to the internet</p>
           <p className="ui-p ui-p--soft" style={{ marginTop: 8 }}>
             Six occasions, and this is the complete list. Five of them are
-            optional; the page-view count is the one that is not.
+            optional; the page-view count on the website is the one that is not,
+            and the store apps never send it.
           </p>
           <dl className="fine">
-            <dt>The page-view count — always on</dt>
+            <dt>The page-view count — website only</dt>
             <dd>
               Each page you open sends Vercel one measurement, described in full
               under "What is counted, and what is not" above. It is the only part
@@ -132,11 +133,16 @@ export function PrivacyPage() {
             </dd>
             <dt>Syncing — only if you sign in</dt>
             <dd>
-              Google signs you in, under{' '}
+              Google or Apple signs you in, under{' '}
               <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">
-                its privacy policy
-              </a>
-              , and tells the app only your name and email address. From then on
+                Google's
+              </a>{' '}
+              or{' '}
+              <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener noreferrer">
+                Apple's
+              </a>{' '}
+              privacy policy, and tells the app only your name and email address
+              (Apple can give a private relay address instead of your own). From then on
               the app talks to Flyleaf's own server at api.flyleaf.cc, run on{' '}
               <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">
                 Cloudflare
@@ -274,7 +280,7 @@ export function TermsPage() {
             </dd>
             <dt>Sync, if you sign in</dt>
             <dd>
-              Signing in with Google keeps your library on Flyleaf's servers so it
+              Signing in with Google or Apple keeps your library on Flyleaf's servers so it
               follows you between devices. It is free and offered as it is: a book
               file over 25 MB stays on the device it was added on, and book files
               across the Flyleaf apps share 1 GB per account. Keep a backup of
