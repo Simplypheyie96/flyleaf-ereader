@@ -451,7 +451,7 @@ export function SettingsPage() {
         <Fold label="The Flyleaf apps">
           <p className="ui-p" style={{ marginTop: 8 }}>
             Three of them, built in this order, and none needs the others or an
-            account. Flyleaf is the journal you keep while reading. Flyleaf Press is
+            account. Flyleaf is the journal you keep while reading. {nativeApp ? 'Bookprint' : 'Flyleaf Press'} is
             where a book becomes a written review afterwards. This one is the reader —
             it opens the file and gets out of the way.
           </p>
@@ -463,7 +463,7 @@ export function SettingsPage() {
             />
             <Leave
               href={OUT.press}
-              label="Flyleaf Press"
+              label={nativeApp ? 'Bookprint' : 'Flyleaf Press'}
               note="Long reviews, printed as cards — and every month and year collaged into what you finished."
             />
             <Leave
