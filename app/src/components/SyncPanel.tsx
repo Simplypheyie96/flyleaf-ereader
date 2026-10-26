@@ -317,15 +317,11 @@ export function SyncPanel() {
               Unlock or restore
             </button>
           </div>
-          {on ? (<>
+          {on ? (
             <p className="ui-p ui-p--soft" style={{ marginTop: 14 }}>
-              Signed in as {who}, which has not unlocked yet.{' '}
-              <button className="btn btn--ghost btn--sm" type="button" disabled={!!busy} onClick={() => void leave()}>
-                Sign out
-              </button>
+              Signed in as {who}, which has not unlocked yet.
             </p>
-            {nativeApp && deleteRow}
-          </>) : (
+          ) : (
             <>
               <p className="ui-p ui-p--soft" style={{ marginTop: 14 }}>
                 Unlocked on another device? Sign in with the same account to bring it here.

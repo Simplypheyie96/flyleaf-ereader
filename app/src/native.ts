@@ -88,7 +88,9 @@ export async function signIn(p: Provider): Promise<string | null> {
 export async function appleCode(): Promise<string> {
   const s = await login()
   const r = await s.login({ provider: 'apple', options: { scopes: [] } }).catch(() => null)
-  const code = (r?.result as { authorizationCode?: string } | undefined)?.authorizationCode
+  // The plugin's default (legacy) mode hands the code back as accessToken.token.
+  const res = r?.result as { authorizationCode?: string; accessToken?: { token?: string } } | undefined
+  const code = res?.authorizationCode || res?.accessToken?.token
   if (!code) throw new Error('Confirm with Apple to delete the account.')
   return code
 }
