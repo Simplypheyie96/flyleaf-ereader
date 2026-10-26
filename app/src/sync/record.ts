@@ -27,7 +27,7 @@
    rather than its id — the id it had here means nothing on the other device.
    See `Grave` in types.ts. */
 
-import { db } from '../db'
+import { db, freshCover, updateBook } from '../db'
 import { APP } from './drive'
 import type { Annotation, Book, Bookmark, Collection, Grave, Locator, ReadingDay } from '../types'
 
@@ -111,7 +111,7 @@ export async function fingerprint(bookId: string): Promise<string | null> {
   const fp = Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
-  await db.books.update(bookId, { fp })
+  await updateBook(bookId, { fp })
   return fp
 }
 
@@ -295,6 +295,9 @@ export async function mergeShelf(doc: ShelfDoc): Promise<{ folded: Folded; map: 
      own stone travels up in the same sync and the other device drops it. */
 
   const collections = await foldCollections(doc.collections, graves, map)
+
+  // Covers out to fresh bytes before the transaction, which cannot wait on them.
+  for (const book of write) book.cover = await freshCover(book.cover)
 
   await db.transaction(
     'rw',

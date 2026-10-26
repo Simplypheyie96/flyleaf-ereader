@@ -427,7 +427,30 @@ export async function bookCost(id: string): Promise<{ marks: number; bookmarks: 
     it is what orders the Continue row, so a shelf render must not touch it. */
 export async function touchBook(id: string): Promise<void> {
   const now = Date.now()
-  await db.books.update(id, { openedAt: now, editedAt: now })
+  await updateBook(id, { openedAt: now, editedAt: now })
+}
+
+/** A cover copied out to fresh bytes, ready to be written back. On iOS, WebKit
+    hands a launch a cover it cannot read ("The object can not be found here.")
+    once that launch has written the stored Blob back into its row, until the app
+    is relaunched; that failed the next sync and backup. Fresh bytes read fine.
+    A cover that cannot be read now is kept as it is: the next launch reads it. */
+export async function freshCover(cover: Blob | null): Promise<Blob | null> {
+  if (!cover) return cover
+  try {
+    return new Blob([await cover.arrayBuffer()], { type: cover.type })
+  } catch {
+    return cover
+  }
+}
+
+/** Change fields on a book's row. Every write to an existing row goes through
+    here rather than db.books.update, which writes the stored cover back as it
+    is (see `freshCover`). */
+export async function updateBook(id: string, changes: Partial<Book>): Promise<void> {
+  const book = await db.books.get(id)
+  if (!book) return
+  await db.books.update(id, { ...changes, cover: 'cover' in changes ? changes.cover : await freshCover(book.cover) })
 }
 
 /** Forget every dismissal, so the next seeding pass puts the included books

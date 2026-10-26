@@ -348,8 +348,13 @@ async function sendFiles(files: Record<string, string>): Promise<{ sent: Record<
   await counted(now.length, async (step) => {
     const packed = new Map<string, { fp: string; body: Blob }>()
     for (const book of now) {
-      const p = await packBook(book.id)
-      if (p && p.body.size <= MEDIA_MAX) packed.set(await hex(p.body), { fp: book.fp!, body: p.body })
+      // One book that will not pack is not a failed sync. Next pass.
+      try {
+        const p = await packBook(book.id)
+        if (p && p.body.size <= MEDIA_MAX) packed.set(await hex(p.body), { fp: book.fp!, body: p.body })
+      } catch {
+        continue
+      }
     }
     /* Another device may already have sent the same book; then it is only a
        line in the document, not megabytes. */

@@ -23,7 +23,7 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, DEFAULT_SETTINGS, saveSettings, touchBook, useSettings } from '../db'
+import { db, DEFAULT_SETTINGS, saveSettings, touchBook, updateBook, useSettings } from '../db'
 import { fetchBookFile } from '../sync/sync'
 import type { Annotation, Bookmark, HighlightColor, Settings } from '../types'
 import { minutes, percent } from '../lib'
@@ -771,7 +771,7 @@ export function Reader() {
                 updatedAt: Date.now(),
             })
             const now = Date.now()
-            void db.books.update(id, { progress: loc.fraction ?? 0, openedAt: now })
+            void updateBook(id, { progress: loc.fraction ?? 0, openedAt: now })
         }, 600)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id])

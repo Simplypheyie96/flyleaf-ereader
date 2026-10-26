@@ -6,9 +6,11 @@ import {
   bury,
   createCollection,
   db,
+  freshCover,
   removeBook,
   toggleInCollection,
   touchBook,
+  updateBook,
 } from '../db'
 import { Cover } from '../components/Cover'
 import { useMenu } from '../components/Menu'
@@ -145,13 +147,14 @@ export function BookDetail() {
 
   const finish = async () => {
     const now = Date.now()
-    await db.books.update(book.id, { finishedAt: book.finishedAt ? null : now, editedAt: now })
+    await updateBook(book.id, { finishedAt: book.finishedAt ? null : now, editedAt: now })
   }
 
   const reset = async () => {
     /* The position, not the marks. Starting a book again is not the same
        decision as throwing away what you wrote in it, and one button doing both
        is a button that surprises somebody once. */
+    const cover = await freshCover((await db.books.get(book.id))?.cover ?? null)
     await db.transaction('rw', [db.books, db.locators, db.graves], async () => {
       await db.locators.delete(book.id)
       /* openedAt goes too, and that is the whole difference between a reset
@@ -164,7 +167,7 @@ export function BookDetail() {
          opened" fact, which is the right trade: you have just told the app
          you are starting this book again. */
       await db.books.update(book.id, {
-        progress: 0, openedAt: null, finishedAt: null, editedAt: Date.now(),
+        progress: 0, openedAt: null, finishedAt: null, editedAt: Date.now(), cover,
       })
       /* The position is a synced row like any other, so throwing it away has
          to be recorded or the next merge hands it straight back. By fingerprint,

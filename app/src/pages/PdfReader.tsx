@@ -33,7 +33,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, DEFAULT_SETTINGS, saveSettings, touchBook, useSettings } from '../db'
+import { db, DEFAULT_SETTINGS, saveSettings, touchBook, updateBook, useSettings } from '../db'
 import { fetchBookFile } from '../sync/sync'
 import type { Annotation, Bookmark, HighlightColor, Settings } from '../types'
 import { percent } from '../lib'
@@ -318,7 +318,7 @@ export function PdfReader() {
                 updatedAt: Date.now(),
             })
             const now = Date.now()
-            void db.books.update(id, { progress: fraction, openedAt: now })
+            void updateBook(id, { progress: fraction, openedAt: now })
         }, 600)
     }, [id])
     useEffect(() => () => { if (writeTimer.current) clearTimeout(writeTimer.current) }, [])
