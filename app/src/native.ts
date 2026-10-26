@@ -97,8 +97,9 @@ export async function appleCode(): Promise<string> {
 
 /* ── Purchases ─────────────────────────────────────────────────────────── */
 
-/* Two non-consumables that unlock the same thing; Supporter only pays more.
-   Owned purchases stay with the store account, so restore works signed out. */
+/* Unlock is a non-consumable. Supporter is no longer sold (tips replaced it), but
+   whoever bought it keeps the unlock. Owned purchases stay with the store account,
+   so restore works signed out. */
 export const PRODUCTS = { unlock: 'com.feyidesigns.ereader.unlock', supporter: 'com.feyidesigns.ereader.supporter' } as const
 export type Product = keyof typeof PRODUCTS
 const OURS = Object.values(PRODUCTS) as string[]
@@ -150,6 +151,36 @@ export async function owned(): Promise<Receipt[]> {
     .filter((t) => OURS.includes(t.productIdentifier) && (!androidApp || t.purchaseState === undefined || t.purchaseState === '1'))
     .map(receipt)
     .filter((r) => r !== null)
+}
+
+/* Tips are consumables offered after the unlock. They open nothing, so the
+   server never sees them, and the same tip can be given again. */
+export const TIPS = ['tip1', 'tip2', 'tip3'] as const
+export type Tip = (typeof TIPS)[number]
+const tipId = (t: Tip) => `com.feyidesigns.ereader.${t}`
+
+/** Tip prices as this storefront shows them. Empty if the store can't answer. */
+export async function tipPrices(): Promise<Partial<Record<Tip, string>>> {
+  const { NativePurchases, PURCHASE_TYPE } = await plugin()
+  const { products } = await NativePurchases.getProducts({ productIdentifiers: TIPS.map(tipId), productType: PURCHASE_TYPE.INAPP })
+  const out: Partial<Record<Tip, string>> = {}
+  for (const p of products) {
+    const t = TIPS.find((t) => tipId(t) === p.identifier)
+    if (t) out[t] = p.priceString
+  }
+  return out
+}
+
+/** Gives one tip. False if the reader cancelled; throws if the store failed. */
+export async function giveTip(t: Tip): Promise<boolean> {
+  const { NativePurchases, PURCHASE_TYPE } = await plugin()
+  try {
+    await NativePurchases.purchaseProduct({ productIdentifier: tipId(t), productType: PURCHASE_TYPE.INAPP, quantity: 1, isConsumable: true })
+    return true
+  } catch (e) {
+    if (cancelled(e)) return false
+    throw e
+  }
 }
 
 export async function restore(): Promise<Receipt[]> {

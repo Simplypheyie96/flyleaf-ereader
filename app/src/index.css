@@ -3126,6 +3126,9 @@ body::before{
 .unlock-modal .export-format:disabled, .unlock-modal .export-alt:disabled{ opacity:.55; }
 .unlock-modal a{ color:inherit; text-decoration:underline; text-underline-offset:2px; }
 .unlock-thanks{ margin:0; font-family:var(--sans); font-size:13px; line-height:1.5; color:var(--ink); }
+.unlock-modal .unlock-tips{ display:grid; grid-template-columns:repeat(3, 1fr); }
+.unlock-tips .export-format{ flex-direction:column; align-items:center; justify-content:center; gap:2px; text-align:center; }
+.unlock-tips .export-format-note{ flex:none; }
 @media (prefers-reduced-motion:reduce){ .unlock-card{ animation:none; } }
 .export-head{
   display:flex; align-items:baseline; gap:10px;

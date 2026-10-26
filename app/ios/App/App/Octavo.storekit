@@ -1,0 +1,94 @@
+{
+  "identifier": "FCAE7CB3",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "4.99",
+      "familyShareable": false,
+      "internalID": "2155198883",
+      "localizations": [
+        {
+          "description": "Unlock",
+          "displayName": "Unlock",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.feyidesigns.ereader.unlock",
+      "referenceName": "Unlock",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "9.99",
+      "familyShareable": false,
+      "internalID": "1201452108",
+      "localizations": [
+        {
+          "description": "Supporter",
+          "displayName": "Supporter",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.feyidesigns.ereader.supporter",
+      "referenceName": "Supporter",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "0.99",
+      "familyShareable": false,
+      "internalID": "6568627770",
+      "localizations": [
+        {
+          "description": "Small tip",
+          "displayName": "Small tip",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.feyidesigns.ereader.tip1",
+      "referenceName": "Small tip",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "2.99",
+      "familyShareable": false,
+      "internalID": "2551604184",
+      "localizations": [
+        {
+          "description": "Kind tip",
+          "displayName": "Kind tip",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.feyidesigns.ereader.tip2",
+      "referenceName": "Kind tip",
+      "type": "Consumable"
+    },
+    {
+      "displayPrice": "4.99",
+      "familyShareable": false,
+      "internalID": "9478345223",
+      "localizations": [
+        {
+          "description": "Generous tip",
+          "displayName": "Generous tip",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.feyidesigns.ereader.tip3",
+      "referenceName": "Generous tip",
+      "type": "Consumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "0",
+    "_developerTeamID": "3B5KFU3FK6",
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [],
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
+}

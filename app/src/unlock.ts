@@ -62,7 +62,7 @@ export function locked(): boolean {
 }
 
 /** Opens the sheet whether or not the unlock is held: after it, the sheet
-    still sells Supporter, as a tip. */
+    offers tips. */
 export const askOpen = () => window.dispatchEvent(new Event(OPEN))
 
 export function onOpenAsked(f: () => void) {

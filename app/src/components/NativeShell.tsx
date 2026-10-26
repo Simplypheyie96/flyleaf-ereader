@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { queueFiles } from '../openQueue'
-import { STORE, startNative, type Product } from '../native'
+import { STORE, TIPS, startNative, type Product, type Tip } from '../native'
 import { onOpenAsked, purchase, restore, useUnlocked } from '../unlock'
 
 export function NativeShell() {
@@ -24,23 +24,22 @@ export function NativeShell() {
   return open ? <UnlockSheet onClose={() => setOpen(false)} /> : null
 }
 
-const OFFERS: { id: Product; name: string; note: string }[] = [
-  { id: 'unlock', name: 'Unlock', note: 'Page stocks, themes, marks export and sync.' },
-  { id: 'supporter', name: 'Supporter', note: 'The same unlock, for those who want to give more.' },
-]
+const UNLOCK = { name: 'Unlock', note: 'Page stocks, themes, marks export and sync.' }
+const TIER: Record<Tip, string> = { tip1: 'Small tip', tip2: 'Kind tip', tip3: 'Generous tip' }
 
 function UnlockSheet({ onClose }: { onClose: () => void }) {
   const done = useUnlocked()
-  const [price, setPrice] = useState<Partial<Record<Product, string>>>({})
-  const [busy, setBusy] = useState<Product | 'restore' | null>(null)
+  const [price, setPrice] = useState<Partial<Record<Product | Tip, string>>>({})
+  const [busy, setBusy] = useState<Product | Tip | 'restore' | null>(null)
   const [said, setSaid] = useState('')
   const box = useRef<HTMLDialogElement>(null)
 
+  // Once unlocked the sheet offers tips, so it asks for their prices instead.
   useEffect(() => {
     void import('../native')
-      .then((n) => n.prices())
-      .then(setPrice, () => setSaid(`Could not reach ${STORE}. Check your connection.`))
-  }, [])
+      .then((n): Promise<Partial<Record<Product | Tip, string>>> => (done ? n.tipPrices() : n.prices()))
+      .then(setPrice, () => setSaid(done ? 'Tips are unavailable right now. Please try again later.' : `Could not reach ${STORE}. Check your connection.`))
+  }, [done])
   /* A modal dialog: on top of every screen, the page behind it inert, focus
      inside it, Escape to leave, and focus back where it was afterwards. */
   useEffect(() => {
@@ -49,17 +48,24 @@ function UnlockSheet({ onClose }: { onClose: () => void }) {
     return () => back?.focus?.()
   }, [])
 
-  const run = async (which: Product | 'restore', job: () => Promise<boolean>, none: string) => {
+  const run = async (which: Product | Tip | 'restore', job: () => Promise<boolean>, none: string, yes = '') => {
     setBusy(which)
     setSaid(which === 'restore' ? `Checking with ${STORE}…` : `Opening ${STORE}…`)
     try {
-      setSaid((await job()) ? '' : none)
+      setSaid((await job()) ? yes : none)
     } catch (e) {
       const code = (e as { code?: string }).code
       const cancel = code === 'USER_CANCELLED' || /cancel/i.test(String((e as Error).message))
-      setSaid(cancel ? '' : 'The purchase did not go through. Nothing was charged.')
+      setSaid(cancel ? '' : `The ${which.startsWith('tip') ? 'tip' : 'purchase'} did not go through. Nothing was charged.`)
     }
     setBusy(null)
+  }
+
+  const unlock = async () => {
+    const ok = await purchase('unlock')
+    // Shut once the unlock lands, so the reader sees what it opened.
+    if (ok) setTimeout(onClose, 1400)
+    return ok
   }
 
   return (
@@ -82,36 +88,51 @@ function UnlockSheet({ onClose }: { onClose: () => void }) {
         <h2 className="export-head" id="unlock-head">
           {done ? 'Unlocked' : 'One purchase, yours for good'}
         </h2>
-        {done && <p className="unlock-thanks">Thank you. Everything is open on this phone.</p>}
-        <div className="export-formats">
-          {(done ? OFFERS.filter((o) => o.id === 'supporter') : OFFERS).map((o) => (
+        {done ? (
+          <>
+            <p className="unlock-thanks">
+              Everything is open on this phone. If Octavo has earned a thank-you, you can leave a tip. It opens nothing more.
+            </p>
+            <div className="export-formats unlock-tips">
+              {TIPS.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className="export-format"
+                  disabled={!!busy}
+                  onClick={() =>
+                    void run(
+                      t,
+                      () => import('../native').then((n) => n.giveTip(t)),
+                      '',
+                      'Thank you for the tip. It means a lot.',
+                    )
+                  }
+                >
+                  <span className="export-format-name">{busy === t ? '…' : (price[t] ?? '·')}</span>
+                  <span className="export-format-note">{TIER[t]}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="export-formats">
             <button
-              key={o.id}
               type="button"
               className="export-format"
               disabled={!!busy}
               onClick={() =>
-                void run(
-                  o.id,
-                  () => purchase(o.id),
-                  'The purchase is waiting on approval. It opens up once it goes through.',
-                )
+                void run('unlock', unlock, 'The purchase is waiting on approval. It opens up once it goes through.')
               }
             >
               <span className="export-format-name">
-                {o.name}
-                {price[o.id] ? ` · ${price[o.id]}` : ''}
+                {UNLOCK.name}
+                {price.unlock ? ` · ${price.unlock}` : ''}
               </span>
-              <span className="export-format-note">
-                {busy === o.id
-                  ? `Opening ${STORE}…`
-                  : done
-                    ? 'A tip on top of the unlock. It opens nothing more.'
-                    : o.note}
-              </span>
+              <span className="export-format-note">{busy === 'unlock' ? `Opening ${STORE}…` : UNLOCK.note}</span>
             </button>
-          ))}
-        </div>
+          </div>
+        )}
         <div className="export-acts">
           {!done && (
             <button

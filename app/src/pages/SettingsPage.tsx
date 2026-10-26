@@ -246,7 +246,7 @@ export function SettingsPage() {
             destination, and the one place it must not be is a row in a list of
             other places to go. */}
         {/* The store apps pay through the store (App Store 3.1.1, Play
-            payments policy): the jar becomes the unlock, Supporter included,
+            payments policy): the jar becomes the unlock, with tips after it,
             and there is nothing to install. */}
         {nativeApp ? <UnlockPanel /> : <Tip />}
 
@@ -578,7 +578,7 @@ function UnlockPanel() {
       <p className="ui-lbl">Unlock</p>
       <p className="ui-p" style={{ marginTop: 8 }}>
         {done
-          ? 'Unlocked. Page stocks, themes, marks export and sync are open. Thank you.'
+          ? 'Unlocked. Page stocks, themes, marks export and sync are open. Tips are welcome, never expected.'
           : 'Reading, places and highlights are free. One purchase opens page stocks, themes, marks export and sync.'}
       </p>
       <div className="set-acts">
