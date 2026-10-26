@@ -3103,8 +3103,30 @@ body::before{
    fight and copy is what most readers actually want. */
 .sheet.export{ padding:14px 16px calc(14px + env(safe-area-inset-bottom)); gap:12px; }
 /* The store apps' unlock sheet (components/NativeShell.tsx): the export sheet's
-   parts, pinned to the bottom of any screen rather than a row of the reader. */
-.sheet.unlock{ position:fixed; inset:auto 0 0; z-index:60; max-height:none; background:var(--stock-bg, var(--paper)); }
+   parts in a modal dialog, pinned to the bottom of any screen. */
+.unlock-modal{
+  position:fixed; inset:0; margin:0; padding:0; border:0;
+  width:100%; height:100%; max-width:none; max-height:none;
+  background:transparent;
+  cursor:pointer; /* iOS sends taps on a plain area to the page only when it looks clickable */
+}
+.unlock-modal[open]{ display:flex; align-items:flex-end; }
+.unlock-card{
+  cursor:auto;
+  width:100%; display:flex; flex-direction:column; gap:12px;
+  padding:20px 16px calc(20px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--rule); border-radius:16px 16px 0 0;
+  background:var(--stock-bg, var(--paper)); color:var(--ink);
+  animation:sheet-in 240ms var(--ease);
+}
+.unlock-modal::backdrop{ background:rgba(27,25,23,.45); }
+/* Outlined, so each price reads as a button and not a line of text. */
+.unlock-modal .export-formats{ gap:8px; }
+.unlock-modal .export-format{ border-color:var(--rule); padding:10px 14px; }
+.unlock-modal .export-format:disabled, .unlock-modal .export-alt:disabled{ opacity:.55; }
+.unlock-modal a{ color:inherit; text-decoration:underline; text-underline-offset:2px; }
+.unlock-thanks{ margin:0; font-family:var(--sans); font-size:13px; line-height:1.5; color:var(--ink); }
+@media (prefers-reduced-motion:reduce){ .unlock-card{ animation:none; } }
 .export-head{
   display:flex; align-items:baseline; gap:10px;
   margin:0;

@@ -273,16 +273,18 @@ export function SettingsPage() {
         <section className="panel">
           <p className="ui-lbl">Your library</p>
           <p className="ui-p" style={{ marginTop: 8 }}>
-            Books, positions and highlights are stored on this device only. Nothing
-            is uploaded, and an update to the app never clears them.
+            {nativeApp
+              ? 'Books, positions and highlights are stored on this phone, and an update to the app never clears them. If you sign in, a copy is kept with your account.'
+              : 'Books, positions and highlights are stored on this device only. Nothing is uploaded, and an update to the app never clears them.'}
           </p>
-          <p className="ui-p ui-p--soft" style={{ marginTop: 8 }}>
+          {/* Browser storage eviction is a web concern; the app's storage is its own. */}
+          {!nativeApp && <p className="ui-p ui-p--soft" style={{ marginTop: 8 }}>
             {persisted === null
               ? 'Checking storage…'
               : persisted
                 ? 'Storage is marked persistent — the browser has agreed not to evict your library to reclaim space.'
                 : 'The browser has not granted persistent storage, so it may clear the library if the device runs very low on space. An exported backup is the answer to that, and it is the next panel down.'}
-          </p>
+          </p>}
           <p className="mono-meta" style={{ marginTop: 12 }}>
             {[
               shelf ? `${shelf.total} ${shelf.total === 1 ? 'book' : 'books'}` : null,
