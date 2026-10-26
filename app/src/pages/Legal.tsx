@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { SEEDS } from '../seed'
+import { APP_NAME, nativeApp } from '../native'
 
 /* The two pages Google requires of any app that signs people in with it, and
    that a reader is entitled to whether Google asks or not.
@@ -44,14 +45,14 @@ export function PrivacyPage() {
       <div className="page-inner page-inner--legal">
         <header className="app-head">
           <h1>Privacy</h1>
-          <span>Flyleaf eReader</span>
+          <span>{APP_NAME}</span>
         </header>
 
         <section className="panel">
           <p className="ui-lbl">The short version</p>
           <p className="ui-p" style={{ marginTop: 8 }}>
-            Flyleaf eReader needs no account. Your books, your highlights, your
-            notes and your place in each one are held in this browser's storage
+            {APP_NAME} needs no account. Your books, your highlights, your
+            notes and your place in each one are held in {nativeApp ? 'the app' : 'this browser'}'s storage
             on this device. Nothing about <em>what</em> you read leaves the device
             unless you sign in to sync it, and you can sign out, or remove what
             was synced, from Settings at any time. The one thing
@@ -157,6 +158,15 @@ export function PrivacyPage() {
               remove it from Drive; either asks Google for permission to that one
               hidden folder only, and only when you press it.
             </dd>
+            {nativeApp ? (<>
+            <dt>If you buy the Unlock</dt>
+            <dd>
+              The purchase goes through the App Store. Apple handles payment and
+              never shares your card with this app. Flyleaf's server keeps a record
+              of the purchase (a transaction number, the product and the date) so
+              the Unlock follows your account.
+            </dd>
+            </>) : (<>
             <dt>A tip — only if you send one</dt>
             <dd>
               The tip jar opens Paystack's own secure form. Card details are
@@ -164,6 +174,7 @@ export function PrivacyPage() {
               receives or stores them. Nothing is charged unless you complete
               the form yourself.
             </dd>
+            </>)}
             <dt>A word you looked up — only if you tap it</dt>
             <dd>
               Looking up a word shows the app's own offline definition first. Under
@@ -250,13 +261,15 @@ export function TermsPage() {
       <div className="page-inner page-inner--legal">
         <header className="app-head">
           <h1>Terms of use</h1>
-          <span>Flyleaf eReader</span>
+          <span>{APP_NAME}</span>
         </header>
 
         <section className="panel">
           <p className="ui-lbl">The short version</p>
           <p className="ui-p" style={{ marginTop: 8 }}>
-            Flyleaf eReader is free, made by one person, and given away as it is.
+            {nativeApp
+              ? 'Octavo is free to use, with an optional one-time Unlock bought through the App Store, which is covered by Apple’s standard licence (EULA). It is made by one person.'
+              : 'Flyleaf eReader is free, made by one person, and given away as it is.'}{' '}
             It opens book files you already have. It does not sell books, needs no
             account unless you choose to sync, and makes no claim on anything you open in
             it or write in it — your books, your highlights and your notes are
@@ -351,7 +364,7 @@ export function TermsPage() {
           <dl className="fine">
             <dt>Not affiliated</dt>
             <dd>
-              Flyleaf eReader has nothing to do with Apple, Amazon, Kobo, Google
+              {APP_NAME} has nothing to do with Apple, Amazon, Kobo, Google
               or any bookseller, and is endorsed by none of them. Format names and
               trade marks belong to their owners and are used only to say what the
               app can open.

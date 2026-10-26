@@ -451,6 +451,8 @@ export function SettingsPage() {
           </p>
         </Fold>
 
+        {/* web only: the store build doesn't send people out to web apps */}
+        {!nativeApp && (
         <Fold label="The Flyleaf apps">
           <p className="ui-p" style={{ marginTop: 8 }}>
             Three of them, built in this order, and none needs the others or an
@@ -476,6 +478,7 @@ export function SettingsPage() {
             />
           </div>
         </Fold>
+        )}
 
         <Fold label="The small print">
           {/* Four things a reader of a local-first app actually needs told, in

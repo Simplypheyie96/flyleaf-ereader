@@ -39,7 +39,9 @@ export function NativeSignIn({ onDone, onError }: Props) {
   return (
     <div className="export-acts" style={{ flexDirection: 'column', alignItems: 'stretch', maxWidth: 400 }}>
       {providers.map((p) => (
-        <button key={p} type="button" className={p === 'apple' ? 'export-do' : 'export-alt'} disabled={busy} onClick={() => void go(p)}>
+        <button key={p} type="button" className={p === 'apple' ? 'export-do' : 'export-alt'} disabled={busy} onClick={() => void go(p)}
+          /* Apple asks for its own black button, whatever the theme */
+          style={p === 'apple' ? { background: '#000', color: '#fff', borderColor: '#000' } : undefined}>
           <svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d={MARK[p]} /></svg>
           <span>{LABEL[p]}</span>
         </button>

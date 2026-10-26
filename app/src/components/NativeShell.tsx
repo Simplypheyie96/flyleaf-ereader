@@ -3,7 +3,7 @@
    opens the unlock sheet. App.tsx renders it only when `nativeApp`. */
 
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { queueFiles } from '../openQueue'
 import { STORE, startNative, type Product } from '../native'
 import { onOpenAsked, purchase, restore, useUnlocked } from '../unlock'
@@ -82,6 +82,7 @@ function UnlockSheet({ onClose }: { onClose: () => void }) {
         </button>
       </div>
       <p className="export-said" role="status">{said || ' '}</p>
+      <p className="export-said"><Link to="/terms" onClick={onClose}>Terms of Use</Link> · <Link to="/privacy" onClick={onClose}>Privacy</Link></p>
     </div>
   )
 }

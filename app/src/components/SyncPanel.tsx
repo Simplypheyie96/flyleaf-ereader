@@ -269,6 +269,37 @@ export function SyncPanel() {
     }
   }
 
+  /* The store apps must let a reader close the account they made there,
+     unlocked or not. */
+  const deleteRow = (
+          <div className="set-row set-row--stack">
+            <div className="set-row-txt">
+              <div className="ui-lbl">Delete my {SERVICE} account</div>
+              <p>
+                Closes your account for {APP_NAME}, Flyleaf Journal and Bookprint and signs this device out.
+                Every book stays on this device, and a purchase comes back with Restore.
+              </p>
+            </div>
+            {sure === 'account' ? (
+              <div className="set-confirm">
+                <p className="ui-p">This cannot be undone.</p>
+                <div className="set-acts" style={{ marginTop: 14 }}>
+                  <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => void dropAccount()}>
+                    {busy === 'account' ? 'Deleting…' : 'Yes, delete it'}
+                  </button>
+                  <button className="btn btn--ghost btn--sm" type="button" disabled={!!busy} onClick={() => setSure(null)}>
+                    Keep it
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => setSure('account')}>
+                Delete
+              </button>
+            )}
+          </div>
+  )
+
   return (
     /* The id is the destination of the Library head's "Sync" link, and
        SettingsPage does the scrolling. */
@@ -286,14 +317,15 @@ export function SyncPanel() {
               Unlock or restore
             </button>
           </div>
-          {on ? (
+          {on ? (<>
             <p className="ui-p ui-p--soft" style={{ marginTop: 14 }}>
               Signed in as {who}, which has not unlocked yet.{' '}
               <button className="btn btn--ghost btn--sm" type="button" disabled={!!busy} onClick={() => void leave()}>
                 Sign out
               </button>
             </p>
-          ) : (
+            {nativeApp && deleteRow}
+          </>) : (
             <>
               <p className="ui-p ui-p--soft" style={{ marginTop: 14 }}>
                 Unlocked on another device? Sign in with the same account to bring it here.
@@ -435,35 +467,7 @@ export function SyncPanel() {
               </button>
             )}
           </div>
-          {/* The store apps must let a reader close the account they made there. */}
-          {nativeApp && (
-            <div className="set-row set-row--stack">
-              <div className="set-row-txt">
-                <div className="ui-lbl">Delete my {SERVICE} account</div>
-                <p>
-                  Closes your account for {APP_NAME}, Flyleaf Journal and Bookprint and signs this device out.
-                  Every book stays on this device, and a purchase comes back with Restore.
-                </p>
-              </div>
-              {sure === 'account' ? (
-                <div className="set-confirm">
-                  <p className="ui-p">This cannot be undone.</p>
-                  <div className="set-acts" style={{ marginTop: 14 }}>
-                    <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => void dropAccount()}>
-                      {busy === 'account' ? 'Deleting…' : 'Yes, delete it'}
-                    </button>
-                    <button className="btn btn--ghost btn--sm" type="button" disabled={!!busy} onClick={() => setSure(null)}>
-                      Keep it
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button className="btn btn--danger btn--sm" type="button" disabled={!!busy} onClick={() => setSure('account')}>
-                  Delete
-                </button>
-              )}
-            </div>
-          )}
+          {nativeApp && deleteRow}
         </div>
       )}
 
