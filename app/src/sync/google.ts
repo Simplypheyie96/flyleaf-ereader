@@ -39,6 +39,8 @@
    opted in", which lets us ask Google for a fresh token silently rather than
    putting a popup in front of somebody who already said yes. */
 
+import { APP_NAME } from '../native'
+
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
 /* `drive.appdata` is the only scope that touches a file. `userinfo.email`
    grants one fact and no more: the address of the account that just signed in,
@@ -315,7 +317,7 @@ async function ensureClient(): Promise<TokenClient> {
       if (!(response.scope ?? '').split(' ').includes(DRIVE)) {
         waiting.reject(
           new Error(
-            'Flyleaf eReader needs permission to use your Google Drive. Try again and leave the box ticked.',
+            `${APP_NAME} needs permission to use your Google Drive. Try again and leave the box ticked.`,
           ),
         )
         return

@@ -20,7 +20,7 @@ import {
 } from '../sync/sync'
 import { GoogleButton } from './GoogleButton'
 import { NativeSignIn } from './NativeSignIn'
-import { nativeApp } from '../native'
+import { APP_NAME, SERVICE, nativeApp } from '../native'
 import { GATED, locked, unlocked, useUnlocked } from '../unlock'
 
 /* Sync across devices, as one settings panel.
@@ -134,7 +134,7 @@ export function SyncPanel() {
     setErr('')
   }
   const fail = (e: unknown) => {
-    setErr(e instanceof Error ? e.message : 'Something went wrong talking to Flyleaf.')
+    setErr(e instanceof Error ? e.message : `Something went wrong talking to ${SERVICE}.`)
     setMsg('')
   }
 
@@ -212,7 +212,7 @@ export function SyncPanel() {
       await signOut()
       setSure(null)
       refresh()
-      say('Removed from Flyleaf. This device is signed out, and every book on it remains here.')
+      say(`Removed from ${SERVICE}. This device is signed out, and every book on it remains here.`)
     } catch (e) {
       fail(e)
     } finally {
@@ -226,7 +226,7 @@ export function SyncPanel() {
       await forgetAccount()
       setSure(null)
       refresh()
-      say('Your Flyleaf account is deleted. This device is signed out, and every book on it remains here.')
+      say(`Your ${SERVICE} account is deleted. This device is signed out, and every book on it remains here.`)
     } catch (e) {
       fail(e)
     } finally {
@@ -241,7 +241,7 @@ export function SyncPanel() {
     try {
       const got = await fromDrive()
       refresh()
-      if (!got) say('That Google Drive holds no Flyleaf eReader library.')
+      if (!got) say(`That Google Drive holds no ${APP_NAME} library.`)
       else if (!got.rows && !got.files) say('Brought in. Nothing there was new to this device.')
       else
         say(
@@ -261,7 +261,7 @@ export function SyncPanel() {
       const n = await forgetDrive()
       setSure(null)
       refresh()
-      say(n ? 'Removed the old copy from Google Drive.' : 'Google Drive held no Flyleaf eReader library.')
+      say(n ? 'Removed the old copy from Google Drive.' : `Google Drive held no ${APP_NAME} library.`)
     } catch (e) {
       fail(e)
     } finally {
@@ -279,7 +279,7 @@ export function SyncPanel() {
         <>
           <p className="ui-p" style={{ marginTop: 8 }}>
             Sync comes with the unlock: your shelf, highlights and places on every device, with up
-            to 1 GB of book files kept on Flyleaf’s servers, private to your account.
+            to 1 GB of book files kept on {SERVICE}’s servers, private to your account.
           </p>
           <div className="set-acts">
             <button className="btn btn--sm" type="button" onClick={() => locked()}>
@@ -357,13 +357,13 @@ export function SyncPanel() {
 
           {full && (
             <p className="ui-p ui-p--warn" style={{ marginTop: 14 }}>
-              Your 1 GB of book files on Flyleaf is full, so new books stay on the device they were
+              Your 1 GB of book files on {SERVICE} is full, so new books stay on the device they were
               added on. Your notes, highlights and places still sync.
             </p>
           )}
           {big.length > 0 && (
             <p className="ui-p ui-p--soft" style={{ marginTop: 14 }}>
-              {big.length === 1 ? 'One book is' : `${big.length} books are`} over the 25 MB Flyleaf
+              {big.length === 1 ? 'One book is' : `${big.length} books are`} over the 25 MB {SERVICE}
               carries per file, so {big.length === 1 ? 'it stays' : 'they stay'} on this device:{' '}
               {big.join(', ')}. {big.length === 1 ? 'Its highlights and place' : 'Their highlights and places'} still sync.
             </p>
@@ -373,7 +373,7 @@ export function SyncPanel() {
         <>
           <p className="ui-p" style={{ marginTop: 8 }}>
             Sign in once and your shelf, highlights and places appear on your other devices and keep
-            up with them by themselves. They are kept on Flyleaf’s servers, private to your account,
+            up with them by themselves. They are kept on {SERVICE}’s servers, private to your account,
             and you can remove them from here at any time. Reading settings stay on each device.
           </p>
           <div style={{ marginTop: 18 }}>
@@ -410,7 +410,7 @@ export function SyncPanel() {
           </div>
           <div className="set-row set-row--stack">
             <div className="set-row-txt">
-              <div className="ui-lbl">Remove my library from Flyleaf</div>
+              <div className="ui-lbl">Remove my library from {SERVICE}</div>
               <p>
                 Deletes the copy in your account, book files included, and signs this device out.
                 Every book stays on this device, but your other devices will have nothing to sync
@@ -439,9 +439,9 @@ export function SyncPanel() {
           {nativeApp && (
             <div className="set-row set-row--stack">
               <div className="set-row-txt">
-                <div className="ui-lbl">Delete my Flyleaf account</div>
+                <div className="ui-lbl">Delete my {SERVICE} account</div>
                 <p>
-                  Closes your account for eReader, Journal and Press and signs this device out.
+                  Closes your account for {APP_NAME}, Flyleaf Journal and Bookprint and signs this device out.
                   Every book stays on this device, and a purchase comes back with Restore.
                 </p>
               </div>
@@ -475,7 +475,7 @@ export function SyncPanel() {
             <div className="set-row-txt">
               <div className="ui-lbl">Your old Google Drive copy</div>
               <p>
-                An older Flyleaf eReader kept a copy of this library in your Google Drive. Bring it in
+                An older {APP_NAME} kept a copy of this library in your Google Drive. Bring it in
                 once and it joins the library here{on ? ' and in your account' : ''}. The Drive copy is
                 left as it is.
               </p>
@@ -489,7 +489,7 @@ export function SyncPanel() {
               <div className="ui-lbl">Remove the Google Drive copy</div>
               <p>
                 Opens Google to confirm the account, then deletes the old copy from your Drive. Nothing
-                here or in your Flyleaf account is touched.
+                here or in your {SERVICE} account is touched.
               </p>
             </div>
             {sure === 'drive' ? (

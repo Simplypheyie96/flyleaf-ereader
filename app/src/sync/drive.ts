@@ -29,6 +29,8 @@
    `book-<fingerprint>` files carry the book bytes themselves, one per book,
    written once and never rewritten. See `record.ts` for what is in them. */
 
+import { APP_NAME } from '../native'
+
 const FILES = 'https://www.googleapis.com/drive/v3/files'
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files'
 
@@ -123,15 +125,15 @@ async function explain(response: Response): Promise<string> {
   /* The API is switched off for this app's Google Cloud project. Nothing the
      reader does fixes it, so do not send them back to the sign-in screen. */
   if (reason('accessNotConfigured') || reason('SERVICE_DISABLED'))
-    return 'Flyleaf eReader is not switched on for Drive yet. That is ours to fix, not yours — your library here is unaffected.'
+    return `${APP_NAME} is not switched on for Drive yet. That is ours to fix, not yours — your library here is unaffected.`
   if (reason('insufficientPermissions') || reason('insufficientFilePermissions'))
-    return 'Flyleaf eReader was not given permission to use your Drive. Sign in again and leave the box ticked on Google’s screen.'
+    return `${APP_NAME} was not given permission to use your Drive. Sign in again and leave the box ticked on Google’s screen.`
   if (reason('storageQuotaExceeded'))
     return 'Your Google Drive is full, so nothing could be saved to it.'
   if (reason('rateLimitExceeded') || reason('userRateLimitExceeded'))
     return 'Google asked us to slow down. Sync will try again shortly.'
   if (response.status === 403)
-    return 'Google would not let Flyleaf eReader into your Drive. Sign in again and leave the box ticked.'
+    return `Google would not let ${APP_NAME} into your Drive. Sign in again and leave the box ticked.`
   if (response.status >= 500) return 'Google Drive is having trouble. Sync will try again shortly.'
   return 'Your library could not reach Google Drive. Check your connection and try again.'
 }

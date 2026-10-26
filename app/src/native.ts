@@ -16,6 +16,8 @@ export const androidApp = nativeApp && cap?.getPlatform?.() === 'android'
 export const STORE = androidApp ? 'Google Play' : 'the App Store'
 /* The store listing's name; the web keeps Flyleaf eReader. */
 export const APP_NAME = __STORE__ ? 'Octavo' : 'Flyleaf eReader'
+/** What the shared account and its messages are called in this app. */
+export const SERVICE = __STORE__ ? 'Octavo' : 'Flyleaf'
 
 /* ── Opening a book from the phone ─────────────────────────────────────── */
 

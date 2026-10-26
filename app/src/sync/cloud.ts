@@ -21,6 +21,7 @@
    server. Book files go up as content-addressed media beside it. */
 
 import { SYNC_EVENT, loadScript } from './google'
+import { SERVICE } from '../native'
 
 const API = import.meta.env.VITE_FLYLEAF_API || 'https://api.flyleaf.cc'
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
@@ -79,13 +80,13 @@ export async function call(path: string, init: RequestInit = {}): Promise<Respon
       headers: { ...init.headers, authorization: `Bearer ${s.token}` },
     })
   } catch {
-    throw new Error('Could not reach Flyleaf. Check your connection and it will catch up by itself.')
+    throw new Error(`Could not reach ${SERVICE}. Check your connection and it will catch up by itself.`)
   }
   if (res.status === 401) {
     keep(null)
     throw new Error(SIGNED_OUT)
   }
-  if (res.status >= 500) throw new Error('Flyleaf could not sync just now. It will try again by itself.')
+  if (res.status >= 500) throw new Error(`${SERVICE} could not sync just now. It will try again by itself.`)
   return res
 }
 
@@ -130,9 +131,9 @@ export async function exchange(credential: string, provider: 'google' | 'apple' 
       body: JSON.stringify({ credential, app: APP }),
     })
   } catch {
-    throw new Error('Could not reach Flyleaf. Check your connection and try again.')
+    throw new Error(`Could not reach ${SERVICE}. Check your connection and try again.`)
   }
-  if (!res.ok) throw new Error(`${provider === 'apple' ? 'Apple' : 'Google'} signed you in, but Flyleaf could not. Try again.`)
+  if (!res.ok) throw new Error(`${provider === 'apple' ? 'Apple' : 'Google'} signed you in, but ${SERVICE} could not. Try again.`)
   const { token, user } = (await res.json()) as { token: string; user: { email: string; name: string } }
   keep({ token, email: user.email, name: user.name })
   return user.email
@@ -190,7 +191,7 @@ export async function push(body: Blob, base: number, device: string): Promise<nu
   })
   if (res.status === 409) return null
   if (res.status === 413) throw new Error('This library’s notes have grown past what one sync can carry.')
-  if (!res.ok) throw new Error('Flyleaf could not sync just now. It will try again by itself.')
+  if (!res.ok) throw new Error(`${SERVICE} could not sync just now. It will try again by itself.`)
   return ((await res.json()) as { rev: number }).rev
 }
 
@@ -221,14 +222,14 @@ export async function putMedia(hash: string, blob: Blob): Promise<'ok' | 'big' |
     const { error } = (await res.json().catch(() => ({}))) as { error?: string }
     return error === 'full' ? 'full' : 'big'
   }
-  if (!res.ok) throw new Error('A book did not upload. Flyleaf will try again by itself.')
+  if (!res.ok) throw new Error(`A book did not upload. ${SERVICE} will try again by itself.`)
   return 'ok'
 }
 
 export async function fetchMedia(hash: string): Promise<Blob | null> {
   const res = await call(`/media/${hash}`)
   if (res.status === 404) return null
-  if (!res.ok) throw new Error('A book did not come down. Flyleaf will try again by itself.')
+  if (!res.ok) throw new Error(`A book did not come down. ${SERVICE} will try again by itself.`)
   return new Blob([await res.arrayBuffer()])
 }
 

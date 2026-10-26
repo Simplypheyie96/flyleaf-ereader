@@ -1923,7 +1923,7 @@ body::before{
 .reader-btn > svg{ display:block; width:20px; height:20px; }
 .reader-btn:active{ transform:scale(.92); background:var(--lift-hi); }
 .reader-btn[aria-expanded="true"]{
-  background:var(--ink); color:var(--stock-bg); border-color:var(--ink);
+  background:var(--ink); color:var(--stock-bg, var(--paper)); border-color:var(--ink);
 }
 
 /* One line, always — a title that wraps is a title that grows into the text.
@@ -1996,7 +1996,7 @@ body::before{
    allowed to be faint. */
 .reader-readout:active{ transform:scale(.96); }
 .reader-readout[aria-expanded="true"]{
-  background:var(--ink); color:var(--stock-bg); border-color:var(--ink);
+  background:var(--ink); color:var(--stock-bg, var(--paper)); border-color:var(--ink);
 }
 .reader-readout[aria-expanded="true"] .reader-readout-sep{ color:var(--stock-bg); }
 .reader-readout-sep{ flex:none; color:var(--ink-soft); opacity:.55; }
@@ -2339,7 +2339,7 @@ body::before{
 }
 .sheet-opt:active{ transform:scale(.96); }
 .sheet-opt[aria-pressed="true"]{
-  background:var(--ink); color:var(--stock-bg); box-shadow:none;
+  background:var(--ink); color:var(--stock-bg, var(--paper)); box-shadow:none;
 }
 /* The face's own family at something near reading size, so the chip is the
    specimen and the control at once. A picker that names five serifs in the
@@ -3138,7 +3138,7 @@ body::before{
   display:inline-flex; align-items:center; justify-content:center; gap:7px;
   min-height:44px; padding:0 18px;
   border:0; border-radius:999px;
-  background:var(--ink); color:var(--stock-bg);
+  background:var(--ink); color:var(--stock-bg, var(--paper));
   font-family:var(--sans); font-size:13px; font-weight:600;
   cursor:pointer;
 }

@@ -11,7 +11,7 @@ import type { BackupSummary, RestoreResult } from '../backup'
 import type { Settings } from '../types'
 import { LeaveIcon } from '../components/icons'
 import { SyncPanel } from '../components/SyncPanel'
-import { APP_NAME, nativeApp, shareFile } from '../native'
+import { APP_NAME, SERVICE, nativeApp, shareFile } from '../native'
 import { locked, useUnlocked } from '../unlock'
 import { Tip } from '../components/Tip'
 import { Erase } from '../components/Erase'
@@ -350,7 +350,7 @@ export function SettingsPage() {
               <p className="ui-p">
                 {pending.sum.createdAt
                   ? `A backup from ${shortDate(pending.sum.createdAt)}.`
-                  : 'A Flyleaf eReader backup.'}{' '}
+                  : `A ${APP_NAME} backup.`}{' '}
                 {[
                   `${pending.sum.books} ${pending.sum.books === 1 ? 'book' : 'books'}`,
                   `${pending.sum.highlights} ${pending.sum.highlights === 1 ? 'highlight' : 'highlights'}`,
@@ -419,7 +419,7 @@ export function SettingsPage() {
 
         <Fold label="Included books">
           <p className="ui-p" style={{ marginTop: 8 }}>
-            Flyleaf eReader ships with {SEEDS.length} public-domain books in your library. Delete
+            {APP_NAME} ships with {SEEDS.length} public-domain books in your library. Delete
             them like any other book — an update will never put them back on its own.
             This is the only thing that does.
           </p>
@@ -491,7 +491,7 @@ export function SettingsPage() {
               Every book, highlight, note and position lives in this browser's
               storage on this device, and nothing about your reading is sent
               anywhere unless you sign in to sync. Then it is also kept on
-              Flyleaf's servers, private to your account, until you remove it.
+              {SERVICE}'s servers, private to your account, until you remove it.
               Deleting the app — or clearing this site's data — deletes this
               device's copy, so export a backup first if you would miss it.
             </dd>
@@ -516,7 +516,7 @@ export function SettingsPage() {
             </dd>
             <dt>Not affiliated</dt>
             <dd>
-              Flyleaf eReader has nothing to do with Apple, Amazon, Kobo, Google or any
+              {APP_NAME} has nothing to do with Apple, Amazon, Kobo, Google or any
               bookseller, and it is not endorsed by any of them. It comes with no
               warranty: it is one person's app, given away, and you use it at your
               own risk.
