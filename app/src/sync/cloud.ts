@@ -236,11 +236,12 @@ export async function fetchMedia(hash: string): Promise<Blob | null> {
 /** Close the Flyleaf account: every app's copy, its media, the purchase records
     (the store keeps the purchase, so Restore brings it back), every session. */
 export async function deleteAccount() {
-  const del = (apple?: string) =>
-    call('/me', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ app: APP, apple }) })
+  const del = (more?: { apple?: string; force: true }) =>
+    call('/me', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ app: APP, ...more }) })
   let res = await del()
   // An Apple account confirms with Apple, so the server can revoke its sign-in too.
-  if (res.status === 409) res = await del(await appleCode())
+  // No code (a cancelled or failed Apple sheet) still deletes: the reader already said yes.
+  if (res.status === 409) res = await del({ apple: await appleCode().catch(() => undefined), force: true })
   if (!res.ok) throw new Error('That could not be deleted. Try again.')
   window.google?.accounts?.id?.disableAutoSelect()
   keep(null)

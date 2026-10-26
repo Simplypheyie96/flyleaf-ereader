@@ -128,8 +128,18 @@ export async function prices(): Promise<Partial<Record<Product, string>>> {
 /** Buys one product. The store acknowledges it straight away (a non-consumable
     is never consumed); the receipt goes to the account afterwards if signed in. */
 export async function buy(p: Product): Promise<Receipt | null> {
-  const { NativePurchases } = await plugin()
-  return receipt(await NativePurchases.purchaseProduct({ productIdentifier: PRODUCTS[p], quantity: 1 }))
+  const { NativePurchases, PURCHASE_TYPE } = await plugin()
+  try {
+    return receipt(await NativePurchases.purchaseProduct({ productIdentifier: PRODUCTS[p], quantity: 1 }))
+  } catch (e) {
+    // Already owned, or bought despite the error: the store's own record decides.
+    if (!cancelled(e)) {
+      const { purchases } = await NativePurchases.getPurchases(androidApp ? { productType: PURCHASE_TYPE.INAPP } : {}).catch(() => ({ purchases: [] as Tx[] }))
+      const had = purchases.find((t) => t.productIdentifier === PRODUCTS[p])
+      if (had) return receipt(had)
+    }
+    throw e
+  }
 }
 
 /** What this store account owns of ours. Refunded purchases drop out. */
@@ -144,8 +154,12 @@ export async function owned(): Promise<Receipt[]> {
 
 export async function restore(): Promise<Receipt[]> {
   const { NativePurchases } = await plugin()
-  await NativePurchases.restorePurchases()
-  return owned()
+  // The sync can fail on its own (TestFlight's AppStore.sync throws), but what
+  // this phone already holds still reads, so the failure only counts when nothing turns up.
+  const failed = await NativePurchases.restorePurchases().then(() => null, (e: unknown) => e)
+  const has = await owned()
+  if (!has.length && failed) throw failed
+  return has
 }
 
 const cancelled = (e: unknown) => /cancel/i.test(`${(e as { code?: string })?.code} ${(e as Error)?.message}`)
