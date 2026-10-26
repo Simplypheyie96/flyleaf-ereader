@@ -12,7 +12,7 @@ import type { Settings } from '../types'
 import { LeaveIcon } from '../components/icons'
 import { SyncPanel } from '../components/SyncPanel'
 import { APP_NAME, SERVICE, nativeApp, shareFile } from '../native'
-import { locked, useUnlocked } from '../unlock'
+import { askOpen, locked, useUnlocked } from '../unlock'
 import { Tip } from '../components/Tip'
 import { Erase } from '../components/Erase'
 import { Fold } from '../components/Fold'
@@ -581,13 +581,11 @@ function UnlockPanel() {
           ? 'Unlocked. Page stocks, themes, marks export and sync are open. Thank you.'
           : 'Reading, places and highlights are free. One purchase opens page stocks, themes, marks export and sync.'}
       </p>
-      {!done && (
-        <div className="set-acts">
-          <button className="btn btn--sm" type="button" onClick={() => locked()}>
-            Unlock or restore
-          </button>
-        </div>
-      )}
+      <div className="set-acts">
+        <button className="btn btn--sm" type="button" onClick={() => (done ? askOpen() : locked())}>
+          {done ? 'Support Octavo' : 'Unlock or restore'}
+        </button>
+      </div>
     </section>
   )
 }

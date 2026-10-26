@@ -57,9 +57,13 @@ export const useUnlocked: () => boolean = __STORE__ ? useHeld : () => true
     feature is locked, so the caller returns instead of acting. */
 export function locked(): boolean {
   if (!GATED || held) return false
-  window.dispatchEvent(new Event(OPEN))
+  askOpen()
   return true
 }
+
+/** Opens the sheet whether or not the unlock is held: after it, the sheet
+    still sells Supporter, as a tip. */
+export const askOpen = () => window.dispatchEvent(new Event(OPEN))
 
 export function onOpenAsked(f: () => void) {
   window.addEventListener(OPEN, f)

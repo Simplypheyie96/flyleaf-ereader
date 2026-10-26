@@ -82,33 +82,36 @@ function UnlockSheet({ onClose }: { onClose: () => void }) {
         <h2 className="export-head" id="unlock-head">
           {done ? 'Unlocked' : 'One purchase, yours for good'}
         </h2>
-        {done ? (
-          <p className="unlock-thanks">Thank you. Everything is open on this phone.</p>
-        ) : (
-          <div className="export-formats">
-            {OFFERS.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                className="export-format"
-                disabled={!!busy}
-                onClick={() =>
-                  void run(
-                    o.id,
-                    () => purchase(o.id),
-                    'The purchase is waiting on approval. It opens up once it goes through.',
-                  )
-                }
-              >
-                <span className="export-format-name">
-                  {o.name}
-                  {price[o.id] ? ` · ${price[o.id]}` : ''}
-                </span>
-                <span className="export-format-note">{busy === o.id ? `Opening ${STORE}…` : o.note}</span>
-              </button>
-            ))}
-          </div>
-        )}
+        {done && <p className="unlock-thanks">Thank you. Everything is open on this phone.</p>}
+        <div className="export-formats">
+          {(done ? OFFERS.filter((o) => o.id === 'supporter') : OFFERS).map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              className="export-format"
+              disabled={!!busy}
+              onClick={() =>
+                void run(
+                  o.id,
+                  () => purchase(o.id),
+                  'The purchase is waiting on approval. It opens up once it goes through.',
+                )
+              }
+            >
+              <span className="export-format-name">
+                {o.name}
+                {price[o.id] ? ` · ${price[o.id]}` : ''}
+              </span>
+              <span className="export-format-note">
+                {busy === o.id
+                  ? `Opening ${STORE}…`
+                  : done
+                    ? 'A tip on top of the unlock. It opens nothing more.'
+                    : o.note}
+              </span>
+            </button>
+          ))}
+        </div>
         <div className="export-acts">
           {!done && (
             <button
