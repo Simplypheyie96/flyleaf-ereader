@@ -21,7 +21,7 @@
    server. Book files go up as content-addressed media beside it. */
 
 import { SYNC_EVENT, loadScript } from './google'
-import { SERVICE } from '../native'
+import { SERVICE, appleCode } from '../native'
 
 const API = import.meta.env.VITE_FLYLEAF_API || 'https://api.flyleaf.cc'
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
@@ -236,7 +236,11 @@ export async function fetchMedia(hash: string): Promise<Blob | null> {
 /** Close the Flyleaf account: every app's copy, its media, the purchase records
     (the store keeps the purchase, so Restore brings it back), every session. */
 export async function deleteAccount() {
-  const res = await call('/me', { method: 'DELETE' })
+  const del = (apple?: string) =>
+    call('/me', { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ app: APP, apple }) })
+  let res = await del()
+  // An Apple account confirms with Apple, so the server can revoke its sign-in too.
+  if (res.status === 409) res = await del(await appleCode())
   if (!res.ok) throw new Error('That could not be deleted. Try again.')
   window.google?.accounts?.id?.disableAutoSelect()
   keep(null)
